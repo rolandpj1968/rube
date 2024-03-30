@@ -4,7 +4,7 @@ use std::path::Path;
 
 // use all::Dat;
 // use all::Fn;
-use crate::all::{Dat, Fn, Lnk, RubeResult, Typ};
+use crate::all::{Dat, Fn, Lnk, RubeResult, Typ, O};
 
 /*
 
@@ -42,7 +42,7 @@ enum Token {
     Txxx = 0,
 
     /* aliases */
-    Tloadw = NPubOp,
+    Tloadw = O::NPubOp as isize,
     Tloadl,
     Tloads,
     Tloadd,
