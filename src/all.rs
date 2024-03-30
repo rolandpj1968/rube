@@ -157,7 +157,169 @@ enum O {
     #include "ops.h"
     NOp,
 };
+ */
 
+// Generated from 'gcc -E' on QBE
+pub enum O {
+    Oxxx,
+
+    Oadd,
+    Osub,
+    Oneg,
+    Odiv,
+    Orem,
+    Oudiv,
+    Ourem,
+    Omul,
+    Oand,
+    Oor,
+    Oxor,
+    Osar,
+    Oshr,
+    Oshl,
+
+    Oceqw,
+    Ocnew,
+    Ocsgew,
+    Ocsgtw,
+    Ocslew,
+    Ocsltw,
+    Ocugew,
+    Ocugtw,
+    Oculew,
+    Ocultw,
+
+    Oceql,
+    Ocnel,
+    Ocsgel,
+    Ocsgtl,
+    Ocslel,
+    Ocsltl,
+    Ocugel,
+    Ocugtl,
+    Oculel,
+    Ocultl,
+
+    Oceqs,
+    Ocges,
+    Ocgts,
+    Ocles,
+    Oclts,
+    Ocnes,
+    Ocos,
+    Ocuos,
+
+    Oceqd,
+    Ocged,
+    Ocgtd,
+    Ocled,
+    Ocltd,
+    Ocned,
+    Ocod,
+    Ocuod,
+
+    Ostoreb,
+    Ostoreh,
+    Ostorew,
+    Ostorel,
+    Ostores,
+    Ostored,
+
+    Oloadsb,
+    Oloadub,
+    Oloadsh,
+    Oloaduh,
+    Oloadsw,
+    Oloaduw,
+    Oload,
+
+    Oextsb,
+    Oextub,
+    Oextsh,
+    Oextuh,
+    Oextsw,
+    Oextuw,
+
+    Oexts,
+    Otruncd,
+    Ostosi,
+    Ostoui,
+    Odtosi,
+    Odtoui,
+    Oswtof,
+    Ouwtof,
+    Osltof,
+    Oultof,
+    Ocast,
+
+    Oalloc4,
+    Oalloc8,
+    Oalloc16,
+
+    Ovaarg,
+    Ovastart,
+
+    Ocopy,
+
+    Odbgloc,
+
+    Onop,
+    Oaddr,
+    Oblit0,
+    Oblit1,
+    Oswap,
+    Osign,
+    Osalloc,
+    Oxidiv,
+    Oxdiv,
+    Oxcmp,
+    Oxtest,
+    Oacmp,
+    Oacmn,
+    Oafcmp,
+    Oreqz,
+    Ornez,
+
+    Opar,
+    Oparsb,
+    Oparub,
+    Oparsh,
+    Oparuh,
+    Oparc,
+    Opare,
+    Oarg,
+    Oargsb,
+    Oargub,
+    Oargsh,
+    Oarguh,
+    Oargc,
+    Oarge,
+    Oargv,
+    Ocall,
+
+    Oflagieq,
+    Oflagine,
+    Oflagisge,
+    Oflagisgt,
+    Oflagisle,
+    Oflagislt,
+    Oflagiuge,
+    Oflagiugt,
+    Oflagiule,
+    Oflagiult,
+    Oflagfeq,
+    Oflagfge,
+    Oflagfgt,
+    Oflagfle,
+    Oflagflt,
+    Oflagfne,
+    Oflagfo,
+    Oflagfuo,
+
+    NOp,
+}
+
+/*
 enum J {
     Jxxx,
 #define JMPS(X)                                 \
@@ -203,24 +365,49 @@ enum {
 #define isparbh(o) INRANGE(o, Oparsb, Oparuh)
 #define isargbh(o) INRANGE(o, Oargsb, Oarguh)
 #define isretbh(j) INRANGE(j, Jretsb, Jretuh)
+ */
 
-enum {
+enum KType {
     Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
     Kw,
     Kl,
     Ks,
-    Kd
-};
+    Kd,
+}
 
+// These are used as array indices
+const_assert_eq!(KType::Kw as usize, 0);
+const_assert_eq!(KType::Kl as usize, 1);
+const_assert_eq!(KType::Ks as usize, 2);
+const_assert_eq!(KType::Kd as usize, 3);
+
+/*
 #define KWIDE(k) ((k)&1)
 #define KBASE(k) ((k)>>1)
+ */
 
+pub fn KWIDE(k: KType) -> usize {
+    (k as usize) & 1
+}
+
+pub fn KBASE(k: KType) -> usize {
+    (k as usize) >> 1
+}
+
+/*
 struct Op {
     char *name;
     short argcls[2][4];
     int canfold;
 };
+ */
+pub struct Op {
+    name: &'static [u8],
+    argcls: [[i16; 4]; 2],
+    canfold: bool,
+}
 
+/*
 struct Ins {
     uint op:30;
     uint cls:2;
