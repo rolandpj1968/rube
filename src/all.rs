@@ -406,37 +406,52 @@ enum ORanges {
 #define isretbh(j) INRANGE(j, Jretsb, Jretuh)
  */
 
-// TODO integer overflow :( - just do this the obvious way
-fn INRANGE(x: O, l: O, u: O) -> bool {
-    (x as usize) - (l as usize) <= (u as usize) - (l as usize) /* linear in x */
+fn INRANGEO(x: O, l: O, u: O) -> bool {
+    // QBE code uses integer overflow
+    // (x as usize) - (l as usize) <= (u as usize) - (l as usize) /* linear in x */
+    (l as usize) <= (x as usize) && (x as usize) <= (u as usize)
 }
 
 pub fn isstore(o: O) -> bool {
-    INRANGE(o, O::Ostoreb, O::Ostored)
+    INRANGEO(o, O::Ostoreb, O::Ostored)
 }
+
 pub fn isload(o: O) -> bool {
-    INRANGE(o, O::Oloadsb, O::Oload)
+    INRANGEO(o, O::Oloadsb, O::Oload)
 }
+
 pub fn isext(o: O) -> bool {
-    INRANGE(o, O::Oextsb, O::Oextuw)
+    INRANGEO(o, O::Oextsb, O::Oextuw)
 }
+
 pub fn ispar(o: O) -> bool {
-    INRANGE(o, O::Opar, O::Opare)
+    INRANGEO(o, O::Opar, O::Opare)
 }
+
 pub fn isarg(o: O) -> bool {
-    INRANGE(o, O::Oarg, O::Oargv)
+    INRANGEO(o, O::Oarg, O::Oargv)
 }
-pub fn isret(j: O) -> bool {
-    INRANGE(j, O::Jretw, O::Jret0)
-}
+
 pub fn isparbh(o: O) -> bool {
-    INRANGE(o, O::Oparsb, O::Oparuh)
+    INRANGEO(o, O::Oparsb, O::Oparuh)
 }
+
 pub fn isargbh(o: O) -> bool {
-    INRANGE(o, O::Oargsb, O::Oarguh)
+    INRANGEO(o, O::Oargsb, O::Oarguh)
 }
-pub fn isretbh(j: O) -> bool {
-    INRANGE(j, O::Jretsb, O::Jretuh)
+
+fn INRANGEJ(x: J, l: J, u: J) -> bool {
+    // QBE code uses integer overflow
+    // (x as usize) - (l as usize) <= (u as usize) - (l as usize) /* linear in x */
+    (l as usize) <= (x as usize) && (x as usize) <= (u as usize)
+}
+
+pub fn isret(j: J) -> bool {
+    INRANGEJ(j, J::Jretw, J::Jret0)
+}
+
+pub fn isretbh(j: J) -> bool {
+    INRANGEJ(j, J::Jretsb, J::Jretuh)
 }
 
 enum KType {
@@ -447,7 +462,7 @@ enum KType {
     Kd,
 }
 
-// Used as array indices in 'optab' init
+// Used as array indices in 'optab' etc.
 const_assert_eq!(KType::Kw as usize, 0);
 const_assert_eq!(KType::Kl as usize, 1);
 const_assert_eq!(KType::Ks as usize, 2);
@@ -473,6 +488,7 @@ struct Op {
     int canfold;
 };
  */
+
 pub struct Op {
     name: &'static [u8],
     argcls: [[i16; 4]; 2],
