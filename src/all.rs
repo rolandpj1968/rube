@@ -456,7 +456,7 @@ pub fn isretbh(j: J) -> bool {
     INRANGEJ(j, J::Jretsb, J::Jretuh)
 }
 
-enum KType {
+enum KBase {
     Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
     Kw,
     Kl,
@@ -465,23 +465,55 @@ enum KType {
 }
 
 // Used as array indices in 'optab' etc.
-const_assert_eq!(KType::Kw as usize, 0);
-const_assert_eq!(KType::Kl as usize, 1);
-const_assert_eq!(KType::Ks as usize, 2);
-const_assert_eq!(KType::Kd as usize, 3);
+const_assert_eq!(KBase::Kw as usize, 0);
+const_assert_eq!(KBase::Kl as usize, 1);
+const_assert_eq!(KBase::Ks as usize, 2);
+const_assert_eq!(KBase::Kd as usize, 3);
 
 /*
 #define KWIDE(k) ((k)&1)
 #define KBASE(k) ((k)>>1)
  */
 
-pub fn KWIDE(k: KType) -> usize {
+pub fn KWIDE(k: KBase) -> usize {
     (k as usize) & 1
 }
 
-pub fn KBASE(k: KType) -> usize {
+pub fn KBASE(k: KBase) -> usize {
     (k as usize) >> 1
 }
+
+#[derive(Clone, Copy)]
+pub enum KExt {
+    // Duplicated here cos optab etc. uses the everythings.
+    // This is going to cause grief?
+    // Really want to extend KBase
+    Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
+    Kw,
+    Kl,
+    Ks,
+    Kd,
+
+    Ksb = 4, /* matches Oarg/Opar/Jret */
+    Kub,
+    Ksh,
+    Kuh,
+    Kc,
+    K0,
+
+    Ke = -2, /* erroneous mode */
+             //Km = KBase::Kl as isize, /* memory pointer */
+}
+
+pub const Kx: KExt = KExt::Kx;
+pub const Kw: KExt = KExt::Kw;
+pub const Kl: KExt = KExt::Kl;
+pub const Ks: KExt = KExt::Ks;
+pub const Kd: KExt = KExt::Kd;
+
+pub const Ke: KExt = KExt::Ke;
+// Ugh, alias - rust does not allow duplicate values in an enum
+pub const Km: KExt = KExt::Kl;
 
 /*
 struct Op {
@@ -491,9 +523,10 @@ struct Op {
 };
  */
 
+#[derive(Clone, Copy)]
 pub struct Op {
     name: &'static [u8],
-    argcls: [[i16; 4]; 2],
+    argcls: [[KExt; 4]; 2],
     canfold: bool,
 }
 
