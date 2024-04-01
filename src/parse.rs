@@ -3,6 +3,8 @@ use std::fmt;
 use std::fs::File;
 use std::io::{BufReader, Bytes, Read};
 use std::path::Path;
+
+use chomp1::ascii::{is_alpha, is_digit, is_whitespace};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
@@ -233,7 +235,7 @@ static struct {
  */
 
 struct TokVal {
-    chr: u8,
+    chr: Option<u8>, // None on EOF (or uninit)
     fltd: f64,
     flts: f32,
     num: i64,
@@ -243,7 +245,7 @@ struct TokVal {
 impl TokVal {
     fn new() -> TokVal {
         TokVal {
-            chr: 0,
+            chr: None,
             fltd: 0.0,
             flts: 0.0,
             num: 0,
@@ -347,14 +349,6 @@ lazy_static! {
                 lexh0[h] = t;
             }
         }
-
-        // for i in [0; Token::Ntok as usize] {
-        //     if !kwmap[i].is_empty() {
-        //         let h = hash(kwmap[i]) * K >> M;
-        //         assert!(lexh[h] == Token::Txxx);
-        //         lexh[h] = i;
-        //     }
-        // }
 
         lexh0
     };
@@ -508,8 +502,235 @@ impl Parser<'_> {
         }
     }
 
+    fn ungetc(&mut self, c: Option<u8>) {
+        assert!(self.ungetc.is_none());
+        self.ungetc = c;
+    }
+
     fn lex(&mut self) -> RubeResult<Token> {
-        Ok(Token::Txxx)
+        //static char tok[NString];
+        //int c, i, esc;
+        //int t;
+        let mut c: Option<u8> = Some(b' ');
+
+        while c.is_some() && is_whitespace(c.unwrap()) {
+            c = self.getc()?;
+        }
+
+        self.tokval.chr = c;
+
+        if c.is_none() {
+            return Ok(Token::Teof);
+        }
+        let craw = c.unwrap();
+
+        let mut t: Token = Token::Txxx;
+        let mut take_alpha = false;
+        let mut take_quote = false;
+
+        match craw {
+            b',' => return Ok(Token::Tcomma),
+            b'(' => return Ok(Token::Tlparen),
+            b')' => return Ok(Token::Trparen),
+            b'{' => return Ok(Token::Tlbrace),
+            b'}' => return Ok(Token::Trbrace),
+            b'=' => return Ok(Token::Teq),
+            b'+' => return Ok(Token::Tplus),
+            b's' => {
+                // if (fscanf(inf, "_%f", &tokval.flts) != 1)
+                //     break;
+                // return Ok(Token::Tflts);
+                return Err(self.err("floating point literals not supported yet"));
+            }
+            b'd' => {
+                // if (fscanf(inf, "_%lf", &tokval.fltd) != 1)
+                //     break;
+                // return Ok(Token::Tfltd);
+                return Err(self.err("floating point literals not supported yet"));
+            }
+            b'%' => {
+                t = Token::Ttmp;
+                take_alpha = true;
+                // c = fgetc(inf);
+                // goto Alpha;
+            }
+            b'@' => {
+                t = Token::Tlbl;
+                take_alpha = true;
+                // c = fgetc(inf);
+                // goto Alpha;
+            }
+            b'$' => {
+                t = Token::Tglo;
+                let c2 = self.getc()?;
+                if c2 == Some(b'"') {
+                    take_quote = true;
+                    c = c2;
+                    craw = c.unwrap();
+                // TODO check inclusion of '"' in quotes in general
+                } else {
+                    self.ungetc(c2); // TODO - hopefully EOF is idempotent
+                    take_alpha = true;
+                }
+                // if ((c = fgetc(inf)) == '"')
+                //     goto Quoted;
+                // goto Alpha;
+            }
+            b':' => {
+                t = Token::Ttyp;
+                take_alpha = true;
+                // c = fgetc(inf);
+                // goto Alpha;
+            }
+            b'#' => {
+                while c.is_some() && c.unwrap() != b'\n' {
+		    c = self.getc()?;
+		}
+		//while ((c=fgetc(inf)) != '\n' && c != EOF)
+		    ;
+                self.lnum += 1;
+                return Ok(Token::Tnl);
+            }
+            b'\n' => {
+                self.lnum += 1;
+                return Ok(Token::Tnl);
+            }
+            b'"' => {
+                t = Token::Tstr;
+                take_quote = true;
+            }
+            _ => {
+                // Expect a symbol
+                take_alpha = true;
+            }
+        }
+
+        if take_alpha {
+            if t != Token::Txxx {
+                let prev_craw = craw;
+                c = self.getc()?;
+                if c.is_none() {
+                    return Err(self.err("end of file after %c %d", prev_craw, prev_craw));
+                }
+                craw = c.unwrap();
+            }
+
+            if !is_alpha(craw) && craw != b'.' && craw != b'_' {
+                return Err(self.err("invalid character %c (%d)", craw, craw));
+            }
+
+            let tok: Vec<u8> = vec![];
+            //i = 0;
+            loop {
+                // if (i >= NString-1)
+                //     err("identifier too long");
+                tok.push(craw);
+                //tok[i++] = c;
+                c = self.getc()?;
+                if c.is_none() {
+                    break;
+                }
+                craw = c.unwrap();
+                if !is_alpha(craw)
+                    && craw != b'$'
+                    && craw != b'.'
+                    && craw != b'_'
+                    && !is_digit(craw)
+                {
+                    break;
+                }
+            } //while (isalpha(c) || c == '$' || c == '.' || c == '_' || isdigit(c));
+              //tok[i] = 0; TODO - this might cause pain?
+            self.ungetc(c); // Hope EOF is idempotent
+                            // TODO notify QBE - if we're assigning to tokval.str anyhow then why bother with tok?
+            self.tokval.str = tok.clone();
+            if t != Token::Txxx {
+                return Ok(t);
+            }
+            t = lexh[(hash(tok) as usize) * K >> M];
+            if t == Token::Txxx || kwmap[t] != tok {
+                return Err(self.err("unknown keyword %s", tok));
+                //return Ok(Token::Txxx);
+            }
+            //return Err(self.err("implement me"));
+        } else if take_quote {
+            assert!(t != Token::Txx);
+            //tokval.str = vnew(2, 1, PFn);
+            self.tokval.str = vec![];
+            //tokval.str[0] = c;
+            self.tokval.str.push(craw);
+            //esc = 0;
+            let mut esc = false;
+            //for (i=1;; i++) {
+            loop {
+                c = self.getc()?;
+                if c.is_none() {
+                    return Err(self.err("unterminated string"));
+                }
+                craw = c.unwrap();
+                //vgrow(&tokval.str, i+2);
+                //self.tokval.str[i] = c;
+                self.tokval.str.push(craw);
+                if craw == b'"' && !esc {
+                    //tokval.str[i+1] = 0;
+                    return Ok(t);
+                }
+                esc = craw == b'\\' && !esc;
+            }
+            //return Err(self.err("implement me"));
+        }
+
+        // TODO - notify QBE; mmm we've already dealt with b'+' as Tplus?
+        if isdigit(craw) || craw == '-' || craw == '+' {
+            self.ungetc(craw);
+            self.tokval.num = self.getint();
+            return Ok(Token::Tint);
+        }
+
+        /*
+              if (c == '"') {
+                  t = Token::Tstr;
+              Quoted:
+                  tokval.str = vnew(2, 1, PFn);
+                  tokval.str[0] = c;
+                  esc = 0;
+                  for (i=1;; i++) {
+                      c = fgetc(inf);
+                      if (c == EOF)
+                          err("unterminated string");
+                      vgrow(&tokval.str, i+2);
+                      tokval.str[i] = c;
+                      if (c == '"' && !esc) {
+                          tokval.str[i+1] = 0;
+                          return t;
+                      }
+                      esc = (c == '\\' && !esc);
+                  }
+              }
+          Alpha:
+              if (!isalpha(c) && c != '.' && c != '_')
+                  err("invalid character %c (%d)", c, c);
+              i = 0;
+              do {
+                  if (i >= NString-1)
+                      err("identifier too long");
+                  tok[i++] = c;
+                  c = fgetc(inf);
+              } while (isalpha(c) || c == '$' || c == '.' || c == '_' || isdigit(c));
+              tok[i] = 0;
+              ungetc(c, inf);
+              tokval.str = tok;
+              if (t != Txxx) {
+                  return t;
+              }
+              t = lexh[hash(tok)*K >> M];
+              if (t == Txxx || strcmp(kwmap[t], tok) != 0) {
+                  err("unknown keyword %s", tok);
+                  return Ok(Token::Txxx);
+              }
+                  Ok(t)
+        */
+        Err(self.err("unexpected character %c %d", craw, craw))
     }
 }
 
