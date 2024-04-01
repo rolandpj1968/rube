@@ -8,6 +8,7 @@ use strum_macros::EnumIter;
 
 use crate::all::{Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, O};
 use crate::optab::optab;
+use crate::util::hash;
 
 #[derive(Debug)]
 struct ParseError {
@@ -341,9 +342,9 @@ lazy_static! {
         for t in Token::iter() {
             let i = t as usize;
             if !kwmap[i].is_empty() {
-                let h = hash(kwmap[i]) * K >> M;
-                assert!(lexh[h] == Token::Txxx);
-                lexh[h] = t;
+                let h = (hash(kwmap[i]) as usize) * K >> M;
+                assert!(lexh0[h] == Token::Txxx);
+                lexh0[h] = t;
             }
         }
 
@@ -1408,25 +1409,25 @@ impl Parser<'_> {
             let t = self.nextnl()?;
 
             match t {
-                Texport => {
+                Token::Texport => {
                     lnk.export = true;
                 }
 
-                Tthread => {
+                Token::Tthread => {
                     lnk.thread = true;
                 }
 
-                Tsection => {
+                Token::Tsection => {
                     if lnk.sec.is_empty() {
                         return Err(self.err("only one section allowed"));
                     }
                     if self.next()? != Token::Tstr {
                         return Err(self.err("section \"name\" expected"));
                     }
-                    lnk.sec = self.tokval.str;
+                    lnk.sec = self.tokval.str.clone();
                     if self.peek()? == Token::Tstr {
                         self.next()?;
-                        lnk.secf = self.tokval.str;
+                        lnk.secf = self.tokval.str.clone();
                     }
                 }
 
@@ -1490,8 +1491,8 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn 
 
 impl Parser<'_> {
     fn new<'a>(
-        f: &File,
-        path: &Path,
+        f: &'a File,
+        path: &'a Path,
         dbgfile: fn(&Vec<u8>) -> (), // string???
         data: fn(&Dat) -> (),
         func: fn(&Fn) -> (),
@@ -1522,44 +1523,50 @@ pub fn parse(
     // Allocate on the heap cos it's laaarge; TODO do we need tmph? Revert to stack
     let mut parser = Box::new(Parser::new(f, path, dbgfile, data, func));
 
-    loop {
-        let mut lnk = Lnk {
-            export: false,
-            thread: false,
-            align: 0,
-            sec: vec![],
-            secf: vec![],
-        };
+    parser.parse()
+}
 
-        match parser.parselnk(&mut lnk) {
-            Tdbgfile => {
-                //expect(Tstr);
-                //dbgfile(tokval.str);
-            }
+impl Parser<'_> {
+    pub fn parse(&mut self) -> RubeResult<()> {
+        loop {
+            let mut lnk = Lnk {
+                export: false,
+                thread: false,
+                align: 0,
+                sec: vec![],
+                secf: vec![],
+            };
 
-            Tfunc => {
-                //func(parsefn(&lnk));
-            }
+            match self.parselnk(&mut lnk)? {
+                Token::Tdbgfile => {
+                    //expect(Tstr);
+                    //dbgfile(tokval.str);
+                }
 
-            Tdata => {
-                //parsedat(data, &lnk);
-            }
+                Token::Tfunc => {
+                    //func(parsefn(&lnk));
+                }
 
-            Ttype => {
-                //parsetyp();
-            }
+                Token::Tdata => {
+                    //parsedat(data, &lnk);
+                }
 
-            Teof => {
-                break;
-            }
+                Token::Ttype => {
+                    //parsetyp();
+                }
 
-            _ => {
-                //err("top-level definition expected");
+                Token::Teof => {
+                    break;
+                }
+
+                _ => {
+                    return Err(self.err("top-level definition expected"));
+                }
             }
         }
-    }
 
-    Ok(())
+        Ok(())
+    }
 }
 
 /*
