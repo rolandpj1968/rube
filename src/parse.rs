@@ -1,8 +1,10 @@
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
-use std::io::{BufReader, Bytes};
+use std::io::{BufReader, Bytes, Read};
 use std::path::Path;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
 use crate::all::{Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, O};
 use crate::optab::optab;
@@ -13,10 +15,8 @@ struct ParseError {
 }
 
 impl ParseError {
-    fn new(msg: &str) -> ParseError {
-        ParseError {
-            msg: msg.to_string(),
-        }
+    fn new(msg: String) -> ParseError {
+        ParseError { msg }
     }
 }
 
@@ -57,7 +57,7 @@ enum PState {
     PEnd,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, EnumIter, PartialEq)]
 enum Token {
     Txxx = 0,
 
@@ -161,7 +161,7 @@ static char *kwmap[Ntok] = {
 
 lazy_static! {
     static ref kwmap: [&'static [u8]; O::NOp as usize] = {
-
+    // Crazy indent courtesy of emacs rustic.
     let mut kwmap0: [&'static [u8]; O::NOp as usize] = [b""; O::NOp as usize];
 
     kwmap0[Token::Tloadw as usize] = b"loadw";
@@ -266,7 +266,7 @@ static uint ntyp;
  */
 
 struct Parser<'a> {
-    inf: Bytes<&'a File>,
+    inf: Bytes<BufReader<&'a File>>,
     ungetc: Option<u8>,
     inpath: &'a Path,
     thead: Token,
@@ -297,7 +297,20 @@ err(char *s, ...)
     va_end(ap);
     exit(1);
 }
+ */
 
+impl Parser<'_> {
+    fn err(&self, s: &str) -> Box<ParseError> {
+        Box::new(ParseError::new(format!(
+            "qbe:{}:{}: {}",
+            self.inpath.display(),
+            self.lnum,
+            s
+        )))
+    }
+}
+
+/*
 static void
 lexinit()
 {
@@ -325,13 +338,22 @@ lazy_static! {
     static ref lexh: [Token; 1 << (32 - M)] = {
         let mut lexh0: [Token; 1 << (32 - M)] = [Token::Txxx; 1 << (32 - M)];
 
-        for i in [0; Token::Ntok as usize] {
+        for t in Token::iter() {
+            let i = t as usize;
             if !kwmap[i].is_empty() {
                 let h = hash(kwmap[i]) * K >> M;
                 assert!(lexh[h] == Token::Txxx);
-                lexh[h] = i;
+                lexh[h] = t;
             }
         }
+
+        // for i in [0; Token::Ntok as usize] {
+        //     if !kwmap[i].is_empty() {
+        //         let h = hash(kwmap[i]) * K >> M;
+        //         assert!(lexh[h] == Token::Txxx);
+        //         lexh[h] = i;
+        //     }
+        // }
 
         lexh0
     };
@@ -471,16 +493,12 @@ Alpha:
  */
 
 impl Parser<'_> {
-    // return Ok(None) for EOF
     fn getc(&mut self) -> RubeResult<Option<u8>> {
-        match self.getc {
-            None => {
-                if self.inf.has_next() {
-                    Ok(self.inf.next()?);
-                } else {
-                    None
-                }
-            }
+        match self.ungetc {
+            None => match self.inf.next() {
+                None => Ok(None),
+                Some(r) => Ok(Some(r?)),
+            },
 
             Some(c) => {
                 self.ungetc = None;
@@ -490,7 +508,7 @@ impl Parser<'_> {
     }
 
     fn lex(&mut self) -> RubeResult<Token> {
-        Ok((Token::new()))
+        Ok(Token::Txxx)
     }
 }
 
@@ -1387,9 +1405,41 @@ impl Parser<'_> {
         let mut haslnk: bool = false;
 
         loop {
-            let t = self.nextnl();
+            let t = self.nextnl()?;
 
-            match t {}
+            match t {
+                Texport => {
+                    lnk.export = true;
+                }
+
+                Tthread => {
+                    lnk.thread = true;
+                }
+
+                Tsection => {
+                    if lnk.sec.is_empty() {
+                        return Err(self.err("only one section allowed"));
+                    }
+                    if self.next()? != Token::Tstr {
+                        return Err(self.err("section \"name\" expected"));
+                    }
+                    lnk.sec = self.tokval.str;
+                    if self.peek()? == Token::Tstr {
+                        self.next()?;
+                        lnk.secf = self.tokval.str;
+                    }
+                }
+
+                _ => {
+                    if t == Token::Tfunc && lnk.thread {
+                        return Err(self.err("only data may have thread linkage"));
+                    }
+                    if haslnk && t != Token::Tdata && t != Token::Tfunc {
+                        return Err(self.err("only data and function have linkage"));
+                    }
+                    return Ok(t);
+                }
+            }
 
             haslnk = true;
         }

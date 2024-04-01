@@ -687,11 +687,11 @@ struct Lnk {
  */
 
 pub struct Lnk {
-    export: bool,
-    thread: bool,
-    align: i8,
-    sec: Vec<u8>, // Option???
-    secf: Vec<u8>,
+    pub export: bool,
+    pub thread: bool,
+    pub align: i8,
+    pub sec: Vec<u8>,
+    pub secf: Vec<u8>,
 }
 
 /*
