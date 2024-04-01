@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
-use std::io::{Bytes, Read};
+use std::io::{BufReader, Bytes};
 use std::path::Path;
 
 use crate::all::{Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, O};
@@ -239,6 +239,18 @@ struct TokVal {
     str: Vec<u8>,
 }
 
+impl TokVal {
+    fn new() -> TokVal {
+        TokVal {
+            chr: 0,
+            fltd: 0.0,
+            flts: 0.0,
+            num: 0,
+            str: vec![],
+        }
+    }
+}
+
 /*
 static int lnum;
 
@@ -255,6 +267,7 @@ static uint ntyp;
 
 struct Parser<'a> {
     inf: Bytes<&'a File>,
+    ungetc: Option<u8>,
     inpath: &'a Path,
     thead: Token,
     tokval: TokVal,
@@ -455,13 +468,39 @@ Alpha:
 	}
 	return t;
 }
+ */
 
+impl Parser<'_> {
+    // return Ok(None) for EOF
+    fn getc(&mut self) -> RubeResult<Option<u8>> {
+        match self.getc {
+            None => {
+                if self.inf.has_next() {
+                    Ok(self.inf.next()?);
+                } else {
+                    None
+                }
+            }
+
+            Some(c) => {
+                self.ungetc = None;
+                Ok(Some(c))
+            }
+        }
+    }
+
+    fn lex(&mut self) -> RubeResult<Token> {
+        Ok((Token::new()))
+    }
+}
+
+/*
 static int
 peek()
 {
-	if (thead == Txxx)
-		thead = lex();
-	return thead;
+    if (thead == Txxx)
+        thead = lex();
+    return thead;
 }
  */
 
@@ -1399,33 +1438,39 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn 
 }
  */
 
+impl Parser<'_> {
+    fn new<'a>(
+        f: &File,
+        path: &Path,
+        dbgfile: fn(&Vec<u8>) -> (), // string???
+        data: fn(&Dat) -> (),
+        func: fn(&Fn) -> (),
+    ) -> Parser<'a> {
+        Parser {
+            inf: BufReader::new(f).bytes(),
+            ungetc: None,
+            inpath: path,
+            thead: Token::Txxx,
+            tokval: TokVal::new(),
+            lnum: 0,
+            tmph: [0; TMask + 1],
+            nblk: 0,
+            rcls: 0,
+            ntyp: 0,
+            typ: vec![],
+        }
+    }
+}
+
 pub fn parse(
     f: &File,
     path: &Path,
-    dbgfile: fn(u8) -> (), // string???
+    dbgfile: fn(&Vec<u8>) -> (), // string???
     data: fn(&Dat) -> (),
     func: fn(&Fn) -> (),
 ) -> RubeResult<()> {
-    // Allocate on the heap cos it's laaarge
-    let mut parser = Box::new(Parser {
-        lexh: [0; 1 << (32 - M)],
-        inf: f.bytes(),
-        inpath: path,
-        thead: Token::Txxx,
-        tokval: TokVal {
-            chr: 0,
-            fltd: 0.0,
-            flts: 0.0,
-            num: 0,
-            str: vec![],
-        },
-        lnum: 0,
-        tmph: [0; TMask + 1],
-        nblk: 0,
-        rcls: 0,
-        ntyp: 0,
-        typ: vec![],
-    });
+    // Allocate on the heap cos it's laaarge; TODO do we need tmph? Revert to stack
+    let mut parser = Box::new(Parser::new(f, path, dbgfile, data, func));
 
     loop {
         let mut lnk = Lnk {
