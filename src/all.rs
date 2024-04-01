@@ -525,9 +525,9 @@ struct Op {
 
 #[derive(Clone, Copy)]
 pub struct Op {
-    name: &'static [u8],
-    argcls: [[KExt; 4]; 2],
-    canfold: bool,
+    pub name: &'static [u8],
+    pub argcls: [[KExt; 4]; 2],
+    pub canfold: bool,
 }
 
 /*
