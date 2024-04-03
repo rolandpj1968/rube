@@ -760,13 +760,27 @@ pub struct TypField {
 }
 
 pub struct Typ {
-    name: Vec<u8>,
-    isdark: bool,
-    isunion: bool,
-    align: i32,
-    size: u64,
-    nunion: u32,
-    fields: Vec<TypField>, // TODO need indirection???
+    pub name: Vec<u8>,
+    pub isdark: bool,
+    pub isunion: bool,
+    pub align: i32,
+    pub size: u64,
+    pub nunion: u32,
+    pub fields: Vec<TypField>, // TODO need indirection???
+}
+
+impl Typ {
+    pub fn new() -> Typ {
+        Typ {
+            name: vec![],
+            isdark: false,
+            isunion: false,
+            align: -1,
+            size: 0,
+            nunion: 0,
+            fields: vec![],
+        }
+    }
 }
 
 /*

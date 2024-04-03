@@ -1566,7 +1566,94 @@ parsetyp()
         parsefields(ty->fields[n++], ty, t);
     ty->nunion = n;
 }
+ */
 
+impl Parser<'_> {
+    fn parsetyp(&mut self) -> RubeResult<()> {
+        // Typ *ty;
+        // int t, al;
+        // uint n;
+
+        /* be careful if extending the syntax
+         * to handle nested types, any pointer
+         * held to typ[] might be invalidated!
+         */
+        // vgrow(&typ, ntyp+1);
+        // ty = &typ[ntyp++];
+        // ty->isdark = 0;
+        // ty->isunion = 0;
+        // ty->align = -1;
+        // ty->size = 0;
+
+        let mut ty = Typ::new();
+
+        if self.nextnl()? != Token::Ttyp || self.nextnl()? != Token::Teq {
+            return Err(self.err("type name and then = expected".to_string()));
+        }
+
+        ty.name = self.tokval.str.clone();
+        let mut t = self.nextnl()?;
+        if t == Token::Talign {
+            if self.nextnl()? != Token::Tint {
+                return Err(self.err("alignment expected".to_string()));
+            }
+            let mut al: i32 = 0;
+            // for (al=0; tokval.num /= 2; al++)
+            // 	;
+            loop {
+                self.tokval.num /= 2;
+                if self.tokval.num == 0 {
+                    break;
+                }
+                al += 1;
+            }
+            ty.align = al;
+            t = self.nextnl()?;
+        }
+        if t != Token::Tlbrace {
+            return Err(self.err("type body must start with {".to_string()));
+        }
+        t = self.nextnl()?;
+        if t == Token::Tint {
+            ty.isdark = true;
+            ty.size = self.tokval.num as u64; // TODO: QBE notify? Mmm check negative value?
+            if ty.align == -1 {
+                return Err(self.err("dark types need alignment".to_string()));
+            }
+            if self.nextnl()? != Token::Trbrace {
+                return Err(self.err("} expected".to_string()));
+            }
+            self.typ.push(ty);
+            return Ok(());
+        }
+        let mut n: u32 = 0;
+        //ty->fields = vnew(1, sizeof ty->fields[0], PHeap);
+        if t == Token::Tlbrace {
+            ty.isunion = true;
+            //do {
+            loop {
+                if t != Token::Tlbrace {
+                    return Err(self.err("invalid union member".to_string()));
+                }
+                //vgrow(&ty->fields, n+1);
+                self.parsefields(/*ty->fields[n++],*/ &mut ty, self.nextnl()?)?;
+                n += 1;
+                t = self.nextnl()?;
+                if t == Token::Trbrace {
+                    break;
+                }
+            } //while (t != Trbrace);
+        } else {
+            self.parsefields(/*ty->fields[n++],*/ &mut ty, t);
+            n += 1;
+        }
+        ty.nunion = n;
+        self.typ.push(ty);
+        Ok(())
+    }
+}
+
+/*
 static void
 parsedatref(Dat *d)
 {
