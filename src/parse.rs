@@ -1,3 +1,4 @@
+use std::ascii::escape_default;
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
@@ -303,7 +304,7 @@ err(char *s, ...)
  */
 
 impl Parser<'_> {
-    fn err(&self, s: &str) -> Box<ParseError> {
+    fn err(&self, s: String) -> Box<ParseError> {
         Box::new(ParseError::new(format!(
             "qbe:{}:{}: {}",
             self.inpath.display(),
@@ -375,7 +376,95 @@ getint()
         n = 1 + ~n;
     return *(int64_t *)&n;
 }
+ */
 
+impl Parser<'_> {
+    // Why return i64??? TODO ask QBE
+    fn getint(&mut self) -> RubeResult<i64> {
+        //uint64_t n;
+        //int c, m;
+
+        let mut n: u64 = 0;
+        let mut c = self.getc()?;
+        if c.is_none() {
+            return Err(self.err("end-of-file in integer constant".to_string()));
+        }
+        let mut craw = c.unwrap();
+        let m = craw == b'-';
+        if m || craw == b'+' {
+            c = self.getc()?;
+            if c.is_none() {
+                return Err(self.err("end-of-file in integer constant".to_string()));
+            }
+        }
+        loop {
+            //do {
+            // ugh integer overflow TODO
+            n = n.wrapping_mul(10).wrapping_add((craw - b'0') as u64);
+            c = self.getc()?;
+            match c {
+                None => break,
+                Some(craw0) => {
+                    craw = craw0;
+                    if craw < b'0' || craw > b'9' {
+                        break;
+                    }
+                }
+            }
+        }
+        self.ungetc(c);
+        if m {
+            n = 1u64.wrapping_add(!n);
+        }
+
+        Ok(n as i64)
+    }
+}
+
+impl Parser<'_> {
+    fn take_non_ws_as_utf8(&mut self) -> RubeResult<String> {
+        let mut bytes: Vec<u8> = vec![];
+
+        loop {
+            let c = self.getc()?;
+
+            if c.is_none() || !is_whitespace(c.unwrap()) {
+                self.ungetc(c);
+                break;
+            }
+
+            bytes.push(c.unwrap());
+        }
+
+        match String::from_utf8(bytes.clone()) {
+            Ok(s) => Ok(s),
+            Err(_) => Err(self.err(format!(
+                "invalid characters in floating point literal \"{}`",
+                String::from_utf8_lossy(&bytes)
+            ))),
+        }
+    }
+
+    fn get_float(&mut self) -> RubeResult<f32> {
+        let s = self.take_non_ws_as_utf8()?;
+        let f: Result<f32, _> = s.parse();
+        match f {
+            Ok(v) => Ok(v),
+            Err(_) => Err(self.err(format!("invalid float literal \"{}`", s))),
+        }
+    }
+
+    fn get_double(&mut self) -> RubeResult<f64> {
+        let s = self.take_non_ws_as_utf8()?;
+        let f: Result<f64, _> = s.parse();
+        match f {
+            Ok(v) => Ok(v),
+            Err(_) => Err(self.err(format!("invalid double literal \"{}`", s))),
+        }
+    }
+}
+
+/*
 static int
 lex()
 {
@@ -522,7 +611,7 @@ impl Parser<'_> {
         if c.is_none() {
             return Ok(Token::Teof);
         }
-        let craw = c.unwrap();
+        let mut craw = c.unwrap();
 
         let mut t: Token = Token::Txxx;
         let mut take_alpha = false;
@@ -537,16 +626,12 @@ impl Parser<'_> {
             b'=' => return Ok(Token::Teq),
             b'+' => return Ok(Token::Tplus),
             b's' => {
-                // if (fscanf(inf, "_%f", &tokval.flts) != 1)
-                //     break;
-                // return Ok(Token::Tflts);
-                return Err(self.err("floating point literals not supported yet"));
+                self.tokval.flts = self.get_float()?;
+                return Ok(Token::Tflts);
             }
             b'd' => {
-                // if (fscanf(inf, "_%lf", &tokval.fltd) != 1)
-                //     break;
-                // return Ok(Token::Tfltd);
-                return Err(self.err("floating point literals not supported yet"));
+                self.tokval.fltd = self.get_double()?;
+                return Ok(Token::Tfltd);
             }
             b'%' => {
                 t = Token::Ttmp;
@@ -600,7 +685,7 @@ impl Parser<'_> {
                 take_quote = true;
             }
             _ => {
-                // Expect a symbol
+                // Expect a keyword
                 take_alpha = true;
             }
         }
@@ -610,16 +695,24 @@ impl Parser<'_> {
                 let prev_craw = craw;
                 c = self.getc()?;
                 if c.is_none() {
-                    return Err(self.err("end of file after %c %d", prev_craw, prev_craw));
+                    return Err(self.err(format!(
+                        "end of file after '{}' ({:#02x?})",
+                        escape_default(prev_craw),
+                        prev_craw
+                    ))); // TODO how to print u8 as char
                 }
                 craw = c.unwrap();
             }
 
             if !is_alpha(craw) && craw != b'.' && craw != b'_' {
-                return Err(self.err("invalid character %c (%d)", craw, craw));
+                return Err(self.err(format!(
+                    "invalid character '{}' ({:#02x?})",
+                    escape_default(craw),
+                    craw
+                )));
             }
 
-            let tok: Vec<u8> = vec![];
+            let mut tok: Vec<u8> = vec![];
             //i = 0;
             loop {
                 // if (i >= NString-1)
@@ -647,14 +740,14 @@ impl Parser<'_> {
             if t != Token::Txxx {
                 return Ok(t);
             }
-            t = lexh[(hash(tok) as usize) * K >> M];
-            if t == Token::Txxx || kwmap[t] != tok {
-                return Err(self.err("unknown keyword %s", tok));
+            t = lexh[(hash(&tok) as usize) * K >> M];
+            if t == Token::Txxx || kwmap[t as usize] != tok {
+                return Err(self.err(format!("unknown keyword \"{:?}\"", tok)));
                 //return Ok(Token::Txxx);
             }
             //return Err(self.err("implement me"));
         } else if take_quote {
-            assert!(t != Token::Txx);
+            assert!(t != Token::Txxx);
             //tokval.str = vnew(2, 1, PFn);
             self.tokval.str = vec![];
             //tokval.str[0] = c;
@@ -665,7 +758,7 @@ impl Parser<'_> {
             loop {
                 c = self.getc()?;
                 if c.is_none() {
-                    return Err(self.err("unterminated string"));
+                    return Err(self.err("unterminated string".to_string()));
                 }
                 craw = c.unwrap();
                 //vgrow(&tokval.str, i+2);
@@ -681,9 +774,9 @@ impl Parser<'_> {
         }
 
         // TODO - notify QBE; mmm we've already dealt with b'+' as Tplus?
-        if isdigit(craw) || craw == '-' || craw == '+' {
-            self.ungetc(craw);
-            self.tokval.num = self.getint();
+        if is_digit(craw) || craw == b'-' || craw == b'+' {
+            self.ungetc(c);
+            self.tokval.num = self.getint()?;
             return Ok(Token::Tint);
         }
 
@@ -730,7 +823,11 @@ impl Parser<'_> {
               }
                   Ok(t)
         */
-        Err(self.err("unexpected character %c %d", craw, craw))
+        Err(self.err(format!(
+            "unexpected character '{}' ({:#02x?})",
+            escape_default(craw),
+            craw
+        )))
     }
 }
 
@@ -1640,10 +1737,10 @@ impl Parser<'_> {
 
                 Token::Tsection => {
                     if lnk.sec.is_empty() {
-                        return Err(self.err("only one section allowed"));
+                        return Err(self.err("only one section allowed".to_string()));
                     }
                     if self.next()? != Token::Tstr {
-                        return Err(self.err("section \"name\" expected"));
+                        return Err(self.err("section \"name\" expected".to_string()));
                     }
                     lnk.sec = self.tokval.str.clone();
                     if self.peek()? == Token::Tstr {
@@ -1654,10 +1751,10 @@ impl Parser<'_> {
 
                 _ => {
                     if t == Token::Tfunc && lnk.thread {
-                        return Err(self.err("only data may have thread linkage"));
+                        return Err(self.err("only data may have thread linkage".to_string()));
                     }
                     if haslnk && t != Token::Tdata && t != Token::Tfunc {
-                        return Err(self.err("only data and function have linkage"));
+                        return Err(self.err("only data and function have linkage".to_string()));
                     }
                     return Ok(t);
                 }
@@ -1781,7 +1878,7 @@ impl Parser<'_> {
                 }
 
                 _ => {
-                    return Err(self.err("top-level definition expected"));
+                    return Err(self.err("top-level definition expected".to_string()));
                 }
             }
         }
