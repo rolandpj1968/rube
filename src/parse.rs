@@ -11,7 +11,7 @@ use strum_macros::EnumIter;
 
 use crate::all::{
     Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, TypField,
-    TypFieldType, O,
+    TypFieldType, TypIdx, O,
 };
 use crate::optab::optab;
 use crate::util::hash;
@@ -963,7 +963,27 @@ findtyp(int i)
             return i;
     err("undefined type :%s", tokval.str);
 }
+ */
 
+impl Parser<'_> {
+    //static int
+    fn findtyp(&self /*, int i*/) -> RubeResult<TypIdx> {
+        for i in (0..self.typ.len()).rev() {
+            //while (--i >= 0)
+            // if (strcmp(tokval.str, typ[i].name) == 0)
+            // 	return i;
+            if self.tokval.str == self.typ[i].name {
+                return Ok(TypIdx(i));
+            }
+        }
+        Err(self.err(format!(
+            "undefined type :{}",
+            String::from_utf8_lossy(&self.tokval.str)
+        )))
+    }
+}
+
+/*
 static int
 parsecls(int *tyn)
 {
@@ -1515,21 +1535,22 @@ parsefields(Field *fld, Typ *ty, int t)
  */
 
 impl Parser<'_> {
+    // TODO - this should just return a Vec<TypField>
     fn parsefields(&mut self, /*Field *fld,*/ ty: &mut Typ, tparam: Token) -> RubeResult<()> {
         let mut t: Token = tparam;
         // Typ *ty1;
         // int n, c, a, al, type;
         // uint64_t sz, s;
 
-        let mut n: i32 = 0;
+        //let mut n: i32 = 0;
         let mut sz: u64 = 0;
-        let al = ty.align;
+        let mut al = ty.align;
         while t != Token::Trbrace {
             let mut type_: TypFieldType = TypFieldType::FEnd;
             let mut s: u64 = 0;
             let mut a: i32 = -1;
+            let mut ftyp_idx: usize = 0;
             match t {
-                _ => return Err(self.err("invalid type member specifier".to_string())),
                 Token::Td => {
                     type_ = TypFieldType::Fd;
                     s = 8;
@@ -1561,18 +1582,21 @@ impl Parser<'_> {
                     a = 0;
                 }
                 Token::Ttyp => {
-                    let mut ty1: &Typ;
+                    //let mut ty1: &Typ;
                     type_ = TypFieldType::FTyp;
-                    ty1 = &typ[findtyp(ntyp - 1)];
-                    s = ty1.size;
-                    a = ty1.align;
+                    let TypIdx(idx) = self.findtyp()?;
+                    ftyp_idx = idx;
+                    //ty1 = &typ[findtyp(ntyp - 1)];
+                    s = self.typ[idx].size;
+                    a = self.typ[idx].align;
                 }
+                _ => return Err(self.err("invalid type member specifier".to_string())),
             }
             if a > al {
                 al = a;
             }
             a = (1 << a) - 1;
-            a = ((sz + a) & !a) - sz;
+            a = (((sz as i32) + a) & !a) - (sz as i32); // TODO - this is fugly
             if a != 0 {
                 // TODO WTF?
                 if true
@@ -1582,19 +1606,20 @@ impl Parser<'_> {
                     /* padding */
                     // fld[n].type = FPad;
                     // fld[n].len = a;
-                    ty.fields.push(TypField::new(TypFieldType::FPad, a));
-                    n += 1;
+                    ty.fields.push(TypField::new(TypFieldType::FPad, a as u32));
+                    //n += 1;
                 }
             }
             t = self.nextnl()?;
             let mut c: i32 = 1;
             if t == Token::Tint {
-                c = self.tokval.num;
+                c = self.tokval.num as i32;
                 t = self.nextnl()?;
             }
-            sz += a + c * s;
+            sz += (a as u64) + (c as u64) * s;
             if type_ == TypFieldType::FTyp {
-                s = ty1 - typ; // TODO WTF? ah, it's the index!
+                //s = ty1 - typ; // TODO WTF? ah, it's the index!
+                s = ftyp_idx as u64;
             }
             //for (; c>0 && n<NField; c--, n++) {
             while c > 0
@@ -1602,10 +1627,10 @@ impl Parser<'_> {
             {
                 // fld[n].type_ = type_; // TODO WTF?
                 // fld[n].len = s;
-                ty.fields.push(TypFieldType::new(type_, s));
+                ty.fields.push(TypField::new(type_, s as u32)); // ugh
 
                 c -= 1;
-                n += 1;
+                //n += 1;
             }
             if t != Token::Tcomma {
                 break;
@@ -1613,7 +1638,7 @@ impl Parser<'_> {
             t = self.nextnl()?;
         }
         if t != Token::Trbrace {
-            return Errerr(", or } expected");
+            return Err(self.err(", or } expected".to_string()));
         }
         // TODO sentinal value marking end of fields - we don't need this in rust
         //fld[n].type_ = FEnd;
@@ -1621,8 +1646,10 @@ impl Parser<'_> {
         if sz < ty.size {
             sz = ty.size;
         }
-        ty.size = (sz + a - 1) & -a;
+        ty.size = (sz + (a as i64 as u64) - 1) & (-a as i64 as u64); // TODO ugh
         ty.align = al;
+
+        Ok(())
     }
 }
 
@@ -1753,7 +1780,8 @@ impl Parser<'_> {
                     return Err(self.err("invalid union member".to_string()));
                 }
                 //vgrow(&ty->fields, n+1);
-                self.parsefields(/*ty->fields[n++],*/ &mut ty, self.nextnl()?)?;
+                t = self.nextnl()?;
+                self.parsefields(/*ty->fields[n++],*/ &mut ty, t)?;
                 n += 1;
                 t = self.nextnl()?;
                 if t == Token::Trbrace {

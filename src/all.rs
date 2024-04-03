@@ -742,6 +742,7 @@ struct Typ {
     } (*fields)[NField+1];
 };
  */
+#[derive(Clone, Copy, PartialEq)]
 pub enum TypFieldType {
     FEnd,
     Fb,
@@ -774,6 +775,8 @@ pub struct Typ {
     pub nunion: u32,
     pub fields: Vec<TypField>, // TODO need indirection???
 }
+
+pub struct TypIdx(pub usize);
 
 impl Typ {
     pub fn new() -> Typ {
