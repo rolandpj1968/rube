@@ -9,7 +9,10 @@ use chomp1::ascii::{is_alpha, is_digit, is_whitespace};
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::all::{Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, O};
+use crate::all::{
+    Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, TypField,
+    TypFieldType, O,
+};
 use crate::optab::optab;
 use crate::util::hash;
 
@@ -1509,7 +1512,121 @@ parsefields(Field *fld, Typ *ty, int t)
     ty->size = (sz + a - 1) & -a;
     ty->align = al;
 }
+ */
 
+impl Parser<'_> {
+    fn parsefields(&mut self, /*Field *fld,*/ ty: &mut Typ, tparam: Token) -> RubeResult<()> {
+        let mut t: Token = tparam;
+        // Typ *ty1;
+        // int n, c, a, al, type;
+        // uint64_t sz, s;
+
+        let mut n: i32 = 0;
+        let mut sz: u64 = 0;
+        let al = ty.align;
+        while t != Token::Trbrace {
+            let mut type_: TypFieldType = TypFieldType::FEnd;
+            let mut s: u64 = 0;
+            let mut a: i32 = -1;
+            match t {
+                _ => return Err(self.err("invalid type member specifier".to_string())),
+                Token::Td => {
+                    type_ = TypFieldType::Fd;
+                    s = 8;
+                    a = 3;
+                }
+                Token::Tl => {
+                    type_ = TypFieldType::Fl;
+                    s = 8;
+                    a = 3;
+                }
+                Token::Ts => {
+                    type_ = TypFieldType::Fs;
+                    s = 4;
+                    a = 2;
+                }
+                Token::Tw => {
+                    type_ = TypFieldType::Fw;
+                    s = 4;
+                    a = 2;
+                }
+                Token::Th => {
+                    type_ = TypFieldType::Fh;
+                    s = 2;
+                    a = 1;
+                }
+                Token::Tb => {
+                    type_ = TypFieldType::Fb;
+                    s = 1;
+                    a = 0;
+                }
+                Token::Ttyp => {
+                    let mut ty1: &Typ;
+                    type_ = TypFieldType::FTyp;
+                    ty1 = &typ[findtyp(ntyp - 1)];
+                    s = ty1.size;
+                    a = ty1.align;
+                }
+            }
+            if a > al {
+                al = a;
+            }
+            a = (1 << a) - 1;
+            a = ((sz + a) & !a) - sz;
+            if a != 0 {
+                // TODO WTF?
+                if true
+                /*n < NField*/
+                {
+                    // TODO we don't need this check? Seems broken in QBE - just dropping fields
+                    /* padding */
+                    // fld[n].type = FPad;
+                    // fld[n].len = a;
+                    ty.fields.push(TypField::new(TypFieldType::FPad, a));
+                    n += 1;
+                }
+            }
+            t = self.nextnl()?;
+            let mut c: i32 = 1;
+            if t == Token::Tint {
+                c = self.tokval.num;
+                t = self.nextnl()?;
+            }
+            sz += a + c * s;
+            if type_ == TypFieldType::FTyp {
+                s = ty1 - typ; // TODO WTF? ah, it's the index!
+            }
+            //for (; c>0 && n<NField; c--, n++) {
+            while c > 0
+            /*&& n < NField*/
+            {
+                // fld[n].type_ = type_; // TODO WTF?
+                // fld[n].len = s;
+                ty.fields.push(TypFieldType::new(type_, s));
+
+                c -= 1;
+                n += 1;
+            }
+            if t != Token::Tcomma {
+                break;
+            }
+            t = self.nextnl()?;
+        }
+        if t != Token::Trbrace {
+            return Errerr(", or } expected");
+        }
+        // TODO sentinal value marking end of fields - we don't need this in rust
+        //fld[n].type_ = FEnd;
+        let a: i32 = 1 << al;
+        if sz < ty.size {
+            sz = ty.size;
+        }
+        ty.size = (sz + a - 1) & -a;
+        ty.align = al;
+    }
+}
+
+/*
 static void
 parsetyp()
 {

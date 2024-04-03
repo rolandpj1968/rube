@@ -742,7 +742,7 @@ struct Typ {
     } (*fields)[NField+1];
 };
  */
-pub enum TypeFieldType {
+pub enum TypFieldType {
     FEnd,
     Fb,
     Fh,
@@ -755,8 +755,14 @@ pub enum TypeFieldType {
 }
 
 pub struct TypField {
-    type_: TypeFieldType,
-    len: u32, // or index in typ[] for FTyp
+    pub type_: TypFieldType,
+    pub len: u32, // or index in typ[] for FTyp
+}
+
+impl TypField {
+    pub fn new(type_: TypFieldType, len: u32) -> TypField {
+        TypField { type_, len }
+    }
 }
 
 pub struct Typ {
