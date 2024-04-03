@@ -597,9 +597,6 @@ impl Parser<'_> {
     }
 
     fn lex(&mut self) -> RubeResult<Token> {
-        //static char tok[NString];
-        //int c, i, esc;
-        //int t;
         let mut c: Option<u8> = Some(b' ');
 
         while c.is_some() && is_whitespace(c.unwrap()) {
@@ -626,24 +623,30 @@ impl Parser<'_> {
             b'=' => return Ok(Token::Teq),
             b'+' => return Ok(Token::Tplus),
             b's' => {
-                self.tokval.flts = self.get_float()?;
-                return Ok(Token::Tflts);
+                let c2 = self.getc()?;
+                if c2 == Some(b'_') {
+                    self.tokval.flts = self.get_float()?;
+                    return Ok(Token::Tflts);
+                } else {
+                    self.ungetc(c2);
+                }
             }
             b'd' => {
-                self.tokval.fltd = self.get_double()?;
-                return Ok(Token::Tfltd);
+                let c2 = self.getc()?;
+                if c2 == Some(b'_') {
+                    self.tokval.fltd = self.get_double()?;
+                    return Ok(Token::Tfltd);
+                } else {
+                    self.ungetc(c2);
+                }
             }
             b'%' => {
                 t = Token::Ttmp;
                 take_alpha = true;
-                // c = fgetc(inf);
-                // goto Alpha;
             }
             b'@' => {
                 t = Token::Tlbl;
                 take_alpha = true;
-                // c = fgetc(inf);
-                // goto Alpha;
             }
             b'$' => {
                 t = Token::Tglo;
@@ -652,14 +655,10 @@ impl Parser<'_> {
                     take_quote = true;
                     c = c2;
                     craw = c.unwrap();
-                // TODO check inclusion of '"' in quotes in general
                 } else {
                     self.ungetc(c2); // TODO - hopefully EOF is idempotent
                     take_alpha = true;
                 }
-                // if ((c = fgetc(inf)) == '"')
-                //     goto Quoted;
-                // goto Alpha;
             }
             b':' => {
                 t = Token::Ttyp;
@@ -690,6 +689,8 @@ impl Parser<'_> {
             }
         }
 
+        assert!(!(take_alpha && take_quote));
+
         if take_alpha {
             if t != Token::Txxx {
                 let prev_craw = craw;
@@ -699,7 +700,7 @@ impl Parser<'_> {
                         "end of file after '{}' ({:#02x?})",
                         escape_default(prev_craw),
                         prev_craw
-                    ))); // TODO how to print u8 as char
+                    )));
                 }
                 craw = c.unwrap();
             }
@@ -713,12 +714,8 @@ impl Parser<'_> {
             }
 
             let mut tok: Vec<u8> = vec![];
-            //i = 0;
             loop {
-                // if (i >= NString-1)
-                //     err("identifier too long");
                 tok.push(craw);
-                //tok[i++] = c;
                 c = self.getc()?;
                 if c.is_none() {
                     break;
@@ -732,10 +729,8 @@ impl Parser<'_> {
                 {
                     break;
                 }
-            } //while (isalpha(c) || c == '$' || c == '.' || c == '_' || isdigit(c));
-              //tok[i] = 0; TODO - this might cause pain?
+            }
             self.ungetc(c); // Hope EOF is idempotent
-                            // TODO notify QBE - if we're assigning to tokval.str anyhow then why bother with tok?
             self.tokval.str = tok.clone();
             if t != Token::Txxx {
                 return Ok(t);
@@ -743,86 +738,32 @@ impl Parser<'_> {
             t = lexh[(hash(&tok) as usize) * K >> M];
             if t == Token::Txxx || kwmap[t as usize] != tok {
                 return Err(self.err(format!("unknown keyword \"{:?}\"", tok)));
-                //return Ok(Token::Txxx);
             }
-            //return Err(self.err("implement me"));
         } else if take_quote {
             assert!(t != Token::Txxx);
-            //tokval.str = vnew(2, 1, PFn);
             self.tokval.str = vec![];
-            //tokval.str[0] = c;
             self.tokval.str.push(craw);
-            //esc = 0;
             let mut esc = false;
-            //for (i=1;; i++) {
             loop {
                 c = self.getc()?;
                 if c.is_none() {
                     return Err(self.err("unterminated string".to_string()));
                 }
                 craw = c.unwrap();
-                //vgrow(&tokval.str, i+2);
-                //self.tokval.str[i] = c;
                 self.tokval.str.push(craw);
                 if craw == b'"' && !esc {
-                    //tokval.str[i+1] = 0;
                     return Ok(t);
                 }
                 esc = craw == b'\\' && !esc;
             }
-            //return Err(self.err("implement me"));
         }
 
-        // TODO - notify QBE; mmm we've already dealt with b'+' as Tplus?
         if is_digit(craw) || craw == b'-' || craw == b'+' {
             self.ungetc(c);
             self.tokval.num = self.getint()?;
             return Ok(Token::Tint);
         }
 
-        /*
-              if (c == '"') {
-                  t = Token::Tstr;
-              Quoted:
-                  tokval.str = vnew(2, 1, PFn);
-                  tokval.str[0] = c;
-                  esc = 0;
-                  for (i=1;; i++) {
-                      c = fgetc(inf);
-                      if (c == EOF)
-                          err("unterminated string");
-                      vgrow(&tokval.str, i+2);
-                      tokval.str[i] = c;
-                      if (c == '"' && !esc) {
-                          tokval.str[i+1] = 0;
-                          return t;
-                      }
-                      esc = (c == '\\' && !esc);
-                  }
-              }
-          Alpha:
-              if (!isalpha(c) && c != '.' && c != '_')
-                  err("invalid character %c (%d)", c, c);
-              i = 0;
-              do {
-                  if (i >= NString-1)
-                      err("identifier too long");
-                  tok[i++] = c;
-                  c = fgetc(inf);
-              } while (isalpha(c) || c == '$' || c == '.' || c == '_' || isdigit(c));
-              tok[i] = 0;
-              ungetc(c, inf);
-              tokval.str = tok;
-              if (t != Txxx) {
-                  return t;
-              }
-              t = lexh[hash(tok)*K >> M];
-              if (t == Txxx || strcmp(kwmap[t], tok) != 0) {
-                  err("unknown keyword %s", tok);
-                  return Ok(Token::Txxx);
-              }
-                  Ok(t)
-        */
         Err(self.err(format!(
             "unexpected character '{}' ({:#02x?})",
             escape_default(craw),
@@ -920,6 +861,38 @@ expect(int t)
     sprintf(buf, "%s expected, got %s instead", s1, s2);
     err(buf);
 }
+ */
+
+impl Parser<'_> {
+    fn expect(&mut self, t: Token) -> RubeResult<()> {
+        static ttoa: [&'static str; Token::Ntok as usize] = {
+            let mut ttoa0: [&'static str; Token::Ntok as usize] =
+                ["<unknown>"; Token::Ntok as usize];
+
+            ttoa0[Token::Tlbl as usize] = "label";
+            ttoa0[Token::Tcomma as usize] = ",";
+            ttoa0[Token::Teq as usize] = "=";
+            ttoa0[Token::Tnl as usize] = "newline";
+            ttoa0[Token::Tlparen as usize] = "(";
+            ttoa0[Token::Trparen as usize] = ")";
+            ttoa0[Token::Tlbrace as usize] = "{";
+            ttoa0[Token::Trbrace as usize] = "}";
+
+            ttoa0
+        };
+
+        let t1 = self.next()?;
+        if t == t1 {
+            return Ok(());
+        }
+
+        Err(self.err(format!(
+            "{} expected, got {} instead",
+            ttoa[t as usize], ttoa[t1 as usize]
+        )))
+    }
+}
+/*
 
 static Ref
 tmpref(char *v)
@@ -1841,11 +1814,16 @@ pub fn parse(
     // Allocate on the heap cos it's laaarge; TODO do we need tmph? Revert to stack
     let mut parser = Box::new(Parser::new(f, path, dbgfile, data, func));
 
-    parser.parse()
+    parser.parse(dbgfile, data, func)
 }
 
 impl Parser<'_> {
-    pub fn parse(&mut self) -> RubeResult<()> {
+    pub fn parse(
+        &mut self,
+        dbgfile: fn(&Vec<u8>) -> (), // string???
+        data: fn(&Dat) -> (),
+        func: fn(&Fn) -> (),
+    ) -> RubeResult<()> {
         loop {
             let mut lnk = Lnk {
                 export: false,
@@ -1857,8 +1835,8 @@ impl Parser<'_> {
 
             match self.parselnk(&mut lnk)? {
                 Token::Tdbgfile => {
-                    //expect(Tstr);
-                    //dbgfile(tokval.str);
+                    self.expect(Token::Tstr)?;
+                    dbgfile(&self.tokval.str);
                 }
 
                 Token::Tfunc => {
