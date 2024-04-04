@@ -833,7 +833,32 @@ struct Dat {
 };
  */
 
-pub struct Dat {}
+enum DatT {
+    DStart,
+    DEnd,
+    DB,
+    DH,
+    DW,
+    DL,
+    DZ,
+}
+
+pub enum DatU {
+    Num(i64),
+    Fltd(f64),
+    Flts(f32),
+    Str(Vec<u8>),
+    Ref { name: Vec<u8>, off: i64 },
+}
+
+pub struct Dat {
+    type_: DatT,
+    name: Vec<u8>,
+    lnk: Lnk,
+    u: DatU,
+    isref: bool,
+    isstr: bool,
+}
 
 /*
 /* main.c */
