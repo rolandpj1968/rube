@@ -777,7 +777,11 @@ pub enum SymT {
 #[derive(new)]
 pub struct Sym {
     pub type_: SymT,
-    pub id: u32, // ??? strong type?
+    pub id: u32, // ??? strong type? It's an intern string...
+}
+
+impl Sym {
+    const UNDEF: Sym = Sym::new(SymT::SGlo, 0); // Ugh, sort out Con
 }
 
 // impl Sym {
@@ -916,6 +920,7 @@ pub enum ConT {
 }
 
 pub enum ConBits {
+    None,
     I(i64),
     D(f64),
     F(f32),
@@ -927,6 +932,17 @@ pub struct Con {
     pub sym: Sym,
     pub bits: ConBits,
     // char flt; /* 1 to print as s, 2 to print as d */
+}
+
+impl Con {
+    // TODO - merge bits and sym into same enum, unless sym actual const is imported later...
+    pub fn new_sym(sym: Sym) -> Con {
+        Con::new(ConT::CAddr, sym, ConBits::None)
+    }
+
+    pub fn new_bits(bits: ConBits) -> Con {
+        Con::new(ConT::CBits, Sym::UNDEF, bits)
+    }
 }
 
 // Index in Fn::con

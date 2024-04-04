@@ -962,7 +962,31 @@ parseref()
     }
     return newcon(&c, curf);
 }
+ */
 
+impl Parser<'_> {
+    fn parseref(&mut self, curf: &mut Fn) -> RubeResult<Ref> {
+        // Con c;
+
+        // memset(&c, 0, sizeof c);
+        let c: Con = match self.next()? {
+            Token::Ttmp => return self.tmpref(self.tokval.str),
+            Token::Tint => Con::new_bits(ConBits::I(self.tokval.num)),
+            Token::Tflts => Con::new_bits(ConBits::F(self.tokval.flts)), // c.flt = 1;
+            Token::Tfltd => Con::new_bits(ConBits::D(self.tokval.fltd)), // c.flt = 2;
+            Token::Tthread => {
+                self.expect(Token::Tglo)?;
+                Con::new_sym(Sym::new(SymT::SThr, self.intern(self.tokval.str)))
+            }
+            Token::Tglo => Con::new_sym(Sym::new(SymT::SGlo, self.intern(self.tokval.str))),
+            _ => return Ref::R,
+        };
+
+        Ok(self.newcon(c, curf))
+    }
+}
+
+/*
 static int
 findtyp(int i)
 {
