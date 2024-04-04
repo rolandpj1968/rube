@@ -1,6 +1,8 @@
 // TODO remove eventually
 #![allow(dead_code, unused_variables)]
 
+use derive_new::new;
+
 // Generic Result
 pub type RubeError = Box<dyn std::error::Error>;
 pub type RubeResult<T> = Result<T, RubeError>;
@@ -81,27 +83,27 @@ struct Target {
 };
  */
 
-struct Target {
-    name: &'static [u8],
-    apple: bool,
-    gpr0: i32, // first general purpose reg
-    ngpr: i32,
-    fpr0: i32, // first floating point reg
-    nfpr: i32,
-    rglob: bits, // globally live regs (e.g., sp, fp)
-    nrglob: i32,
-    rsave: Vec<i32>, // caller-save [Vec???]
-    nrsave: [i32; 2],
-    retregs: fn(Ref, [i32; 2]) -> bits,
-    argregs: fn(Ref, [i32; 2]) -> bits,
-    memargs: fn(i32) -> i32,
-    abi0: fn(&mut Fn),
-    abi1: fn(&mut Fn),
-    isel: fn(&mut Fn),
-    emitfn: fn(&Fn /*, FILE **/), // TODO
-    emitfin: fn(/*FILE **/),      // TODO
-    asloc: &'static [u8; 4],
-    assym: &'static [u8; 4],
+pub struct Target {
+    pub name: &'static [u8],
+    pub apple: bool,
+    pub gpr0: i32, // first general purpose reg
+    pub ngpr: i32,
+    pub fpr0: i32, // first floating point reg
+    pub nfpr: i32,
+    pub rglob: bits, // globally live regs (e.g., sp, fp)
+    pub nrglob: i32,
+    pub rsave: Vec<i32>, // caller-save [Vec???]
+    pub nrsave: [i32; 2],
+    pub retregs: fn(Ref, [i32; 2]) -> bits,
+    pub argregs: fn(Ref, [i32; 2]) -> bits,
+    pub memargs: fn(i32) -> i32,
+    pub abi0: fn(&mut Fn),
+    pub abi1: fn(&mut Fn),
+    pub isel: fn(&mut Fn),
+    pub emitfn: fn(&Fn /*, FILE **/), // TODO
+    pub emitfin: fn(/*FILE **/),      // TODO
+    pub asloc: &'static [u8; 4],
+    pub assym: &'static [u8; 4],
 }
 
 /*
@@ -149,7 +151,7 @@ enum {
 
 // TODO we can tighten up these types
 #[derive(Clone, Copy)]
-enum Ref {
+pub enum Ref {
     R,
     RTmp(TmpIdx),
     RCon(u32),
@@ -521,36 +523,37 @@ pub fn isretbh(j: J) -> bool {
     in_range_j(j, J::Jretsb, J::Jretuh)
 }
 
-pub enum KBase {
-    Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
-    Kw,
-    Kl,
-    Ks,
-    Kd,
-}
+// Jusgt using Kext as a super-set for now...
+// pub enum KBase {
+//     Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
+//     Kw,
+//     Kl,
+//     Ks,
+//     Kd,
+// }
 
-// Used as array indices in 'optab' etc.
-const_assert_eq!(KBase::Kw as usize, 0);
-const_assert_eq!(KBase::Kl as usize, 1);
-const_assert_eq!(KBase::Ks as usize, 2);
-const_assert_eq!(KBase::Kd as usize, 3);
+// // Used as array indices in 'optab' etc.
+// const_assert_eq!(KBase::Kw as usize, 0);
+// const_assert_eq!(KBase::Kl as usize, 1);
+// const_assert_eq!(KBase::Ks as usize, 2);
+// const_assert_eq!(KBase::Kd as usize, 3);
 
 /*
 #define KWIDE(k) ((k)&1)
 #define KBASE(k) ((k)>>1)
  */
 
-pub fn k_wide(k: KBase) -> usize {
-    (k as usize) & 1
-}
+// pub fn k_wide(k: KBase) -> usize {
+//     (k as usize) & 1
+// }
 
-pub fn k_base(k: KBase) -> usize {
-    (k as usize) >> 1
-}
+// pub fn k_base(k: KBase) -> usize {
+//     (k as usize) >> 1
+// }
 
 #[derive(Clone, Copy)]
 pub enum KExt {
-    // Duplicated here cos optab etc. uses the everythings.
+    // Duplicated here from Kbase cos optab etc. uses the everythings.
     // This is going to cause grief?
     // Really want to extend KBase
     Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
@@ -579,6 +582,12 @@ pub const KD: KExt = KExt::Kd;
 pub const KE: KExt = KExt::Ke;
 // Ugh, alias - rust does not allow duplicate values in an enum
 pub const KM: KExt = KExt::Kl;
+
+// Used as array indices in 'optab' etc.
+const_assert_eq!(KW as usize, 0);
+const_assert_eq!(KL as usize, 1);
+const_assert_eq!(KS as usize, 2);
+const_assert_eq!(KD as usize, 3);
 
 /*
 struct Op {
@@ -636,6 +645,7 @@ pub struct Phi {
     link: PhiIdx,
 }
 
+#[derive(Clone, Copy)]
 pub struct PhiIdx(usize); // Index into Fn::phi
 
 /*
@@ -700,6 +710,7 @@ pub struct Blk {
 }
 
 // Index into Fn::blks
+#[derive(Clone, Copy)]
 pub struct BlkIdx(usize);
 
 /*
@@ -724,7 +735,24 @@ struct Sym {
     } type;
     uint32_t id;
 };
+ */
+pub enum SymT {
+    SGlo,
+    SThr,
+}
 
+pub struct Sym {
+    pub type_: SymT,
+    pub id: u32, // ??? strong type?
+}
+
+impl Sym {
+    pub fn new(type_: SymT, id: u32) -> Sym {
+        Sym { type_, id }
+    }
+}
+
+/*
 enum {
     NoAlias,
     MayAlias,
@@ -801,7 +829,7 @@ pub struct Tmp {
     // uint bid; /* id of a defining block */
     // uint cost;
     slot: i32, /* -1 for unset */
-    cls: i16,  // TODO real type
+    cls: KExt,
     // struct {
     //     int r;  /* register or -1 */
     //     int w;  /* weight */
@@ -814,7 +842,7 @@ pub struct Tmp {
 }
 
 impl Tmp {
-    pub fn new(name: Vec<u8>, ndef: u32, nuse: u32, slot: i32, cls: i16) -> Tmp {
+    pub fn new(name: Vec<u8>, ndef: u32, nuse: u32, slot: i32, cls: KExt) -> Tmp {
         Tmp {
             name,
             ndef,
@@ -827,6 +855,7 @@ impl Tmp {
 }
 
 // Index in Fn::tmp
+#[derive(Clone, Copy)]
 pub struct TmpIdx(pub usize);
 
 /*
@@ -846,8 +875,28 @@ struct Con {
 };
  */
 
-pub struct Con {}
+pub enum ConT {
+    CUndef,
+    CBits,
+    CAddr,
+}
+
+pub enum ConBits {
+    I(i64),
+    D(f64),
+    F(f32),
+}
+
+#[derive(new)]
+pub struct Con {
+    pub type_: ConT,
+    pub sym: Sym,
+    pub bits: ConBits,
+    // char flt; /* 1 to print as s, 2 to print as d */
+}
+
 // Index in Fn::con
+#[derive(Clone, Copy)]
 pub struct ConIdx(usize);
 
 /*
@@ -870,6 +919,7 @@ pub struct Addr {
 }
 
 pub type Mem = Addr;
+#[derive(Clone, Copy)]
 pub struct MemIdx(usize); // Index into Fn::mem
 
 /*
@@ -1017,6 +1067,7 @@ pub struct Typ {
     pub fields: Vec<TypFld>, // TODO need indirection???
 }
 
+#[derive(Clone, Copy)]
 pub struct TypIdx(pub usize);
 
 impl Typ {

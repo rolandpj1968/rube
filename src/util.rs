@@ -1,4 +1,4 @@
-use crate::all::{Fn, Tmp, TmpIdx};
+use crate::all::{Fn, KExt, Ref, Tmp, TmpIdx};
 
 /*
 #include "all.h"
@@ -368,7 +368,8 @@ newtmp(char *prfx, int k,  Fn *fn)
 }
  */
 
-pub fn newtmp(prfx: Option<&[u8]>, k: i32, fn_: &mut Fn) -> Ref {
+pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
+    // TODO why a globally unique name?
     static mut n: i32 = 0;
     // int t;
 
@@ -390,8 +391,7 @@ pub fn newtmp(prfx: Option<&[u8]>, k: i32, fn_: &mut Fn) -> Ref {
     }
 
     fn_.tmp.push(Tmp::new(
-        name, /*ndef*/ 1, /*nuse*/ 1, /*slot*/ -1,
-        /*cls*/ k as i16, // ugh tighten types
+        name, /*ndef*/ 1, /*nuse*/ 1, /*slot*/ -1, /*cls*/ k,
     ));
 
     // fn->tmp[t].cls = k;

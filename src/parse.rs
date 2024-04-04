@@ -13,11 +13,11 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Blk, BlkIdx, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT, TypIdx, KD, KE,
-    KL, KM, KS, KW, KX, O, Tmp0,
+    Blk, BlkIdx, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Target, Tmp0, Typ,
+    TypFld, TypFldT, TypIdx, KD, KE, KL, KM, KS, KW, KX, O,
 };
 use crate::optab::OPTAB;
-use crate::util::hash;
+use crate::util::{hash, newtmp};
 
 #[derive(Debug)]
 struct ParseError {
@@ -276,17 +276,17 @@ static uint ntyp;
  */
 
 struct Parser<'a> {
-    T: &Target,
+    T: &'a Target,
     inf: Bytes<BufReader<&'a File>>,
     ungetc: Option<u8>,
     inpath: &'a Path,
     thead: Token,
     tokval: TokVal,
     lnum: i32,
-    //static Fn *curf;
+    //curf: Option<Fn>,
     tmph: [i32; TMASK + 1],
     //static Phi **plink;
-    curb: Option<BlkIdx>,
+    //curb: Option<BlkIdx>,
     //static Blk **blink;
     //static Blk *blkh[BMask+1];
     nblk: i32,
@@ -1473,63 +1473,68 @@ b->dlink = 0; /* was trashed by findblk() */
 }
  */
 impl Parser<'_> {
-    //static Fn *
-    fn parsefn(&mut self, lnk: &Lnk) -> RubeResult<Fn> { // Mmm, return won't work here
-	// Blk *b;
-	// int i;
-	// PState ps;
-	
-	self.curb = None;
-	// nblk = 0;
-	// curi = insb;
-	// curf = alloc(sizeof *curf);
-	self.curf = Fn::new(lnk.clone());
-	// curf->ntmp = 0;
-	// curf->ncon = 2;
-	// curf->tmp = vnew(curf->ntmp, sizeof curf->tmp[0], PFn);
-	// curf->con = vnew(curf->ncon, sizeof curf->con[0], PFn);
-	for i in 0..(Tmp0 as i32)) {
+    // New function in curf after
+    fn parsefn(&mut self, lnk: &Lnk) -> RubeResult<Fn> {
+        // Blk *b;
+        // int i;
+        // PState ps;
+
+        // self.curb = None;
+        // nblk = 0;
+        // curi = insb;
+        // curf = alloc(sizeof *curf);
+        let mut curf = Fn::new(lnk.clone());
+        //let curf: &mut Fn = &mut self.curf.unwrap();
+        // curf->ntmp = 0;
+        // curf->ncon = 2;
+        // curf->tmp = vnew(curf->ntmp, sizeof curf->tmp[0], PFn);
+        // curf->con = vnew(curf->ncon, sizeof curf->con[0], PFn);
+        for i in 0..(Tmp0 as i32) {
             if self.T.fpr0 <= i && i < self.T.fpr0 + self.T.nfpr {
-		let _ = newtmp(0, Kd, curf); // WTF??
-	    } else {
-		let _ = newtmp(0, Kl, curf); // WTF??
-	    }
-	}
-	curf->con[0].type = CBits;
-	curf->con[0].bits.i = 0xdeaddead; /* UNDEF */
-	curf->con[1].type = CBits;
-	curf->lnk = *lnk;
-	blink = &curf->start;
-	curf->retty = Kx;
-	if (peek() != Tglo)
-            rcls = parsecls(&curf->retty);
-	else
-            rcls = K0;
-	if (next() != Tglo)
-            err("function name expected");
-	strncpy(curf->name, tokval.str, NString-1);
-	curf->vararg = parserefl(0);
-	if (nextnl() != Tlbrace)
-            err("function body must start with {");
-	ps = PLbl;
-	do
-            ps = parseline(ps);
-	while (ps != PEnd);
-	if (!curb)
-            err("empty function");
-	if (curb->jmp.type == Jxxx)
-            err("last block misses jump");
-	curf->mem = vnew(0, sizeof curf->mem[0], PFn);
-	curf->nmem = 0;
-	curf->nblk = nblk;
-	curf->rpo = 0;
-	for (b=0; b; b=b->link)
-	    b->dlink = 0; /* was trashed by findblk() */
-	for (i=0; i<BMask+1; ++i)
-            blkh[i] = 0;
-	memset(tmph, 0, sizeof tmph);
-	typecheck(curf);
-	return curf;
+                let _ = newtmp(None, KD, &mut curf);
+            } else {
+                let _ = newtmp(None, KL, &mut curf);
+            }
+        }
+
+        // #$@%@#$%@#$%@#$%@#$% up to here... carry on here...
+        // curf->con[0].type = CBits;
+        // curf->con[0].bits.i = 0xdeaddead; /* UNDEF */
+        // curf->con[1].type = CBits;
+        // // curf->lnk = *lnk;
+        // blink = &curf->start;
+        // curf->retty = Kx;
+        // if (peek() != Tglo)
+        //     rcls = parsecls(&curf->retty);
+        // else
+        //     rcls = K0;
+        // if (next() != Tglo)
+        //     err("function name expected");
+        // strncpy(curf->name, tokval.str, NString-1);
+        // curf->vararg = parserefl(0);
+        // if (nextnl() != Tlbrace)
+        //     err("function body must start with {");
+        // ps = PLbl;
+        // do
+        //     ps = parseline(ps);
+        // while (ps != PEnd);
+        // if (!curb)
+        //     err("empty function");
+        // if (curb->jmp.type == Jxxx)
+        //     err("last block misses jump");
+        // curf->mem = vnew(0, sizeof curf->mem[0], PFn);
+        // curf->nmem = 0;
+        // curf->nblk = nblk;
+        // curf->rpo = 0;
+        // for (b=0; b; b=b->link)
+        //     b->dlink = 0; /* was trashed by findblk() */
+        // for (i=0; i<BMask+1; ++i)
+        //     blkh[i] = 0;
+        // memset(tmph, 0, sizeof tmph);
+        // typecheck(curf);
+        // return curf;
+
+        Ok(curf)
     }
 }
 /*
@@ -2208,6 +2213,7 @@ parse(FILE *f, char *path, void dbgfile(char *), void data(Dat *), void func(Fn 
 
 impl Parser<'_> {
     fn new<'a>(
+        T: &'a Target,
         f: &'a File,
         path: &'a Path,
         dbgfile: fn(&[u8]) -> (),
@@ -2215,22 +2221,26 @@ impl Parser<'_> {
         func: fn(&Fn) -> (),
     ) -> Parser<'a> {
         Parser {
+            T,
             inf: BufReader::new(f).bytes(),
             ungetc: None,
             inpath: path,
             thead: Token::Txxx,
             tokval: TokVal::new(),
             lnum: 0,
+            //curf: None,
             tmph: [0; TMASK + 1],
+            //curb: None,
             nblk: 0,
             rcls: 0,
-            ntyp: 0,
+            //ntyp: 0,
             typ: vec![],
         }
     }
 }
 
 pub fn parse(
+    T: &Target,
     f: &File,
     path: &Path,
     dbgfile: fn(&[u8]) -> (),
@@ -2238,7 +2248,7 @@ pub fn parse(
     func: fn(&Fn) -> (),
 ) -> RubeResult<()> {
     // Allocate on the heap cos it's laaarge; TODO do we need tmph? Revert to stack
-    let mut parser = Box::new(Parser::new(f, path, dbgfile, data, func));
+    let mut parser = Box::new(Parser::new(T, f, path, dbgfile, data, func));
 
     parser.parse(dbgfile, data, func)
 }
