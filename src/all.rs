@@ -699,6 +699,7 @@ struct Lnk {
 };
  */
 
+#[derive(Clone)]
 pub struct Lnk {
     pub export: bool,
     pub thread: bool,
@@ -833,7 +834,7 @@ struct Dat {
 };
  */
 
-enum DatT {
+pub enum DatT {
     DStart,
     DEnd,
     DB,
@@ -844,6 +845,7 @@ enum DatT {
 }
 
 pub enum DatU {
+    None,
     Num(i64),
     Fltd(f64),
     Flts(f32),
@@ -852,12 +854,25 @@ pub enum DatU {
 }
 
 pub struct Dat {
-    type_: DatT,
-    name: Vec<u8>,
-    lnk: Lnk,
-    u: DatU,
-    isref: bool,
-    isstr: bool,
+    pub type_: DatT,
+    pub name: Vec<u8>,
+    pub lnk: Lnk,
+    pub u: DatU,
+    pub isref: bool,
+    pub isstr: bool,
+}
+
+impl Dat {
+    pub fn new(type_: DatT, name: &Vec<u8>, lnk: Lnk) -> Dat {
+        Dat {
+            type_,
+            name: name.clone(),
+            lnk: lnk,
+            u: DatU::None,
+            isref: false,
+            isstr: false,
+        }
+    }
 }
 
 /*

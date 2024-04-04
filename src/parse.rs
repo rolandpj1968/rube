@@ -13,8 +13,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Dat, Fn, KExt, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT, TypIdx, KD, KE, KL, KM, KS,
-    KW, KX, O,
+    Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT, TypIdx, KD, KE,
+    KL, KM, KS, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::hash;
@@ -428,6 +428,7 @@ impl Parser<'_> {
 }
 
 impl Parser<'_> {
+    // TODO - this is wrong cos it will slurp the next comma - rather do alphanum and '.'
     fn take_non_ws_as_utf8(&mut self) -> RubeResult<String> {
         let mut bytes: Vec<u8> = vec![];
 
@@ -445,7 +446,7 @@ impl Parser<'_> {
         match String::from_utf8(bytes.clone()) {
             Ok(s) => Ok(s),
             Err(_) => Err(self.err(&format!(
-                "invalid characters in floating point literal \"{}`",
+                "invalid characters in floating point literal {:?}",
                 String::from_utf8_lossy(&bytes)
             ))),
         }
@@ -456,7 +457,7 @@ impl Parser<'_> {
         let f: Result<f32, _> = s.parse();
         match f {
             Ok(v) => Ok(v),
-            Err(_) => Err(self.err(&format!("invalid float literal \"{}`", s))),
+            Err(_) => Err(self.err(&format!("invalid float literal {:?}", s))),
         }
     }
 
@@ -1892,7 +1893,101 @@ Done:
     d.type = DEnd;
     cb(&d);
 }
+ */
 
+impl Parser<'_> {
+    fn parsedat(&mut self, cb: fn(&Dat) -> (), lnk: &mut Lnk) -> RubeResult<()> {
+        // char name[NString] = {0};
+        // int t;
+        // Dat d;
+
+        if (self.nextnl()? != Token::Tglo || self.nextnl()? != Token::Teq) {
+            return Err(self.err("data name, then = expected"));
+        }
+
+        //strncpy(name, tokval.str, NString-1);
+        let name: Vec<u8> = self.tokval.str.clone();
+        let mut t: Token = self.nextnl()?;
+        lnk.align = 8;
+        if t == Token::Talign {
+            if self.nextnl()? != Token::Tint {
+                return Err(self.err("alignment expected"));
+            }
+            lnk.align = self.tokval.num as i8;
+            t = self.nextnl()?;
+        }
+
+        // d.type = DStart;
+        // d.name = name;
+        // d.lnk = lnk;
+        let mut d: Dat = Dat::new(DatT::DStart, &name, lnk.clone());
+        cb(&d);
+
+        if t != Token::Tlbrace {
+            return Err(self.err("expected data contents in { .. }"));
+        }
+        //for (;;) {
+        loop {
+            match self.nextnl()? {
+                Token::Trbrace => break,
+                Token::Tl => d.type_ = DatT::DL,
+                Token::Tw => d.type_ = DatT::DW,
+                Token::Th => d.type_ = DatT::DH,
+                Token::Tb => d.type_ = DatT::DB,
+                Token::Ts => d.type_ = DatT::DW,
+                Token::Td => d.type_ = DatT::DL,
+                Token::Tz => d.type_ = DatT::DZ,
+                _ => {
+                    return Err(self.err(&format!(
+                        "invalid size specifier '{}' ({:#02x?}) in data",
+                        escape_default(self.tokval.chr.unwrap_or(b'?')),
+                        self.tokval.chr
+                    )));
+                }
+            }
+            t = nextnl()?;
+            loop {
+                d.isstr = false;
+                d.isref = false;
+                d.u = DatU::None;
+
+                match t {
+                    Token::Tflts => d.u = DatU::Flts(self.tokval.flts),
+                    Token::Tfltd => d.u = DatU::Fltd(self.tokval.fltd),
+                    Token::Tint => d.u = DatU::Num(self.tokval.num),
+                    Token::Tglo => parsedatref(&d)?,
+                    Token::Tstr => parsedatstr(&d),
+                    _ => {
+                        return Err(self.err("constant literal or global ref expected in data"));
+                    }
+                }
+                cb(&d);
+                t = self.nextnl()?;
+                if !(t == Token::Tint
+                    || t == Token::Tflts
+                    || t == Token::Tfltd
+                    || t == Token::Tstr
+                    || t == Token::Tglo)
+                {
+                    break;
+                }
+            } //while (t == Tint || t == Tflts || t == Tfltd || t == Tstr || t == Tglo);
+            if t == Token::Trbrace {
+                break;
+            }
+            if t != Token::Tcomma {
+                return Err(self.err(", or } expected in data"));
+            }
+        }
+        //Done:
+        d.type_ = DatT::DEnd;
+        cb(&d);
+
+        Ok(())
+    }
+}
+
+/*
 static int
 parselnk(Lnk *lnk)
 {
