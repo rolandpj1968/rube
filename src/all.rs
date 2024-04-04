@@ -26,7 +26,7 @@ typedef unsigned long ulong;
 typedef unsigned long long bits;
  */
 
-pub type bits = u64;
+pub type Bits = u64;
 
 /*
 typedef struct BSet BSet;
@@ -57,7 +57,7 @@ enum {
 };
  */
 
-pub const NBit: usize = 8 * std::mem::size_of::<bits>();
+pub const NBit: usize = 8 * std::mem::size_of::<Bits>();
 
 /*
 struct Target {
@@ -91,12 +91,12 @@ pub struct Target {
     pub ngpr: i32,
     pub fpr0: i32, // first floating point reg
     pub nfpr: i32,
-    pub rglob: bits, // globally live regs (e.g., sp, fp)
+    pub rglob: Bits, // globally live regs (e.g., sp, fp)
     pub nrglob: i32,
     pub rsave: Vec<i32>, // caller-save [Vec???]
     pub nrsave: [i32; 2],
-    pub retregs: fn(Ref, [i32; 2]) -> bits,
-    pub argregs: fn(Ref, [i32; 2]) -> bits,
+    pub retregs: fn(Ref, [i32; 2]) -> Bits,
+    pub argregs: fn(Ref, [i32; 2]) -> Bits,
     pub memargs: fn(i32) -> i32,
     pub abi0: fn(&mut Fn),
     pub abi1: fn(&mut Fn),
@@ -859,15 +859,15 @@ enum TmpWdth {
 }
 
 pub struct Tmp {
-    name: Vec<u8>,
+    pub name: Vec<u8>,
     // Ins *def;
     // Use *use;
-    ndef: u32,
-    nuse: u32,
+    pub ndef: u32,
+    pub nuse: u32,
     // uint bid; /* id of a defining block */
     // uint cost;
-    slot: i32, /* -1 for unset */
-    cls: KExt,
+    pub slot: i32, /* -1 for unset */
+    pub cls: KExt,
     // struct {
     //     int r;  /* register or -1 */
     //     int w;  /* weight */
@@ -875,7 +875,7 @@ pub struct Tmp {
     // } hint;
     // int phi;
     // Alias alias;
-    width: TmpWdth,
+    pub width: TmpWdth,
     // int visit;
 }
 
@@ -893,8 +893,12 @@ impl Tmp {
 }
 
 // Index in Fn::tmp
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct TmpIdx(pub usize);
+
+impl TmpIdx {
+    pub const INVALID: TmpIdx = TmpIdx(usize::MAX);
+}
 
 /*
 struct Con {

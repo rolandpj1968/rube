@@ -53,11 +53,11 @@ hash(char *s)
 }
  */
 
-pub fn hash(s: &[u8]) -> u32 {
-    let mut h: u32 = 0;
+pub fn hash(s: &[u8]) -> usize {
+    let mut h: usize = 0;
 
     for c in s {
-        h = (*c as u32) + 17 * h;
+        h = (*c as usize) + 17 * h;
     }
 
     h

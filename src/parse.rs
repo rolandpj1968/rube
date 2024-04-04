@@ -14,8 +14,8 @@ use strum_macros::EnumIter;
 
 use crate::all::{
     Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, ORanges, Ref, RubeResult,
-    Sym, SymT, Target, Tmp0, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH, KUB,
-    KUH, KW, O,
+    Sym, SymT, Target, Tmp0, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH,
+    KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, newtmp};
@@ -286,7 +286,7 @@ struct Parser<'a> {
     tokval: TokVal,
     lnum: i32,
     //curf: Option<Fn>,
-    tmph: [i32; TMASK + 1],
+    tmph: [TmpIdx; TMASK + 1],
     //static Phi **plink;
     curb: Option<BlkIdx>,
     //static Blk **blink;
@@ -903,8 +903,8 @@ impl Parser<'_> {
         )))
     }
 }
-/*
 
+/*
 static Ref
 tmpref(char *v)
 {
@@ -925,7 +925,38 @@ tmpref(char *v)
     strcpy(curf->tmp[t].name, v);
     return TMP(t);
 }
+ */
 
+impl Parser<'_> {
+    fn tmpref(&mut self, v: &[u8], curf: &mut Fn) -> Ref {
+        // int t, *h;
+
+        // h = &tmph[hash(v) & TMask];
+        // t = *h;
+
+        let tmp_idx: TmpIdx = self.tmph[(hash(v) & TMASK) as usize];
+        if tmp_idx != TmpIdx::INVALID {
+            if curf.tmp[tmp_idx.0].name == v {
+                return Ref::RTmp(tmp_idx);
+            }
+            for t in (Tmp0..curf.tmp.len()).rev() {
+                if curf.tmp[t].name == v {
+                    return Ref::RTmp(TmpIdx(t));
+                }
+            }
+        }
+        // t = curf->ntmp;
+        // *h = t;
+        // newtmp(0, Kx, curf);
+        // strcpy(curf->tmp[t].name, v);
+        let t = curf.tmp.len();
+        let _ = newtmp(None, KX, curf);
+
+        Ref::RTmp(TmpIdx(t))
+    }
+}
+
+/*
 static Ref
 parseref()
 {
@@ -970,7 +1001,7 @@ impl Parser<'_> {
 
         // memset(&c, 0, sizeof c);
         let c: Con = match self.next()? {
-            Token::Ttmp => return self.tmpref(self.tokval.str),
+            Token::Ttmp => return Ok(self.tmpref(&self.tokval.str, curf)),
             Token::Tint => Con::new_bits(ConBits::I(self.tokval.num)),
             Token::Tflts => Con::new_bits(ConBits::F(self.tokval.flts)), // c.flt = 1;
             Token::Tfltd => Con::new_bits(ConBits::D(self.tokval.fltd)), // c.flt = 2;
@@ -979,7 +1010,7 @@ impl Parser<'_> {
                 Con::new_sym(Sym::new(SymT::SThr, self.intern(self.tokval.str)))
             }
             Token::Tglo => Con::new_sym(Sym::new(SymT::SGlo, self.intern(self.tokval.str))),
-            _ => return Ref::R,
+            _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
         };
 
         Ok(self.newcon(c, curf))
@@ -1731,7 +1762,7 @@ impl Parser<'_> {
         }
         // memset(tmph, 0, sizeof tmph);
         for i in 0..TMASK + 1 {
-            self.tmph[i] = 0;
+            self.tmph[i] = TmpIdx::INVALID;
         }
         self.typecheck(&curf)?;
         //return curf;
@@ -2431,7 +2462,7 @@ impl Parser<'_> {
             tokval: TokVal::new(),
             lnum: 0,
             //curf: None,
-            tmph: [0; TMASK + 1],
+            tmph: [TmpIdx::INVALID; TMASK + 1],
             curb: None,
             blkh: [BlkIdx::INVALID; BMASK + 1],
             //nblk: 0,
