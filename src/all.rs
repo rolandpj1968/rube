@@ -21,7 +21,11 @@ typedef unsigned char uchar;
 typedef unsigned int uint;
 typedef unsigned long ulong;
 typedef unsigned long long bits;
+ */
 
+pub type bits = u64;
+
+/*
 typedef struct BSet BSet;
 typedef struct Ref Ref;
 typedef struct Op Op;
@@ -48,7 +52,11 @@ enum {
     NField  = 32,
     NBit    = CHAR_BIT * sizeof(bits),
 };
+ */
 
+pub const NBit: usize = 8 * std::mem::size_of::<bits>();
+
+/*
 struct Target {
     char name[16];
     char apple;
@@ -71,14 +79,44 @@ struct Target {
     char asloc[4];
     char assym[4];
 };
+ */
 
+struct Target {
+    name: &'static [u8],
+    apple: bool,
+    gpr0: i32, // first general purpose reg
+    ngpr: i32,
+    fpr0: i32, // first floating point reg
+    nfpr: i32,
+    rglob: bits, // globally live regs (e.g., sp, fp)
+    nrglob: i32,
+    rsave: Vec<i32>, // caller-save [Vec???]
+    nrsave: [i32; 2],
+    retregs: fn(Ref, [i32; 2]) -> bits,
+    argregs: fn(Ref, [i32; 2]) -> bits,
+    memargs: fn(i32) -> i32,
+    abi0: fn(&mut Fn),
+    abi1: fn(&mut Fn),
+    isel: fn(&mut Fn),
+    emitfn: fn(&Fn /*, FILE **/), // TODO
+    emitfin: fn(/*FILE **/),      // TODO
+    asloc: &'static [u8; 4],
+    assym: &'static [u8; 4],
+}
+
+/*
 #define BIT(n) ((bits)1 << (n))
 
 enum {
     RXX = 0,
     Tmp0 = NBit, /* first non-reg temporary */
 };
+ */
 
+pub const RXX: usize = 0;
+pub const Tmp0: usize = NBit;
+
+/*
 struct BSet {
     uint nt;
     bits *t;
@@ -113,7 +151,7 @@ enum {
 #[derive(Clone, Copy)]
 enum Ref {
     R,
-    RTmp(u32),
+    RTmp(TmpIdx),
     RCon(u32),
     RInt(u32),
     RType(u32), /* last kind to come out of the parser */
@@ -744,9 +782,52 @@ struct Tmp {
 };
  */
 
-pub struct Tmp {}
+enum TmpWdth {
+    WFull,
+    Wsb, /* must match Oload/Oext order */
+    Wub,
+    Wsh,
+    Wuh,
+    Wsw,
+    Wuw,
+}
+
+pub struct Tmp {
+    name: Vec<u8>,
+    // Ins *def;
+    // Use *use;
+    ndef: u32,
+    nuse: u32,
+    // uint bid; /* id of a defining block */
+    // uint cost;
+    slot: i32, /* -1 for unset */
+    cls: i16,  // TODO real type
+    // struct {
+    //     int r;  /* register or -1 */
+    //     int w;  /* weight */
+    //     bits m; /* avoid these registers */
+    // } hint;
+    // int phi;
+    // Alias alias;
+    width: TmpWdth,
+    // int visit;
+}
+
+impl Tmp {
+    pub fn new(name: Vec<u8>, ndef: u32, nuse: u32, slot: i32, cls: i16) -> Tmp {
+        Tmp {
+            name,
+            ndef,
+            nuse,
+            slot,
+            cls,
+            width: TmpWdth::WFull,
+        }
+    }
+}
+
 // Index in Fn::tmp
-pub struct TmpIdx(usize);
+pub struct TmpIdx(pub usize);
 
 /*
 struct Con {
@@ -834,7 +915,7 @@ struct Fn {
 
 pub struct Fn {
     pub blks: Vec<Blk>,
-    pub start: BlkIdx, // Option?
+    pub start: Option<BlkIdx>,
     pub tmp: Vec<Tmp>,
     pub con: Vec<Con>,
     pub mem: Vec<Mem>,
@@ -853,18 +934,43 @@ pub struct Fn {
     pub lnk: Lnk,
 }
 
+impl Fn {
+    pub fn new(lnk: Lnk) -> Fn {
+        Fn {
+            blks: vec![],
+            start: None,
+            tmp: vec![],
+            con: vec![],
+            mem: vec![],
+            //int ntmp,
+            //int ncon,
+            //int nmem,
+            //uint nblk,
+            retty: None,
+            retr: Ref::R,
+            rpo: vec![],
+            //bits reg,
+            slot: -1, // ???
+            vararg: false,
+            dynalloc: false,
+            name: vec![],
+            lnk,
+        }
+    }
+}
+
 /*
 struct Typ {
-    char name[NString];
-    char isdark;
-    char isunion;
-    int align;
-    uint64_t size;
-    uint nunion;
-    struct Field {
-        enum {
-            FEnd,
-            Fb,
+char name[NString];
+char isdark;
+char isunion;
+int align;
+uint64_t size;
+uint nunion;
+struct Field {
+enum {
+FEnd,
+Fb,
             Fh,
             Fw,
             Fl,

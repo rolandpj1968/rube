@@ -13,8 +13,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT, TypIdx, KD, KE,
-    KL, KM, KS, KW, KX, O,
+    Blk, BlkIdx, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT, TypIdx, KD, KE,
+    KL, KM, KS, KW, KX, O, Tmp0,
 };
 use crate::optab::OPTAB;
 use crate::util::hash;
@@ -276,6 +276,7 @@ static uint ntyp;
  */
 
 struct Parser<'a> {
+    T: &Target,
     inf: Bytes<BufReader<&'a File>>,
     ungetc: Option<u8>,
     inpath: &'a Path,
@@ -285,12 +286,12 @@ struct Parser<'a> {
     //static Fn *curf;
     tmph: [i32; TMASK + 1],
     //static Phi **plink;
-    //static Blk *curb;
+    curb: Option<BlkIdx>,
     //static Blk **blink;
     //static Blk *blkh[BMask+1];
     nblk: i32,
     rcls: i32,
-    ntyp: u32,
+    //ntyp: u32,
     typ: Vec<Typ>, // from util.c
 }
 
@@ -1473,24 +1474,25 @@ b->dlink = 0; /* was trashed by findblk() */
  */
 impl Parser<'_> {
     //static Fn *
-    fn parsefn(lnk: &Lnk) -> RubeResult<Fn> { // Mmm, return won't work here
-	Blk *b;
-	int i;
-	PState ps;
+    fn parsefn(&mut self, lnk: &Lnk) -> RubeResult<Fn> { // Mmm, return won't work here
+	// Blk *b;
+	// int i;
+	// PState ps;
 	
-	curb = 0;
-	nblk = 0;
-	curi = insb;
-	curf = alloc(sizeof *curf);
-	curf->ntmp = 0;
-	curf->ncon = 2;
-	curf->tmp = vnew(curf->ntmp, sizeof curf->tmp[0], PFn);
-	curf->con = vnew(curf->ncon, sizeof curf->con[0], PFn);
-	for (i=0; i<Tmp0; ++i) {
-            if (T.fpr0 <= i && i < T.fpr0 + T.nfpr) {
-		newtmp(0, Kd, curf);
+	self.curb = None;
+	// nblk = 0;
+	// curi = insb;
+	// curf = alloc(sizeof *curf);
+	self.curf = Fn::new(lnk.clone());
+	// curf->ntmp = 0;
+	// curf->ncon = 2;
+	// curf->tmp = vnew(curf->ntmp, sizeof curf->tmp[0], PFn);
+	// curf->con = vnew(curf->ncon, sizeof curf->con[0], PFn);
+	for i in 0..(Tmp0 as i32)) {
+            if self.T.fpr0 <= i && i < self.T.fpr0 + self.T.nfpr {
+		let _ = newtmp(0, Kd, curf); // WTF??
 	    } else {
-		newtmp(0, Kl, curf);
+		let _ = newtmp(0, Kl, curf); // WTF??
 	    }
 	}
 	curf->con[0].type = CBits;

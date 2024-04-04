@@ -1,3 +1,5 @@
+use crate::all::{Fn, Tmp, TmpIdx};
+
 /*
 #include "all.h"
 #include <stdarg.h>
@@ -364,7 +366,44 @@ newtmp(char *prfx, int k,  Fn *fn)
     fn->tmp[t].ndef = +1;
     return TMP(t);
 }
+ */
 
+pub fn newtmp(prfx: Option<&[u8]>, k: i32, fn_: &mut Fn) -> Ref {
+    static mut n: i32 = 0;
+    // int t;
+
+    // t = fn_->ntmp++;
+    let t = fn_.tmp.len();
+    // vgrow(&fn_->tmp, fn_->ntmp);
+    // memset(&fn_->tmp[t], 0, sizeof(Tmp));
+    let mut name: Vec<u8> = vec![];
+    // Mmm, empty name if there's no prefix?
+    if let Some(bytes) = prfx {
+        // strf(fn->tmp[t].name, "%s.%d", prfx, ++n);
+        name.extend_from_slice(bytes);
+        name.push(b'.');
+        unsafe {
+            // TODO
+            n += 1;
+            name.extend_from_slice(&format!("{}", n).as_bytes());
+        }
+    }
+
+    fn_.tmp.push(Tmp::new(
+        name, /*ndef*/ 1, /*nuse*/ 1, /*slot*/ -1,
+        /*cls*/ k as i16, // ugh tighten types
+    ));
+
+    // fn->tmp[t].cls = k;
+    // fn->tmp[t].slot = -1;
+    // fn->tmp[t].nuse = +1;
+    // fn->tmp[t].ndef = +1;
+
+    // return TMP(t);
+    Ref::RTmp(TmpIdx(t))
+}
+
+/*
 void
 chuse(Ref r, int du, Fn *fn)
 {
