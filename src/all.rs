@@ -83,12 +83,21 @@ struct BSet {
     uint nt;
     bits *t;
 };
+ */
 
+/*
 struct Ref {
     uint type:3;
     uint val:29;
 };
+ */
 
+// pub struct Ref {
+//     pub type_: RefT,
+//     pub val: u32,
+// }
+
+/*
 enum {
     RTmp,
     RCon,
@@ -98,7 +107,22 @@ enum {
     RCall,
     RMem,
 };
+ */
 
+// TODO we can tighten up these types
+#[derive(Clone, Copy)]
+enum Ref {
+    R,
+    RTmp(u32),
+    RCon(u32),
+    RInt(u32),
+    RType(u32), /* last kind to come out of the parser */
+    RSlot(u32),
+    RCall(u32),
+    RMem(u32),
+}
+
+/*
 #define R        (Ref){RTmp, 0}
 #define UNDEF    (Ref){RCon, 0}  /* represents uninitialized data */
 #define CON_Z    (Ref){RCon, 1}
@@ -550,7 +574,11 @@ struct Ins {
     Ref to;
     Ref arg[2];
 };
+ */
 
+pub struct Ins {}
+
+/*
 struct Phi {
     Ref to;
     Ref *arg;
@@ -559,7 +587,20 @@ struct Phi {
     int cls;
     Phi *link;
 };
+ */
 
+pub struct Phi {
+    to: Ref,
+    arg: Vec<Ref>,
+    blk: Vec<BlkIdx>,
+    //uint narg;
+    cls: bool,
+    link: PhiIdx,
+}
+
+pub struct PhiIdx(usize); // Index into Fn::phi
+
+/*
 struct Blk {
     Phi *phi;
     Ins *ins;
@@ -587,7 +628,43 @@ struct Blk {
     int loop;
     char name[NString];
 };
+ */
 
+#[derive(Clone, Copy)]
+pub struct BlkJmp {
+    pub type_: i16, // TODO
+    pub arg: Ref,
+}
+
+pub struct Blk {
+    pub phi: PhiIdx,
+    pub ins: Vec<Ins>,
+    //pub uint nins;
+    pub jmp: BlkJmp,
+    pub s1: Option<BlkIdx>,
+    pub s2: Option<BlkIdx>,
+    pub link: Option<BlkIdx>,
+
+    pub id: u32,
+    pub visit: u32,
+
+    pub idom: BlkIdx, // maybe Vec<BlkIdx>?
+    pub dom: BlkIdx,  // maybe Vec<BlkIdx>?
+    pub dlink: BlkIdx,
+    pub fron: Vec<BlkIdx>,
+    //pub uint nfron;
+    pub pred: Vec<BlkIdx>,
+    //pub uint npred;
+    //pub BSet in[1], out[1], gen[1]; // TODO
+    pub nlive: [u32; 2],
+    pub loop_: bool, // i32?
+    pub name: Vec<u8>,
+}
+
+// Index into Fn::blks
+pub struct BlkIdx(usize);
+
+/*
 struct Use {
     enum {
         UXXX,
@@ -665,7 +742,13 @@ struct Tmp {
     } width;
     int visit;
 };
+ */
 
+pub struct Tmp {}
+// Index in Fn::tmp
+pub struct TmpIdx(usize);
+
+/*
 struct Con {
     enum {
         CUndef,
@@ -680,7 +763,13 @@ struct Con {
     } bits;
     char flt; /* 1 to print as s, 2 to print as d */
 };
+ */
 
+pub struct Con {}
+// Index in Fn::con
+pub struct ConIdx(usize);
+
+/*
 typedef struct Addr Addr;
 
 struct Addr { /* amd64 addressing */
@@ -689,7 +778,20 @@ struct Addr { /* amd64 addressing */
     Ref index;
     int scale;
 };
+ */
 
+pub struct Addr {
+    // amd64 addressing
+    offset: Con,
+    base: Ref,
+    index: Ref,
+    scale: i32,
+}
+
+pub type Mem = Addr;
+pub struct MemIdx(usize); // Index into Fn::mem
+
+/*
 struct Lnk {
     char export;
     char thread;
@@ -730,7 +832,26 @@ struct Fn {
 };
  */
 
-pub struct Fn {}
+pub struct Fn {
+    pub blks: Vec<Blk>,
+    pub start: BlkIdx, // Option?
+    pub tmp: Vec<Tmp>,
+    pub con: Vec<Con>,
+    pub mem: Vec<Mem>,
+    //pub int ntmp,
+    //pub int ncon,
+    //pub int nmem,
+    //pub uint nblk,
+    pub retty: Option<TypIdx>, // index in Parser::typ, None if no aggregate return
+    pub retr: Ref,
+    pub rpo: Vec<BlkIdx>,
+    //pub bits reg,
+    pub slot: i32, // ???
+    pub vararg: bool,
+    pub dynalloc: bool,
+    pub name: Vec<u8>,
+    pub lnk: Lnk,
+}
 
 /*
 struct Typ {

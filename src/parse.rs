@@ -1470,7 +1470,67 @@ b->dlink = 0; /* was trashed by findblk() */
     typecheck(curf);
     return curf;
 }
-
+ */
+impl Parser<'_> {
+    //static Fn *
+    fn parsefn(lnk: &Lnk) -> RubeResult<Fn> { // Mmm, return won't work here
+	Blk *b;
+	int i;
+	PState ps;
+	
+	curb = 0;
+	nblk = 0;
+	curi = insb;
+	curf = alloc(sizeof *curf);
+	curf->ntmp = 0;
+	curf->ncon = 2;
+	curf->tmp = vnew(curf->ntmp, sizeof curf->tmp[0], PFn);
+	curf->con = vnew(curf->ncon, sizeof curf->con[0], PFn);
+	for (i=0; i<Tmp0; ++i) {
+            if (T.fpr0 <= i && i < T.fpr0 + T.nfpr) {
+		newtmp(0, Kd, curf);
+	    } else {
+		newtmp(0, Kl, curf);
+	    }
+	}
+	curf->con[0].type = CBits;
+	curf->con[0].bits.i = 0xdeaddead; /* UNDEF */
+	curf->con[1].type = CBits;
+	curf->lnk = *lnk;
+	blink = &curf->start;
+	curf->retty = Kx;
+	if (peek() != Tglo)
+            rcls = parsecls(&curf->retty);
+	else
+            rcls = K0;
+	if (next() != Tglo)
+            err("function name expected");
+	strncpy(curf->name, tokval.str, NString-1);
+	curf->vararg = parserefl(0);
+	if (nextnl() != Tlbrace)
+            err("function body must start with {");
+	ps = PLbl;
+	do
+            ps = parseline(ps);
+	while (ps != PEnd);
+	if (!curb)
+            err("empty function");
+	if (curb->jmp.type == Jxxx)
+            err("last block misses jump");
+	curf->mem = vnew(0, sizeof curf->mem[0], PFn);
+	curf->nmem = 0;
+	curf->nblk = nblk;
+	curf->rpo = 0;
+	for (b=0; b; b=b->link)
+	    b->dlink = 0; /* was trashed by findblk() */
+	for (i=0; i<BMask+1; ++i)
+            blkh[i] = 0;
+	memset(tmph, 0, sizeof tmph);
+	typecheck(curf);
+	return curf;
+    }
+}
+/*
 static void
 parsefields(Field *fld, Typ *ty, int t)
 {
