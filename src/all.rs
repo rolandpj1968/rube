@@ -157,7 +157,7 @@ enum {
 pub enum Ref {
     R,
     RTmp(TmpIdx),
-    RCon(u32),
+    RCon(ConIdx),
     RInt(u32),
     RType(TypIdx), /* last kind to come out of the parser */
     RSlot(u32),
@@ -771,12 +771,13 @@ struct Sym {
     uint32_t id;
 };
  */
+#[derive(PartialEq)]
 pub enum SymT {
     SGlo,
     SThr,
 }
 
-#[derive(new)]
+#[derive(new, PartialEq)]
 pub struct Sym {
     pub type_: SymT,
     pub id: InternId,
@@ -919,12 +920,14 @@ struct Con {
 };
  */
 
+#[derive(PartialEq)]
 pub enum ConT {
     CUndef,
     CBits,
     CAddr,
 }
 
+#[derive(PartialEq)]
 pub enum ConBits {
     None,
     I(i64),
@@ -932,7 +935,7 @@ pub enum ConBits {
     F(f32),
 }
 
-#[derive(new)]
+#[derive(new, PartialEq)]
 pub struct Con {
     pub type_: ConT,
     pub sym: Sym,

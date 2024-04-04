@@ -18,7 +18,7 @@ use crate::all::{
     KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
-use crate::util::{hash, intern, newtmp, Bucket, IMask, InternId};
+use crate::util::{hash, intern, newcon, newtmp, Bucket, IMask, InternId};
 
 #[derive(Debug)]
 struct ParseError {
@@ -1015,7 +1015,7 @@ impl Parser<'_> {
             _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
         };
 
-        Ok(self.newcon(c, curf))
+        Ok(newcon(c, curf))
     }
 }
 
