@@ -4,6 +4,8 @@
 // TODO - use this more prevalently...
 use derive_new::new;
 
+use crate::util::InternId;
+
 // Generic Result
 pub type RubeError = Box<dyn std::error::Error>;
 pub type RubeResult<T> = Result<T, RubeError>;
@@ -777,11 +779,11 @@ pub enum SymT {
 #[derive(new)]
 pub struct Sym {
     pub type_: SymT,
-    pub id: u32, // ??? strong type? It's an intern string...
+    pub id: InternId,
 }
 
 impl Sym {
-    const UNDEF: Sym = Sym::new(SymT::SGlo, 0); // Ugh, sort out Con
+    const UNDEF: Sym = Sym::new(SymT::SGlo, InternId::INVALID); // Ugh, sort out Con
 }
 
 // impl Sym {

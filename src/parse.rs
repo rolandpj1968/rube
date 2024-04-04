@@ -18,7 +18,7 @@ use crate::all::{
     KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
-use crate::util::{hash, newtmp};
+use crate::util::{hash, intern, newtmp, Bucket, IMask, InternId};
 
 #[derive(Debug)]
 struct ParseError {
@@ -277,7 +277,8 @@ static int rcls;
 static uint ntyp;
  */
 
-struct Parser<'a> {
+// Ugh, pub for util::intern()
+pub struct Parser<'a> {
     T: &'a Target,
     inf: Bytes<BufReader<&'a File>>,
     ungetc: Option<u8>,
@@ -294,8 +295,9 @@ struct Parser<'a> {
     //nblk: i32,
     rcls: KExt,
     //ntyp: u32,
-    typ: Vec<Typ>,  // from util.c
-    insb: Vec<Ins>, // from util.c
+    typ: Vec<Typ>,                 // from util.c
+    insb: Vec<Ins>,                // from util.c
+    pub itbl: [Bucket; IMask + 1], // from util.c; string interning table; ugh pub for util::intern
 }
 
 /*
@@ -1007,9 +1009,9 @@ impl Parser<'_> {
             Token::Tfltd => Con::new_bits(ConBits::D(self.tokval.fltd)), // c.flt = 2;
             Token::Tthread => {
                 self.expect(Token::Tglo)?;
-                Con::new_sym(Sym::new(SymT::SThr, self.intern(self.tokval.str)))
+                Con::new_sym(Sym::new(SymT::SThr, intern(&self.tokval.str, self)))
             }
-            Token::Tglo => Con::new_sym(Sym::new(SymT::SGlo, self.intern(self.tokval.str))),
+            Token::Tglo => Con::new_sym(Sym::new(SymT::SGlo, intern(&self.tokval.str, self))), // Ugh
             _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
         };
 
@@ -1704,13 +1706,13 @@ impl Parser<'_> {
         // curf->con[0].bits.i = 0xdeaddead; /* UNDEF */
         curf.con.push(Con::new(
             ConT::CBits,
-            Sym::new(SymT::SGlo, 0),
+            Sym::new(SymT::SGlo, InternId::INVALID),
             ConBits::I(0xdeaddead),
         )); /* UNDEF */
         // curf->con[1].type = CBits;
         curf.con.push(Con::new(
             ConT::CBits,
-            Sym::new(SymT::SGlo, 0),
+            Sym::new(SymT::SGlo, InternId::INVALID),
             ConBits::I(0),
         )); // ??? what's this for?
             // curf->lnk = *lnk;
@@ -2453,6 +2455,7 @@ impl Parser<'_> {
         data: fn(&Dat) -> (),
         func: fn(&Fn) -> (),
     ) -> Parser<'a> {
+        // let itbl0 = [(); IMask + 1].map(|_| Vec::new()); //[Bucket::EMPTY; IMask + 1],
         Parser {
             T,
             inf: BufReader::new(f).bytes(),
@@ -2470,6 +2473,7 @@ impl Parser<'_> {
             //ntyp: 0,
             typ: vec![],
             insb: vec![],
+            itbl: [(); IMask + 1].map(|_| Vec::new()), //[Bucket::EMPTY; IMask + 1],
         }
     }
 }

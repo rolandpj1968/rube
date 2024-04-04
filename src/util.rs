@@ -1,4 +1,5 @@
 use crate::all::{Fn, KExt, Ref, Tmp, TmpIdx};
+use crate::parse::Parser; // ugh for intern()
 
 /*
 #include "all.h"
@@ -24,6 +25,11 @@ struct Bucket {
     uint nstr;
     char **str;
 };
+ */
+
+pub type Bucket = Vec<Vec<u8>>;
+
+/*
 
 enum {
     VMin = 2,
@@ -32,7 +38,12 @@ enum {
     IBits = 12,
     IMask = (1<<IBits) - 1,
 };
+ */
 
+const IBits: usize = 12;
+pub const IMask: usize = (1 << IBits) - 1;
+
+/*
 Typ *typ;
 Ins insb[NIns], *curi;
 
@@ -206,7 +217,49 @@ intern(char *s)
     strcpy(b->str[n], s);
     return h + (n<<IBits);
 }
+ */
 
+pub struct InternId(usize);
+
+impl InternId {
+    pub const INVALID: InternId = InternId(usize::MAX);
+}
+
+pub fn intern(s: &[u8], parser: &mut Parser) -> InternId {
+    // Ugh, ownership
+    // Bucket *b;
+    // uint32_t h;
+    // uint i, n;
+
+    let h = hash(s) & IMask;
+    let b = &mut parser.itbl[h];
+    let n = b.len();
+
+    for i in 0..n {
+        if s == b[i] {
+            return InternId(h + (i << IBits));
+        }
+    }
+
+    if n == 1 << (32 - IBits) {
+        panic!("interning table overflow");
+    }
+
+    // if (n == 0)
+    //     b->str = vnew(1, sizeof b->str[0], PHeap);
+    // else if ((n & (n-1)) == 0)
+    //     vgrow(&b->str, n+n);
+
+    // b->str[n] = emalloc(strlen(s)+1);
+    // b->nstr = n + 1;
+    // strcpy(b->str[n], s);
+
+    b.push(s.to_vec());
+
+    InternId(h + (n << IBits))
+}
+
+/*
 char *
 str(uint32_t id)
 {
