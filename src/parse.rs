@@ -307,7 +307,7 @@ err(char *s, ...)
  */
 
 impl Parser<'_> {
-    fn err(&self, s: String) -> Box<ParseError> {
+    fn err(&self, s: &str) -> Box<ParseError> {
         Box::new(ParseError::new(format!(
             "qbe:{}:{}: {}",
             self.inpath.display(),
@@ -348,7 +348,7 @@ lazy_static! {
         for t in Token::iter() {
             let i = t as usize;
             if !kwmap[i].is_empty() {
-                let h = (hash(kwmap[i]) as usize) * K >> M;
+                let h = ((hash(kwmap[i]) as usize) * K) >> M;
                 assert!(lexh0[h] == Token::Txxx);
                 lexh0[h] = t;
             }
@@ -390,14 +390,14 @@ impl Parser<'_> {
         let mut n: u64 = 0;
         let mut c = self.getc()?;
         if c.is_none() {
-            return Err(self.err("end-of-file in integer constant".to_string()));
+            return Err(self.err("end-of-file expecting integer constant"));
         }
         let mut craw = c.unwrap();
         let m = craw == b'-';
         if m || craw == b'+' {
             c = self.getc()?;
             if c.is_none() {
-                return Err(self.err("end-of-file in integer constant".to_string()));
+                return Err(self.err("end-of-file in integer constant"));
             }
         }
         loop {
@@ -441,7 +441,7 @@ impl Parser<'_> {
 
         match String::from_utf8(bytes.clone()) {
             Ok(s) => Ok(s),
-            Err(_) => Err(self.err(format!(
+            Err(_) => Err(self.err(&format!(
                 "invalid characters in floating point literal \"{}`",
                 String::from_utf8_lossy(&bytes)
             ))),
@@ -453,7 +453,7 @@ impl Parser<'_> {
         let f: Result<f32, _> = s.parse();
         match f {
             Ok(v) => Ok(v),
-            Err(_) => Err(self.err(format!("invalid float literal \"{}`", s))),
+            Err(_) => Err(self.err(&format!("invalid float literal \"{}`", s))),
         }
     }
 
@@ -462,7 +462,7 @@ impl Parser<'_> {
         let f: Result<f64, _> = s.parse();
         match f {
             Ok(v) => Ok(v),
-            Err(_) => Err(self.err(format!("invalid double literal \"{}`", s))),
+            Err(_) => Err(self.err(&format!("invalid double literal {:?}", s))),
         }
     }
 }
@@ -699,7 +699,7 @@ impl Parser<'_> {
                 let prev_craw = craw;
                 c = self.getc()?;
                 if c.is_none() {
-                    return Err(self.err(format!(
+                    return Err(self.err(&format!(
                         "end of file after '{}' ({:#02x?})",
                         escape_default(prev_craw),
                         prev_craw
@@ -709,7 +709,7 @@ impl Parser<'_> {
             }
 
             if !is_alpha(craw) && craw != b'.' && craw != b'_' {
-                return Err(self.err(format!(
+                return Err(self.err(&format!(
                     "invalid character '{}' ({:#02x?})",
                     escape_default(craw),
                     craw
@@ -740,7 +740,7 @@ impl Parser<'_> {
             }
             t = lexh[(hash(&tok) as usize) * K >> M];
             if t == Token::Txxx || kwmap[t as usize] != tok {
-                return Err(self.err(format!("unknown keyword \"{:?}\"", tok)));
+                return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
             }
         } else if take_quote {
             assert!(t != Token::Txxx);
@@ -750,7 +750,7 @@ impl Parser<'_> {
             loop {
                 c = self.getc()?;
                 if c.is_none() {
-                    return Err(self.err("unterminated string".to_string()));
+                    return Err(self.err("unterminated string"));
                 }
                 craw = c.unwrap();
                 self.tokval.str.push(craw);
@@ -767,7 +767,7 @@ impl Parser<'_> {
             return Ok(Token::Tint);
         }
 
-        Err(self.err(format!(
+        Err(self.err(&format!(
             "unexpected character '{}' ({:#02x?})",
             escape_default(craw),
             craw
@@ -889,7 +889,7 @@ impl Parser<'_> {
             return Ok(());
         }
 
-        Err(self.err(format!(
+        Err(self.err(&format!(
             "{} expected, got {} instead",
             ttoa[t as usize], ttoa[t1 as usize]
         )))
@@ -976,7 +976,7 @@ impl Parser<'_> {
                 return Ok(TypIdx(i));
             }
         }
-        Err(self.err(format!(
+        Err(self.err(&format!(
             "undefined type :{}",
             String::from_utf8_lossy(&self.tokval.str)
         )))
@@ -1590,7 +1590,7 @@ impl Parser<'_> {
                     s = self.typ[idx].size;
                     a = self.typ[idx].align;
                 }
-                _ => return Err(self.err("invalid type member specifier".to_string())),
+                _ => return Err(self.err("invalid type member specifier")),
             }
             if a > al {
                 al = a;
@@ -1638,7 +1638,7 @@ impl Parser<'_> {
             t = self.nextnl()?;
         }
         if t != Token::Trbrace {
-            return Err(self.err(", or } expected".to_string()));
+            return Err(self.err(", or } expected"));
         }
         // TODO sentinal value marking end of fields - we don't need this in rust
         //fld[n].type_ = FEnd;
@@ -1732,14 +1732,14 @@ impl Parser<'_> {
         let mut ty = Typ::new();
 
         if self.nextnl()? != Token::Ttyp || self.nextnl()? != Token::Teq {
-            return Err(self.err("type name and then = expected".to_string()));
+            return Err(self.err("type name and then = expected"));
         }
 
         ty.name = self.tokval.str.clone();
         let mut t = self.nextnl()?;
         if t == Token::Talign {
             if self.nextnl()? != Token::Tint {
-                return Err(self.err("alignment expected".to_string()));
+                return Err(self.err("alignment expected"));
             }
             let mut al: i32 = 0;
             // for (al=0; tokval.num /= 2; al++)
@@ -1755,17 +1755,17 @@ impl Parser<'_> {
             t = self.nextnl()?;
         }
         if t != Token::Tlbrace {
-            return Err(self.err("type body must start with {".to_string()));
+            return Err(self.err("type body must start with {"));
         }
         t = self.nextnl()?;
         if t == Token::Tint {
             ty.isdark = true;
             ty.size = self.tokval.num as u64; // TODO: QBE notify? Mmm check negative value?
             if ty.align == -1 {
-                return Err(self.err("dark types need alignment".to_string()));
+                return Err(self.err("dark types need alignment"));
             }
             if self.nextnl()? != Token::Trbrace {
-                return Err(self.err("} expected".to_string()));
+                return Err(self.err("} expected"));
             }
             self.typ.push(ty);
             return Ok(());
@@ -1777,7 +1777,7 @@ impl Parser<'_> {
             //do {
             loop {
                 if t != Token::Tlbrace {
-                    return Err(self.err("invalid union member".to_string()));
+                    return Err(self.err("invalid union member"));
                 }
                 //vgrow(&ty->fields, n+1);
                 t = self.nextnl()?;
@@ -1942,10 +1942,10 @@ impl Parser<'_> {
 
                 Token::Tsection => {
                     if lnk.sec.is_empty() {
-                        return Err(self.err("only one section allowed".to_string()));
+                        return Err(self.err("only one section allowed"));
                     }
                     if self.next()? != Token::Tstr {
-                        return Err(self.err("section \"name\" expected".to_string()));
+                        return Err(self.err("section \"name\" expected"));
                     }
                     lnk.sec = self.tokval.str.clone();
                     if self.peek()? == Token::Tstr {
@@ -1956,10 +1956,10 @@ impl Parser<'_> {
 
                 _ => {
                     if t == Token::Tfunc && lnk.thread {
-                        return Err(self.err("only data may have thread linkage".to_string()));
+                        return Err(self.err("only data may have thread linkage"));
                     }
                     if haslnk && t != Token::Tdata && t != Token::Tfunc {
-                        return Err(self.err("only data and function have linkage".to_string()));
+                        return Err(self.err("only data and function have linkage"));
                     }
                     return Ok(t);
                 }
@@ -2088,7 +2088,7 @@ impl Parser<'_> {
                 }
 
                 _ => {
-                    return Err(self.err("top-level definition expected".to_string()));
+                    return Err(self.err("top-level definition expected"));
                 }
             }
         }
