@@ -533,6 +533,16 @@ pub struct Op {
     pub canfold: bool,
 }
 
+impl Op {
+    pub const fn new(name: &'static [u8], argcls: [[KExt; 4]; 2], canfold: bool) -> Op {
+        Op {
+            name,
+            argcls,
+            canfold,
+        }
+    }
+}
+
 /*
 struct Ins {
     uint op:30;
