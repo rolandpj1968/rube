@@ -157,7 +157,7 @@ pub enum Ref {
     RTmp(TmpIdx),
     RCon(u32),
     RInt(u32),
-    RType(u32), /* last kind to come out of the parser */
+    RType(TypIdx), /* last kind to come out of the parser */
     RSlot(u32),
     RCall(u32),
     RMem(u32),
@@ -552,7 +552,7 @@ pub fn isretbh(j: J) -> bool {
 //     (k as usize) >> 1
 // }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum KExt {
     // Duplicated here from Kbase cos optab etc. uses the everythings.
     // This is going to cause grief?
@@ -632,8 +632,27 @@ struct Ins {
     Ref arg[2];
 };
  */
+#[derive(new)]
+pub struct Ins {
+    op: O,
+    cls: KExt, // Must be one of Kw, Kl, Ks, Kd
+    to: Ref,
+    arg: [Ref; 2],
+}
 
-pub struct Ins {}
+impl Ins {
+    pub fn new0(op: O, cls: KExt, to: Ref) -> Ins {
+        Ins::new(op, cls, to, [Ref::R, Ref::R])
+    }
+
+    pub fn new1(op: O, cls: KExt, to: Ref, args1: [Ref; 1]) -> Ins {
+        Ins::new(op, cls, to, [args1[0], Ref::R])
+    }
+
+    pub fn new2(op: O, cls: KExt, to: Ref, args2: [Ref; 2]) -> Ins {
+        Ins::new(op, cls, to, args2)
+    }
+}
 
 /*
 struct Phi {

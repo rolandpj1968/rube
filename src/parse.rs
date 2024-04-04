@@ -13,9 +13,9 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, RubeResult, Sym,
-    SymT, Target, Tmp0, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH, KUB, KUH,
-    KW, O,
+    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, ORanges, Ref, RubeResult,
+    Sym, SymT, Target, Tmp0, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH, KUB,
+    KUH, KW, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, newtmp};
@@ -294,7 +294,8 @@ struct Parser<'a> {
     //nblk: i32,
     rcls: KExt,
     //ntyp: u32,
-    typ: Vec<Typ>, // from util.c
+    typ: Vec<Typ>,  // from util.c
+    insb: Vec<Ins>, // from util.c
 }
 
 /*
@@ -1110,7 +1111,133 @@ parserefl(int arg)
     expect(Trparen);
     return vararg;
 }
+ */
 
+fn op_arg_bh(k: KExt) -> O {
+    match k {
+        KSB => O::Oargsb,
+        KUB => O::Oargub,
+        KSH => O::Oargsh,
+        KUH => O::Oarguh,
+        _ => panic!("BUG: expected byte/short type but got {:?}", k),
+    }
+}
+
+fn op_par_bh(k: KExt) -> O {
+    match k {
+        KSB => O::Oparsb,
+        KUB => O::Oparub,
+        KSH => O::Oparsh,
+        KUH => O::Oparuh,
+        _ => panic!("BUG: expected byte/short type but got {:?}", k),
+    }
+}
+
+impl Parser<'_> {
+    fn parserefl(&mut self, arg: bool, curf: &mut Fn) -> RubeResult<bool> {
+        // int k, ty, env, hasenv, vararg;
+        // Ref r;
+
+        let ty: TypIdx;
+        let k: KExt;
+        let env: bool;
+        let mut hasenv: bool = false;
+        let mut vararg: bool = false;
+        let r: Ref;
+
+        self.expect(Token::Tlparen)?;
+
+        while self.peek()? != Token::Trparen {
+            // if (curi - insb >= NIns)
+            // 	err("too many instructions");
+            if !arg && vararg {
+                return Err(self.err("no parameters allowed after '...'"));
+            }
+
+            let mut goto_next: bool = false;
+            match self.peek()? {
+                Token::Tdots => {
+                    if vararg {
+                        return Err(self.err("only one '...' allowed"));
+                    }
+                    vararg = true;
+                    if arg {
+                        // *curi = (Ins){.op = Oargv}; // Mmm, would actually like Ins's to be on Blk's
+                        // curi++;
+                        self.insb.push(Ins::new0(O::Oargv, KW, Ref::R)); // TODO - KW is 0 but seems wrong???
+                    }
+                    let _ = self.next()?;
+                    goto_next = true;
+                }
+                Token::Tenv => {
+                    if hasenv {
+                        return Err(self.err("only one environment allowed"));
+                    }
+                    hasenv = true;
+                    env = true;
+                    let _ = self.next()?;
+                    k = KL;
+                }
+                _ => {
+                    env = false;
+                    (k, ty) = self.parsecls()?;
+                }
+            }
+
+            if !goto_next {
+                let r: Ref = self.parseref(&mut curf)?;
+                match r {
+                    Ref::R => return Err(self.err("invalid argument")),
+                    Ref::RTmp(_) => {
+                        if !arg {
+                            return Err(self.err("invalid function parameter"));
+                        }
+                    }
+                    _ => (),
+                }
+                let ins: Ins = {
+                    if env {
+                        if arg {
+                            Ins::new1(O::Oarge, k, Ref::R, [r])
+                        } else {
+                            Ins::new1(O::Opare, k, r, [Ref::R])
+                        }
+                    } else if k == KC {
+                        if arg {
+                            Ins::new2(O::Oargc, KL, Ref::R, [Ref::RType(ty), r])
+                        } else {
+                            Ins::new1(O::Oparc, KL, r, [Ref::RType(ty)])
+                        }
+                    } else if k >= KSB {
+                        if arg {
+                            Ins::new1(op_arg_bh(k), KW, Ref::R, [r])
+                        } else {
+                            Ins::new1(op_par_bh(k), KW, r, [Ref::R])
+                        }
+                    } else {
+                        if arg {
+                            Ins::new1(O::Oarg, k, Ref::R, [r])
+                        } else {
+                            Ins::new1(O::Opar, k, r, [Ref::R])
+                        }
+                    }
+                };
+                self.insb.push(ins);
+                //curi++;
+            }
+            //Next:
+            if self.peek()? == Token::Trparen {
+                break;
+            }
+            self.expect(Token::Tcomma)?;
+        }
+        self.expect(Token::Trparen)?;
+
+        Ok(vararg)
+    }
+}
+
+/*
 static Blk *
 findblk(char *name)
 {
@@ -1502,7 +1629,8 @@ impl Parser<'_> {
         // self.curb = None;
         // nblk = 0;
         // curi = insb;
-        // curf = alloc(sizeof *curf);
+        self.insb.clear(); // TODO would prefer Ins's on Blk's...
+                           // curf = alloc(sizeof *curf);
         let mut curf = Fn::new(lnk.clone());
         //let curf: &mut Fn = &mut self.curf.unwrap();
         // curf->ntmp = 0;
@@ -1544,7 +1672,7 @@ impl Parser<'_> {
         }
         // strncpy(curf->name, tokval.str, NString-1);
         curf.name = self.tokval.str.clone();
-        curf.vararg = self.parserefl(0)?;
+        curf.vararg = self.parserefl(false, &mut curf)?;
         if self.nextnl()? != Token::Tlbrace {
             return Err(self.err("function body must start with {"));
         }
@@ -2286,6 +2414,7 @@ impl Parser<'_> {
             rcls: K0,
             //ntyp: 0,
             typ: vec![],
+            insb: vec![],
         }
     }
 }
