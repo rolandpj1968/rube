@@ -580,13 +580,20 @@ pub const KL: KExt = KExt::Kl;
 pub const KS: KExt = KExt::Ks;
 pub const KD: KExt = KExt::Kd;
 
-pub const KE: KExt = KExt::Ke;
 // Alias
 pub const KM: KExt = KExt::Kl;
 
+pub const KSB: KExt = KExt::Ksb;
+pub const KUB: KExt = KExt::Kub;
+pub const KSH: KExt = KExt::Ksh;
+pub const KUH: KExt = KExt::Kuh;
+
+pub const KC: KExt = KExt::Kc;
 pub const K0: KExt = KExt::K0;
 
-// Used as array indices in 'optab' etc.
+pub const KE: KExt = KExt::Ke;
+
+// Used as array indices in OPTAB init
 const_assert_eq!(KW as usize, 0);
 const_assert_eq!(KL as usize, 1);
 const_assert_eq!(KS as usize, 2);
@@ -981,7 +988,7 @@ pub struct Fn {
     //pub int ncon,
     //pub int nmem,
     //pub uint nblk,
-    pub retty: Option</*TypIdx*/ KExt>, // [NOT!!!] index in Parser::typ, None if no aggregate return
+    pub retty: TypIdx, // index in Parser::typ, TypIdx::INVALID if no aggregate return
     pub retr: Ref,
     pub rpo: Vec<BlkIdx>,
     //pub bits reg,
@@ -1004,7 +1011,7 @@ impl Fn {
             //int ncon,
             //int nmem,
             //uint nblk,
-            retty: None,
+            retty: TypIdx::INVALID,
             retr: Ref::R,
             rpo: vec![],
             //bits reg,
@@ -1077,6 +1084,10 @@ pub struct Typ {
 
 #[derive(Clone, Copy)]
 pub struct TypIdx(pub usize);
+
+impl TypIdx {
+    pub const INVALID: TypIdx = TypIdx(usize::MAX);
+}
 
 impl Typ {
     pub fn new() -> Typ {

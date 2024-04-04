@@ -13,8 +13,9 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Sym,
-    SymT, Target, Tmp0, Typ, TypFld, TypFldT, TypIdx, J, K0, KD, KE, KL, KM, KS, KW, KX, O,
+    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, RubeResult, Sym,
+    SymT, Target, Tmp0, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH, KUB, KUH,
+    KW, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, newtmp};
@@ -1017,7 +1018,26 @@ parsecls(int *tyn)
         return Kd;
     }
 }
+ */
 
+impl Parser<'_> {
+    fn parsecls(&mut self) -> RubeResult<(KExt, TypIdx)> {
+        match self.next()? {
+            Token::Ttyp => Ok((KC, self.findtyp()?)),
+            Token::Tsb => Ok((KSB, TypIdx::INVALID)),
+            Token::Tub => Ok((KUB, TypIdx::INVALID)),
+            Token::Tsh => Ok((KSH, TypIdx::INVALID)),
+            Token::Tuh => Ok((KUH, TypIdx::INVALID)),
+            Token::Tw => Ok((KW, TypIdx::INVALID)),
+            Token::Tl => Ok((KL, TypIdx::INVALID)),
+            Token::Ts => Ok((KS, TypIdx::INVALID)),
+            Token::Td => Ok((KD, TypIdx::INVALID)),
+            _ => Err(self.err("invalid class specifier")),
+        }
+    }
+}
+
+/*
 static int
 parserefl(int arg)
 {
@@ -1512,9 +1532,9 @@ impl Parser<'_> {
         )); // ??? what's this for?
             // curf->lnk = *lnk;
             // blink = &curf->start; // TODO - ???
-        curf.retty = Some(KX); // Mmm, do we need the Option?
+            // curf.retty = Some(KX); // Handled in Fn::new() as TypIdx::INVALID
         if self.peek()? != Token::Tglo {
-            self.rcls = self.parsecls(&mut curf.retty)?;
+            (self.rcls, curf.retty) = self.parsecls()?;
         } /*else {
               self.rcls = K0; // Default in Fn::new()
           }*/
