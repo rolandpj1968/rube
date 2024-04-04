@@ -1,6 +1,7 @@
 // TODO remove eventually
 #![allow(dead_code, unused_variables)]
 
+// TODO - use this more prevalently...
 use derive_new::new;
 
 // Generic Result
@@ -580,8 +581,10 @@ pub const KS: KExt = KExt::Ks;
 pub const KD: KExt = KExt::Kd;
 
 pub const KE: KExt = KExt::Ke;
-// Ugh, alias - rust does not allow duplicate values in an enum
+// Alias
 pub const KM: KExt = KExt::Kl;
+
+pub const K0: KExt = KExt::K0;
 
 // Used as array indices in 'optab' etc.
 const_assert_eq!(KW as usize, 0);
@@ -646,7 +649,7 @@ pub struct Phi {
 }
 
 #[derive(Clone, Copy)]
-pub struct PhiIdx(usize); // Index into Fn::phi
+pub struct PhiIdx(pub usize); // Index into Fn::phi
 
 /*
 struct Blk {
@@ -680,7 +683,7 @@ struct Blk {
 
 #[derive(Clone, Copy)]
 pub struct BlkJmp {
-    pub type_: i16, // TODO
+    pub type_: J,
     pub arg: Ref,
 }
 
@@ -711,7 +714,11 @@ pub struct Blk {
 
 // Index into Fn::blks
 #[derive(Clone, Copy)]
-pub struct BlkIdx(usize);
+pub struct BlkIdx(pub usize);
+
+impl BlkIdx {
+    pub const INVALID: BlkIdx = BlkIdx(usize::MAX);
+}
 
 /*
 struct Use {
@@ -741,16 +748,17 @@ pub enum SymT {
     SThr,
 }
 
+#[derive(new)]
 pub struct Sym {
     pub type_: SymT,
     pub id: u32, // ??? strong type?
 }
 
-impl Sym {
-    pub fn new(type_: SymT, id: u32) -> Sym {
-        Sym { type_, id }
-    }
-}
+// impl Sym {
+//     pub fn new(type_: SymT, id: u32) -> Sym {
+//         Sym { type_, id }
+//     }
+// }
 
 /*
 enum {
@@ -897,7 +905,7 @@ pub struct Con {
 
 // Index in Fn::con
 #[derive(Clone, Copy)]
-pub struct ConIdx(usize);
+pub struct ConIdx(pub usize);
 
 /*
 typedef struct Addr Addr;
@@ -920,7 +928,7 @@ pub struct Addr {
 
 pub type Mem = Addr;
 #[derive(Clone, Copy)]
-pub struct MemIdx(usize); // Index into Fn::mem
+pub struct MemIdx(pub usize); // Index into Fn::mem
 
 /*
 struct Lnk {
@@ -973,7 +981,7 @@ pub struct Fn {
     //pub int ncon,
     //pub int nmem,
     //pub uint nblk,
-    pub retty: Option<TypIdx>, // index in Parser::typ, None if no aggregate return
+    pub retty: Option</*TypIdx*/ KExt>, // [NOT!!!] index in Parser::typ, None if no aggregate return
     pub retr: Ref,
     pub rpo: Vec<BlkIdx>,
     //pub bits reg,

@@ -13,8 +13,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Blk, BlkIdx, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Target, Tmp0, Typ,
-    TypFld, TypFldT, TypIdx, KD, KE, KL, KM, KS, KW, KX, O,
+    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, KExt, Lnk, ORanges, Op, RubeResult, Sym,
+    SymT, Target, Tmp0, Typ, TypFld, TypFldT, TypIdx, J, K0, KD, KE, KL, KM, KS, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, newtmp};
@@ -59,6 +59,7 @@ Op optab[NOp] = {
 };
  */
 
+#[derive(PartialEq)]
 enum PState {
     PXXX,
     PLbl,
@@ -286,11 +287,11 @@ struct Parser<'a> {
     //curf: Option<Fn>,
     tmph: [i32; TMASK + 1],
     //static Phi **plink;
-    //curb: Option<BlkIdx>,
+    curb: Option<BlkIdx>,
     //static Blk **blink;
-    //static Blk *blkh[BMask+1];
-    nblk: i32,
-    rcls: i32,
+    blkh: [BlkIdx; BMASK + 1],
+    //nblk: i32,
+    rcls: KExt,
     //ntyp: u32,
     typ: Vec<Typ>, // from util.c
 }
@@ -1473,7 +1474,6 @@ b->dlink = 0; /* was trashed by findblk() */
 }
  */
 impl Parser<'_> {
-    // New function in curf after
     fn parsefn(&mut self, lnk: &Lnk) -> RubeResult<Fn> {
         // Blk *b;
         // int i;
@@ -1497,42 +1497,72 @@ impl Parser<'_> {
             }
         }
 
-        // #$@%@#$%@#$%@#$%@#$% up to here... carry on here...
         // curf->con[0].type = CBits;
         // curf->con[0].bits.i = 0xdeaddead; /* UNDEF */
+        curf.con.push(Con::new(
+            ConT::CBits,
+            Sym::new(SymT::SGlo, 0),
+            ConBits::I(0xdeaddead),
+        )); /* UNDEF */
         // curf->con[1].type = CBits;
-        // // curf->lnk = *lnk;
-        // blink = &curf->start;
-        // curf->retty = Kx;
-        // if (peek() != Tglo)
-        //     rcls = parsecls(&curf->retty);
-        // else
-        //     rcls = K0;
-        // if (next() != Tglo)
-        //     err("function name expected");
+        curf.con.push(Con::new(
+            ConT::CBits,
+            Sym::new(SymT::SGlo, 0),
+            ConBits::I(0),
+        )); // ??? what's this for?
+            // curf->lnk = *lnk;
+            // blink = &curf->start; // TODO - ???
+        curf.retty = Some(KX); // Mmm, do we need the Option?
+        if self.peek()? != Token::Tglo {
+            self.rcls = self.parsecls(&mut curf.retty)?;
+        } /*else {
+              self.rcls = K0; // Default in Fn::new()
+          }*/
+
+        if self.next()? != Token::Tglo {
+            return Err(self.err("function name expected"));
+        }
         // strncpy(curf->name, tokval.str, NString-1);
-        // curf->vararg = parserefl(0);
-        // if (nextnl() != Tlbrace)
-        //     err("function body must start with {");
-        // ps = PLbl;
-        // do
-        //     ps = parseline(ps);
-        // while (ps != PEnd);
-        // if (!curb)
-        //     err("empty function");
-        // if (curb->jmp.type == Jxxx)
-        //     err("last block misses jump");
+        curf.name = self.tokval.str.clone();
+        curf.vararg = self.parserefl(0)?;
+        if self.nextnl()? != Token::Tlbrace {
+            return Err(self.err("function body must start with {"));
+        }
+        let mut ps: PState = PState::PLbl;
+        loop {
+            ps = self.parseline(ps)?;
+            if ps == PState::PEnd {
+                break;
+            }
+        }
+        match self.curb {
+            None => {
+                return Err(self.err("empty function"));
+            }
+            Some(blki) => {
+                let b: &Blk = &curf.blks[blki.0]; // TODO accessor fn rather?
+                if b.jmp.type_ == J::Jxxx {
+                    return Err(self.err("last block misses jump"));
+                }
+            }
+        }
         // curf->mem = vnew(0, sizeof curf->mem[0], PFn);
         // curf->nmem = 0;
         // curf->nblk = nblk;
         // curf->rpo = 0;
+
+        // WTF is this for loop doing? It starts at 0????? TODO TODO TODO - Notify QBE?
         // for (b=0; b; b=b->link)
         //     b->dlink = 0; /* was trashed by findblk() */
-        // for (i=0; i<BMask+1; ++i)
-        //     blkh[i] = 0;
+        for i in 0..BMASK + 1 {
+            self.blkh[i] = BlkIdx::INVALID;
+        }
         // memset(tmph, 0, sizeof tmph);
-        // typecheck(curf);
-        // return curf;
+        for i in 0..TMASK + 1 {
+            self.tmph[i] = 0;
+        }
+        self.typecheck(&curf)?;
+        //return curf;
 
         Ok(curf)
     }
@@ -2230,9 +2260,10 @@ impl Parser<'_> {
             lnum: 0,
             //curf: None,
             tmph: [0; TMASK + 1],
-            //curb: None,
-            nblk: 0,
-            rcls: 0,
+            curb: None,
+            blkh: [BlkIdx::INVALID; BMASK + 1],
+            //nblk: 0,
+            rcls: K0,
             //ntyp: 0,
             typ: vec![],
         }
