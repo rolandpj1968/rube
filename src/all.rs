@@ -1,3 +1,6 @@
+// TODO remove eventually
+#![allow(dead_code, unused_variables)]
+
 // Generic Result
 pub type RubeError = Box<dyn std::error::Error>;
 pub type RubeResult<T> = Result<T, RubeError>;
@@ -408,55 +411,55 @@ pub enum ORanges {
 #define isretbh(j) INRANGE(j, Jretsb, Jretuh)
  */
 
-fn INRANGEO(x: O, l: O, u: O) -> bool {
+fn in_range_o(x: O, l: O, u: O) -> bool {
     // QBE code uses integer overflow
     // (x as usize) - (l as usize) <= (u as usize) - (l as usize) /* linear in x */
     (l as usize) <= (x as usize) && (x as usize) <= (u as usize)
 }
 
 pub fn isstore(o: O) -> bool {
-    INRANGEO(o, O::Ostoreb, O::Ostored)
+    in_range_o(o, O::Ostoreb, O::Ostored)
 }
 
 pub fn isload(o: O) -> bool {
-    INRANGEO(o, O::Oloadsb, O::Oload)
+    in_range_o(o, O::Oloadsb, O::Oload)
 }
 
 pub fn isext(o: O) -> bool {
-    INRANGEO(o, O::Oextsb, O::Oextuw)
+    in_range_o(o, O::Oextsb, O::Oextuw)
 }
 
 pub fn ispar(o: O) -> bool {
-    INRANGEO(o, O::Opar, O::Opare)
+    in_range_o(o, O::Opar, O::Opare)
 }
 
 pub fn isarg(o: O) -> bool {
-    INRANGEO(o, O::Oarg, O::Oargv)
+    in_range_o(o, O::Oarg, O::Oargv)
 }
 
 pub fn isparbh(o: O) -> bool {
-    INRANGEO(o, O::Oparsb, O::Oparuh)
+    in_range_o(o, O::Oparsb, O::Oparuh)
 }
 
 pub fn isargbh(o: O) -> bool {
-    INRANGEO(o, O::Oargsb, O::Oarguh)
+    in_range_o(o, O::Oargsb, O::Oarguh)
 }
 
-fn INRANGEJ(x: J, l: J, u: J) -> bool {
+fn in_range_j(x: J, l: J, u: J) -> bool {
     // QBE code uses integer overflow
     // (x as usize) - (l as usize) <= (u as usize) - (l as usize) /* linear in x */
     (l as usize) <= (x as usize) && (x as usize) <= (u as usize)
 }
 
 pub fn isret(j: J) -> bool {
-    INRANGEJ(j, J::Jretw, J::Jret0)
+    in_range_j(j, J::Jretw, J::Jret0)
 }
 
 pub fn isretbh(j: J) -> bool {
-    INRANGEJ(j, J::Jretsb, J::Jretuh)
+    in_range_j(j, J::Jretsb, J::Jretuh)
 }
 
-enum KBase {
+pub enum KBase {
     Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
     Kw,
     Kl,
@@ -475,11 +478,11 @@ const_assert_eq!(KBase::Kd as usize, 3);
 #define KBASE(k) ((k)>>1)
  */
 
-pub fn KWIDE(k: KBase) -> usize {
+pub fn k_wide(k: KBase) -> usize {
     (k as usize) & 1
 }
 
-pub fn KBASE(k: KBase) -> usize {
+pub fn k_base(k: KBase) -> usize {
     (k as usize) >> 1
 }
 
@@ -505,15 +508,15 @@ pub enum KExt {
              //Km = KBase::Kl as isize, /* memory pointer */
 }
 
-pub const Kx: KExt = KExt::Kx;
-pub const Kw: KExt = KExt::Kw;
-pub const Kl: KExt = KExt::Kl;
-pub const Ks: KExt = KExt::Ks;
-pub const Kd: KExt = KExt::Kd;
+pub const KX: KExt = KExt::Kx;
+pub const KW: KExt = KExt::Kw;
+pub const KL: KExt = KExt::Kl;
+pub const KS: KExt = KExt::Ks;
+pub const KD: KExt = KExt::Kd;
 
-pub const Ke: KExt = KExt::Ke;
+pub const KE: KExt = KExt::Ke;
 // Ugh, alias - rust does not allow duplicate values in an enum
-pub const Km: KExt = KExt::Kl;
+pub const KM: KExt = KExt::Kl;
 
 /*
 struct Op {

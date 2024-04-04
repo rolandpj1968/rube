@@ -1,15 +1,16 @@
-use crate::all::{KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Op, O};
+use crate::all::{KExt, Op, KD, KE, KL, KM, KS, KW, KX, O};
 
+// TODO Op::new() instead
 const fn mkop(name: &'static [u8], argcls: [[KExt; 4]; 2], canfold: bool) -> Op {
     Op {
-        name: name,
-        argcls: argcls,
-        canfold: canfold,
+        name,
+        argcls,
+        canfold,
     }
 }
 
-pub static optab: [Op; O::NOp as usize] = {
-    let nullop = mkop(b"", [[Ke, Ke, Ke, Ke], [Ke, Ke, Ke, Ke]], false);
+pub static OPTAB: [Op; O::NOp as usize] = {
+    let nullop = mkop(b"", [[KE, KE, KE, KE], [KE, KE, KE, KE]], false);
     let mut optab0 = [nullop; O::NOp as usize];
 
     // Generated from QBE with gcc -E and then hand-munged
@@ -17,10 +18,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"add",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
         ],
         true,
@@ -29,10 +30,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"sub",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
         ],
         true,
@@ -41,10 +42,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"neg",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         true,
@@ -53,10 +54,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"div",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
         ],
         true,
@@ -65,10 +66,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"rem",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -77,10 +78,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"udiv",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -89,10 +90,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"urem",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -101,10 +102,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"mul",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
         ],
         true,
@@ -113,10 +114,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"and",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -125,10 +126,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"or",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -137,10 +138,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"xor",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -149,10 +150,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"sar",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -161,10 +162,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"shr",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -173,10 +174,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"shl",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -186,10 +187,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"ceqw",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -198,10 +199,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cnew",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -210,10 +211,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"csgew",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -222,10 +223,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"csgtw",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -234,10 +235,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cslew",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -246,10 +247,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"csltw",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -258,10 +259,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cugew",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -270,10 +271,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cugtw",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -282,10 +283,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"culew",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -294,10 +295,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cultw",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -307,10 +308,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"ceql",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -319,10 +320,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cnel",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -331,10 +332,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"csgel",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -343,10 +344,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"csgtl",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -355,10 +356,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cslel",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -367,10 +368,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"csltl",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -379,10 +380,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cugel",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -391,10 +392,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cugtl",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -403,10 +404,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"culel",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -415,10 +416,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cultl",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -428,10 +429,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"ceqs",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -440,10 +441,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cges",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -452,10 +453,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cgts",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -464,10 +465,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cles",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -476,10 +477,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"clts",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -488,10 +489,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cnes",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -500,10 +501,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cos",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -512,10 +513,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cuos",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -525,10 +526,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"ceqd",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -537,10 +538,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cged",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -549,10 +550,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cgtd",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -561,10 +562,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cled",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -573,10 +574,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cltd",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -585,10 +586,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cned",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -597,10 +598,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cod",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -609,10 +610,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cuod",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -622,10 +623,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"storeb",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -634,10 +635,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"storeh",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -646,10 +647,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"storew",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -658,10 +659,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"storel",
         [
             [
-                /*[Kw]=*/ Kl, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KL, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -670,10 +671,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"stores",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -682,10 +683,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"stored",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -695,10 +696,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"loadsb",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -707,10 +708,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"loadub",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -719,10 +720,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"loadsh",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -731,10 +732,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"loaduh",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -743,10 +744,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"loadsw",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -755,10 +756,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"loaduw",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -767,10 +768,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"load",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Km, /*[Kd]=*/ Km,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KM, /*[Kd]=*/ KM,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -780,10 +781,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"extsb",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -792,10 +793,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"extub",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -804,10 +805,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"extsh",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -816,10 +817,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"extuh",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -828,10 +829,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"extsw",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -840,10 +841,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"extuw",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kw, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KW, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -853,10 +854,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"exts",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ks,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KS,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KX,
             ],
         ],
         true,
@@ -865,10 +866,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"truncd",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kd, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KD, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kx, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KX, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -877,10 +878,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"stosi",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -889,10 +890,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"stoui",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Ks, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KS, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -901,10 +902,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"dtosi",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -913,10 +914,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"dtoui",
         [
             [
-                /*[Kw]=*/ Kd, /*[Kl]=*/ Kd, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KD, /*[Kl]=*/ KD, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         true,
@@ -925,10 +926,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"swtof",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kw, /*[Kd]=*/ Kw,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KW, /*[Kd]=*/ KW,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         true,
@@ -937,10 +938,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"uwtof",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kw, /*[Kd]=*/ Kw,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KW, /*[Kd]=*/ KW,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         true,
@@ -949,10 +950,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"sltof",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kl, /*[Kd]=*/ Kl,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KL, /*[Kd]=*/ KL,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         true,
@@ -961,10 +962,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"ultof",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kl, /*[Kd]=*/ Kl,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KL, /*[Kd]=*/ KL,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         true,
@@ -973,10 +974,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"cast",
         [
             [
-                /*[Kw]=*/ Ks, /*[Kl]=*/ Kd, /*[Ks]=*/ Kw, /*[Kd]=*/ Kl,
+                /*[Kw]=*/ KS, /*[Kl]=*/ KD, /*[Ks]=*/ KW, /*[Kd]=*/ KL,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         true,
@@ -986,10 +987,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"alloc4",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -998,10 +999,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"alloc8",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1010,10 +1011,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"alloc16",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1023,10 +1024,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"vaarg",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Km, /*[Kd]=*/ Km,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KM, /*[Kd]=*/ KM,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1035,10 +1036,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"vastart",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1048,10 +1049,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"copy",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1061,10 +1062,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"dbgloc",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1074,10 +1075,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"nop",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1086,10 +1087,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"addr",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1098,10 +1099,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"blit0",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1110,10 +1111,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"blit1",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1122,10 +1123,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"swap",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
         ],
         false,
@@ -1134,10 +1135,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"sign",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1146,10 +1147,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"salloc",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1158,10 +1159,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"xidiv",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1170,10 +1171,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"xdiv",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1182,10 +1183,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"xcmp",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
         ],
         false,
@@ -1194,10 +1195,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"xtest",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1206,10 +1207,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"acmp",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1218,10 +1219,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"acmn",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1230,10 +1231,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"afcmp",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Ke, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KE, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
         ],
         false,
@@ -1242,10 +1243,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"reqz",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1254,10 +1255,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"rnez",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1267,10 +1268,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"par",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1279,10 +1280,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"parsb",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1291,10 +1292,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"parub",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1303,10 +1304,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"parsh",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1315,10 +1316,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"paruh",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1327,10 +1328,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"parc",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1339,10 +1340,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"pare",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1351,10 +1352,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"arg",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Kl, /*[Ks]=*/ Ks, /*[Kd]=*/ Kd,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KL, /*[Ks]=*/ KS, /*[Kd]=*/ KD,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1363,10 +1364,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"argsb",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1375,10 +1376,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"argub",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1387,10 +1388,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"argsh",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1399,10 +1400,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"arguh",
         [
             [
-                /*[Kw]=*/ Kw, /*[Kl]=*/ Ke, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KW, /*[Kl]=*/ KE, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1411,10 +1412,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"argc",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1423,10 +1424,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"arge",
         [
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kl, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KL, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Ke, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KE, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1435,10 +1436,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"argv",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1447,10 +1448,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"call",
         [
             [
-                /*[Kw]=*/ Km, /*[Kl]=*/ Km, /*[Ks]=*/ Km, /*[Kd]=*/ Km,
+                /*[Kw]=*/ KM, /*[Kl]=*/ KM, /*[Ks]=*/ KM, /*[Kd]=*/ KM,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Kx, /*[Kd]=*/ Kx,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KX, /*[Kd]=*/ KX,
             ],
         ],
         false,
@@ -1460,10 +1461,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagieq",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1472,10 +1473,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagine",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1484,10 +1485,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagisge",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1496,10 +1497,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagisgt",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1508,10 +1509,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagisle",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1520,10 +1521,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagislt",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1532,10 +1533,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagiuge",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1544,10 +1545,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagiugt",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1556,10 +1557,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagiule",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1568,10 +1569,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagiult",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1580,10 +1581,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagfeq",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1592,10 +1593,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagfge",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1604,10 +1605,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagfgt",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1616,10 +1617,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagfle",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1628,10 +1629,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagflt",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1640,10 +1641,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagfne",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1652,10 +1653,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagfo",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,
@@ -1664,10 +1665,10 @@ pub static optab: [Op; O::NOp as usize] = {
         b"flagfuo",
         [
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
             [
-                /*[Kw]=*/ Kx, /*[Kl]=*/ Kx, /*[Ks]=*/ Ke, /*[Kd]=*/ Ke,
+                /*[Kw]=*/ KX, /*[Kl]=*/ KX, /*[Ks]=*/ KE, /*[Kd]=*/ KE,
             ],
         ],
         false,

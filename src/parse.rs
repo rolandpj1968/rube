@@ -1,3 +1,6 @@
+// TODO remove eventually
+#![allow(dead_code, unused_variables)]
+
 use std::ascii::escape_default;
 use std::error::Error;
 use std::fmt;
@@ -10,10 +13,10 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT,
-    TypIdx, O,
+    Dat, Fn, KExt, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT, TypIdx, KD, KE, KL, KM, KS,
+    KW, KX, O,
 };
-use crate::optab::optab;
+use crate::optab::OPTAB;
 use crate::util::hash;
 
 #[derive(Debug)]
@@ -167,7 +170,7 @@ static char *kwmap[Ntok] = {
  */
 
 lazy_static! {
-    static ref kwmap: [&'static [u8]; O::NOp as usize] = {
+    static ref KWMAP: [&'static [u8]; O::NOp as usize] = {
     // Crazy indent courtesy of emacs rustic.
     let mut kwmap0: [&'static [u8]; O::NOp as usize] = [b""; O::NOp as usize];
 
@@ -208,8 +211,8 @@ lazy_static! {
 
     // formerly in lexinit()
     for i in 0..(ORanges::NPubOp as usize) {
-            if !optab[i].name.is_empty() {
-        kwmap0[i] = optab[i].name;
+            if !OPTAB[i].name.is_empty() {
+        kwmap0[i] = OPTAB[i].name;
             }
     }
 
@@ -217,9 +220,9 @@ lazy_static! {
     };
 }
 
-const NPred: usize = 63;
-const TMask: usize = 16383; /* for temps hash */
-const BMask: usize = 8191; /* for blocks hash */
+const NPRED: usize = 63;
+const TMASK: usize = 16383; /* for temps hash */
+const BMASK: usize = 8191; /* for blocks hash */
 const K: usize = 9583425; /* found using tools/lexh.c */
 const M: usize = 23;
 
@@ -280,7 +283,7 @@ struct Parser<'a> {
     tokval: TokVal,
     lnum: i32,
     //static Fn *curf;
-    tmph: [i32; TMask + 1],
+    tmph: [i32; TMASK + 1],
     //static Phi **plink;
     //static Blk *curb;
     //static Blk **blink;
@@ -342,13 +345,13 @@ lexinit()
  */
 
 lazy_static! {
-    static ref lexh: [Token; 1 << (32 - M)] = {
+    static ref LEXH: [Token; 1 << (32 - M)] = {
         let mut lexh0: [Token; 1 << (32 - M)] = [Token::Txxx; 1 << (32 - M)];
 
         for t in Token::iter() {
             let i = t as usize;
-            if !kwmap[i].is_empty() {
-                let h = ((hash(kwmap[i]) as usize) * K) >> M;
+            if !KWMAP[i].is_empty() {
+                let h = ((hash(KWMAP[i]) as usize) * K) >> M;
                 assert!(lexh0[h] == Token::Txxx);
                 lexh0[h] = t;
             }
@@ -738,8 +741,8 @@ impl Parser<'_> {
             if t != Token::Txxx {
                 return Ok(t);
             }
-            t = lexh[(hash(&tok) as usize) * K >> M];
-            if t == Token::Txxx || kwmap[t as usize] != tok {
+            t = LEXH[(hash(&tok) as usize) * K >> M];
+            if t == Token::Txxx || KWMAP[t as usize] != tok {
                 return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
             }
         } else if take_quote {
@@ -868,7 +871,7 @@ expect(int t)
 
 impl Parser<'_> {
     fn expect(&mut self, t: Token) -> RubeResult<()> {
-        static ttoa: [&'static str; Token::Ntok as usize] = {
+        static TTOA: [&'static str; Token::Ntok as usize] = {
             let mut ttoa0: [&'static str; Token::Ntok as usize] =
                 ["<unknown>"; Token::Ntok as usize];
 
@@ -891,7 +894,7 @@ impl Parser<'_> {
 
         Err(self.err(&format!(
             "{} expected, got {} instead",
-            ttoa[t as usize], ttoa[t1 as usize]
+            TTOA[t as usize], TTOA[t1 as usize]
         )))
     }
 }
@@ -1546,9 +1549,9 @@ impl Parser<'_> {
         let mut sz: u64 = 0;
         let mut al = ty.align;
         while t != Token::Trbrace {
-            let mut type_: TypFldT = TypFldT::FEnd;
-            let mut s: u64 = 0;
-            let mut a: i32 = -1;
+            let type_: TypFldT;
+            let mut s: u64;
+            let mut a: i32;
             let mut ftyp_idx: usize = 0;
             match t {
                 Token::Td => {
@@ -1789,7 +1792,7 @@ impl Parser<'_> {
                 }
             } //while (t != Trbrace);
         } else {
-            self.parsefields(/*ty->fields[n++],*/ &mut ty, t);
+            self.parsefields(/*ty->fields[n++],*/ &mut ty, t)?;
             n += 1;
         }
         ty.nunion = n;
@@ -2016,7 +2019,7 @@ impl Parser<'_> {
     fn new<'a>(
         f: &'a File,
         path: &'a Path,
-        dbgfile: fn(&Vec<u8>) -> (), // string???
+        dbgfile: fn(&[u8]) -> (),
         data: fn(&Dat) -> (),
         func: fn(&Fn) -> (),
     ) -> Parser<'a> {
@@ -2027,7 +2030,7 @@ impl Parser<'_> {
             thead: Token::Txxx,
             tokval: TokVal::new(),
             lnum: 0,
-            tmph: [0; TMask + 1],
+            tmph: [0; TMASK + 1],
             nblk: 0,
             rcls: 0,
             ntyp: 0,
@@ -2039,7 +2042,7 @@ impl Parser<'_> {
 pub fn parse(
     f: &File,
     path: &Path,
-    dbgfile: fn(&Vec<u8>) -> (), // string???
+    dbgfile: fn(&[u8]) -> (),
     data: fn(&Dat) -> (),
     func: fn(&Fn) -> (),
 ) -> RubeResult<()> {
@@ -2052,7 +2055,7 @@ pub fn parse(
 impl Parser<'_> {
     pub fn parse(
         &mut self,
-        dbgfile: fn(&Vec<u8>) -> (), // string???
+        dbgfile: fn(&[u8]) -> (),
         data: fn(&Dat) -> (),
         func: fn(&Fn) -> (),
     ) -> RubeResult<()> {
