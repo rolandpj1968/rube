@@ -2208,11 +2208,11 @@ impl Parser<'_> {
                 }
 
                 Token::Tdata => {
-                    //parsedat(data, &lnk);
+                    self.parsedat(data, &mut lnk)?;
                 }
 
                 Token::Ttype => {
-                    //parsetyp();
+                    self.parsetyp()?;
                 }
 
                 Token::Teof => {
