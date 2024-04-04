@@ -1819,14 +1819,48 @@ parsedatref(Dat *d)
         d->u.ref.off = tokval.num;
     }
 }
+ */
 
+impl Parser<'_> {
+    fn parsedatref(&mut self, d: &mut Dat) -> RubeResult<()> {
+        //int t;
+
+        d.isref = true;
+        let name: Vec<u8> = self.tokval.str.clone();
+        // d->u.ref.name = tokval.str;
+        // d->u.ref.off = 0;
+        let mut off: i64 = 0;
+        // t = peek();
+        if self.peek()? == Token::Tplus {
+            let _ = self.next()?;
+            if self.next()? != Token::Tint {
+                return Err(self.err("invalid token after offset in ref"));
+            }
+            off = self.tokval.num;
+        }
+        d.u = DatU::Ref { name, off };
+
+        Ok(())
+    }
+}
+
+/*
 static void
 parsedatstr(Dat *d)
 {
     d->isstr = 1;
     d->u.str = tokval.str;
 }
+ */
 
+impl Parser<'_> {
+    fn parsedatstr(&self, d: &mut Dat) {
+        d.isstr = true;
+        d.u = DatU::Str(self.tokval.str.clone());
+    }
+}
+
+/*
 static void
 parsedat(void cb(Dat *), Lnk *lnk)
 {
@@ -1901,7 +1935,7 @@ impl Parser<'_> {
         // int t;
         // Dat d;
 
-        if (self.nextnl()? != Token::Tglo || self.nextnl()? != Token::Teq) {
+        if self.nextnl()? != Token::Tglo || self.nextnl()? != Token::Teq {
             return Err(self.err("data name, then = expected"));
         }
 
@@ -1945,7 +1979,7 @@ impl Parser<'_> {
                     )));
                 }
             }
-            t = nextnl()?;
+            t = self.nextnl()?;
             loop {
                 d.isstr = false;
                 d.isref = false;
@@ -1955,8 +1989,8 @@ impl Parser<'_> {
                     Token::Tflts => d.u = DatU::Flts(self.tokval.flts),
                     Token::Tfltd => d.u = DatU::Fltd(self.tokval.fltd),
                     Token::Tint => d.u = DatU::Num(self.tokval.num),
-                    Token::Tglo => parsedatref(&d)?,
-                    Token::Tstr => parsedatstr(&d),
+                    Token::Tglo => self.parsedatref(&mut d)?,
+                    Token::Tstr => self.parsedatstr(&mut d),
                     _ => {
                         return Err(self.err("constant literal or global ref expected in data"));
                     }
