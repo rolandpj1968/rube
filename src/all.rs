@@ -743,7 +743,7 @@ struct Typ {
 };
  */
 #[derive(Clone, Copy, PartialEq)]
-pub enum TypFieldType {
+pub enum TypFldT {
     FEnd,
     Fb,
     Fh,
@@ -755,14 +755,14 @@ pub enum TypFieldType {
     FTyp,
 }
 
-pub struct TypField {
-    pub type_: TypFieldType,
+pub struct TypFld {
+    pub type_: TypFldT,
     pub len: u32, // or index in typ[] for FTyp
 }
 
-impl TypField {
-    pub fn new(type_: TypFieldType, len: u32) -> TypField {
-        TypField { type_, len }
+impl TypFld {
+    pub fn new(type_: TypFldT, len: u32) -> TypFld {
+        TypFld { type_, len }
     }
 }
 
@@ -773,7 +773,7 @@ pub struct Typ {
     pub align: i32,
     pub size: u64,
     pub nunion: u32,
-    pub fields: Vec<TypField>, // TODO need indirection???
+    pub fields: Vec<TypFld>, // TODO need indirection???
 }
 
 pub struct TypIdx(pub usize);

@@ -10,8 +10,8 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, TypField,
-    TypFieldType, TypIdx, O,
+    Dat, Fn, KExt, Kd, Ke, Kl, Km, Ks, Kw, Kx, Lnk, ORanges, Op, RubeResult, Typ, TypFld, TypFldT,
+    TypIdx, O,
 };
 use crate::optab::optab;
 use crate::util::hash;
@@ -1546,44 +1546,44 @@ impl Parser<'_> {
         let mut sz: u64 = 0;
         let mut al = ty.align;
         while t != Token::Trbrace {
-            let mut type_: TypFieldType = TypFieldType::FEnd;
+            let mut type_: TypFldT = TypFldT::FEnd;
             let mut s: u64 = 0;
             let mut a: i32 = -1;
             let mut ftyp_idx: usize = 0;
             match t {
                 Token::Td => {
-                    type_ = TypFieldType::Fd;
+                    type_ = TypFldT::Fd;
                     s = 8;
                     a = 3;
                 }
                 Token::Tl => {
-                    type_ = TypFieldType::Fl;
+                    type_ = TypFldT::Fl;
                     s = 8;
                     a = 3;
                 }
                 Token::Ts => {
-                    type_ = TypFieldType::Fs;
+                    type_ = TypFldT::Fs;
                     s = 4;
                     a = 2;
                 }
                 Token::Tw => {
-                    type_ = TypFieldType::Fw;
+                    type_ = TypFldT::Fw;
                     s = 4;
                     a = 2;
                 }
                 Token::Th => {
-                    type_ = TypFieldType::Fh;
+                    type_ = TypFldT::Fh;
                     s = 2;
                     a = 1;
                 }
                 Token::Tb => {
-                    type_ = TypFieldType::Fb;
+                    type_ = TypFldT::Fb;
                     s = 1;
                     a = 0;
                 }
                 Token::Ttyp => {
                     //let mut ty1: &Typ;
-                    type_ = TypFieldType::FTyp;
+                    type_ = TypFldT::FTyp;
                     let TypIdx(idx) = self.findtyp()?;
                     ftyp_idx = idx;
                     //ty1 = &typ[findtyp(ntyp - 1)];
@@ -1606,7 +1606,7 @@ impl Parser<'_> {
                     /* padding */
                     // fld[n].type = FPad;
                     // fld[n].len = a;
-                    ty.fields.push(TypField::new(TypFieldType::FPad, a as u32));
+                    ty.fields.push(TypFld::new(TypFldT::FPad, a as u32));
                     //n += 1;
                 }
             }
@@ -1617,7 +1617,7 @@ impl Parser<'_> {
                 t = self.nextnl()?;
             }
             sz += (a as u64) + (c as u64) * s;
-            if type_ == TypFieldType::FTyp {
+            if type_ == TypFldT::FTyp {
                 //s = ty1 - typ; // TODO WTF? ah, it's the index!
                 s = ftyp_idx as u64;
             }
@@ -1627,7 +1627,7 @@ impl Parser<'_> {
             {
                 // fld[n].type_ = type_; // TODO WTF?
                 // fld[n].len = s;
-                ty.fields.push(TypField::new(type_, s as u32)); // ugh
+                ty.fields.push(TypFld::new(type_, s as u32)); // ugh
 
                 c -= 1;
                 //n += 1;
