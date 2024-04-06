@@ -15,7 +15,7 @@ use strum_macros::{EnumIter, FromRepr};
 use crate::all::{
     jmp_for_cls, /*isstore, */ Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn,
     Ins, KExt, Lnk, ORanges, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx, Typ,
-    TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
+    TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, intern, newcon, newtmp, Bucket, IMask, InternId};
@@ -1181,15 +1181,17 @@ impl Parser<'_> {
 
         // memset(&c, 0, sizeof c);
         let c: Con = match self.next()? {
-            Token::Ttmp => return Ok(self.tmpref(&self.tokval.str, curf)),
+            Token::Ttmp => return Ok(self.tmpref(&self.tokval.str.clone(), curf)),
             Token::Tint => Con::new_bits(ConBits::I(self.tokval.num)),
             Token::Tflts => Con::new_bits(ConBits::F(self.tokval.flts)), // c.flt = 1;
             Token::Tfltd => Con::new_bits(ConBits::D(self.tokval.fltd)), // c.flt = 2;
             Token::Tthread => {
                 self.expect(Token::Tglo)?;
-                Con::new_sym(Sym::new(SymT::SThr, intern(&self.tokval.str, self)))
+                Con::new_sym(Sym::new(SymT::SThr, intern(&self.tokval.str.clone(), self)))
             }
-            Token::Tglo => Con::new_sym(Sym::new(SymT::SGlo, intern(&self.tokval.str, self))), // Ugh
+            Token::Tglo => {
+                Con::new_sym(Sym::new(SymT::SGlo, intern(&self.tokval.str.clone(), self)))
+            } // Ugh
             _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
         };
 
@@ -1373,9 +1375,9 @@ impl Parser<'_> {
         // int k, ty, env, hasenv, vararg;
         // Ref r;
 
-        let ty: TypIdx;
-        let k: KExt;
-        let env: bool;
+        let mut ty: TypIdx = TypIdx::INVALID;
+        let mut k: KExt = KE; // KW???
+        let mut env: bool = false;
         let mut hasenv: bool = false;
         let mut vararg: bool = false;
         let r: Ref;
@@ -1420,7 +1422,7 @@ impl Parser<'_> {
             }
 
             if !goto_next {
-                let r: Ref = self.parseref(&mut curf)?;
+                let r: Ref = self.parseref(curf)?;
                 match r {
                     Ref::R => return Err(self.err("invalid argument")),
                     Ref::RTmp(_) => {
@@ -1535,7 +1537,7 @@ closeblk()
  */
 
 impl Parser<'_> {
-    fn closeblk(&self, curf: &mut Fn) {
+    fn closeblk(&mut self, curf: &mut Fn) {
         // TODO - should really check if self.curb is valid
         let curb: &mut Blk = &mut curf.blks[self.curb.0];
         // curb->nins = curi - insb;
@@ -1762,22 +1764,22 @@ impl Parser<'_> {
         // int t, op, i, k, ty;
 
         // Instruction (or pphi) arguments
-        let arg: Vec<Ref> = vec![];
+        let mut arg: Vec<Ref> = vec![];
         // Phi targets
-        let blk: Vec<BlkIdx> = vec![];
-        let r: Ref;
-        let k: KExt;
-        let ty: TypIdx;
+        let mut blk: Vec<BlkIdx> = vec![];
+        let mut r: Ref = Ref::R;
+        let mut k: KExt = KE; // KW???
+        let mut ty: TypIdx = TypIdx::INVALID;
         // let op: O; not yet...
 
-        let op_tok: Token;
+        let mut op_tok: Token = Token::Txxx;
 
         if self.curb == BlkIdx::INVALID {
             return Err(self.err("BUG: no current block"));
         }
-        let curb: &mut Blk = &mut curf.blks[self.curb.0];
+        //let curb: &mut Blk = &mut curf.blks[self.curb.0];
 
-        let t: Token = self.nextnl()?;
+        let mut t: Token = self.nextnl()?;
 
         if ps == PState::PLbl && t != Token::Tlbl && t != Token::Trbrace {
             return Err(self.err("label or } expected"));
@@ -1791,7 +1793,7 @@ impl Parser<'_> {
         match t {
             // Instruction returning a value
             Token::Ttmp => {
-                r = self.tmpref(&self.tokval.str, curf);
+                r = self.tmpref(&self.tokval.str.clone(), curf);
                 self.expect(Token::Teq)?;
                 (k, ty) = self.parsecls()?;
                 op_tok = self.next()?;
@@ -1807,12 +1809,20 @@ impl Parser<'_> {
             Token::Trbrace => return Ok(PState::PEnd),
             // New block
             Token::Tlbl => {
-                let new_blki: BlkIdx = self.findblk(&self.tokval.str, curf);
-                if self.curb != BlkIdx::INVALID && curb.jmp.type_ == J::Jxxx {
+                let new_blki: BlkIdx = self.findblk(&self.tokval.str.clone(), curf);
+                if self.curb != BlkIdx::INVALID
+                    && curf.blks[self.curb.0] /*.curb*/
+                        .jmp
+                        .type_
+                        == J::Jxxx
+                {
                     // When is curb not valid? Maybe start block with explicit label?
                     self.closeblk(curf);
-                    curb.jmp.type_ = J::Jjmp;
-                    curb.s1 = new_blki;
+                    curf.blks[self.curb.0] /*curb*/
+                        .jmp
+                        .type_ = J::Jjmp;
+                    curf.blks[self.curb.0] /*curb*/
+                        .s1 = new_blki;
                 }
                 let new_b: &mut Blk = &mut curf.blks[new_blki.0];
                 if new_b.jmp.type_ != J::Jxxx {
@@ -1825,7 +1835,8 @@ impl Parser<'_> {
                     // First block
                     curf.start = new_blki;
                 } else {
-                    curb.link = new_blki;
+                    curf.blks[self.curb.0] /*curb*/
+                        .link = new_blki;
                 }
                 self.curb = new_blki;
                 self.plink = PhiIdx::INVALID;
@@ -1834,50 +1845,76 @@ impl Parser<'_> {
             }
             // Return instruction - ends block
             Token::Tret => {
-                curb.jmp.type_ = match jmp_for_cls(self.rcls) {
+                curf.blks[self.curb.0] /*curb*/
+                    .jmp
+                    .type_ = match jmp_for_cls(self.rcls) {
                     None => return Err(self.err("BUG: invalid type for ret")),
                     Some(j) => j,
                 };
                 if self.peek()? == Token::Tnl {
-                    curb.jmp.type_ = J::Jret0;
+                    curf.blks[self.curb.0] /*curb*/
+                        .jmp
+                        .type_ = J::Jret0;
                 } else if self.rcls != K0 {
                     let r: Ref = self.parseref(curf)?;
                     if let Ref::R = r {
                         return Err(self.err("invalid return value"));
                     }
-                    curb.jmp.arg = r;
+                    curf.blks[self.curb.0] /*curb*/
+                        .jmp
+                        .arg = r;
                 }
                 goto_close = true;
             }
             // Jump instruction - ends block
             Token::Tjmp | Token::Tjnz => {
                 if t == Token::Tjmp {
-                    curb.jmp.type_ = J::Jjmp;
+                    curf.blks[self.curb.0] /*curb*/
+                        .jmp
+                        .type_ = J::Jjmp;
                 } else {
-                    curb.jmp.type_ = J::Jjnz;
+                    curf.blks[self.curb.0] /*curb*/
+                        .jmp
+                        .type_ = J::Jjnz;
                     let r: Ref = self.parseref(curf)?;
                     if let Ref::R = r {
                         return Err(self.err("invalid argument for jnz jump"));
                     }
-                    curb.jmp.arg = r;
+                    curf.blks[self.curb.0] /*curb*/
+                        .jmp
+                        .arg = r;
                     self.expect(Token::Tcomma)?;
                 }
                 // Jump:
                 self.expect(Token::Tlbl)?;
-                curb.s1 = self.findblk(&self.tokval.str, curf);
-                if curb.jmp.type_ != J::Jjmp {
+                curf.blks[self.curb.0] /*curb*/
+                    .s1 = self.findblk(&self.tokval.str.clone(), curf);
+                if curf.blks[self.curb.0] /*curb*/
+                    .jmp
+                    .type_
+                    != J::Jjmp
+                {
                     self.expect(Token::Tcomma)?;
                     self.expect(Token::Tlbl)?;
-                    curb.s2 = self.findblk(&self.tokval.str, curf);
+                    curf.blks[self.curb.0] /*curb*/
+                        .s2 = self.findblk(&self.tokval.str.clone(), curf);
                 }
-                if curb.s1 == curf.start || curb.s2 == curf.start {
+                if curf.blks[self.curb.0] /*curb*/
+                    .s1
+                    == curf.start
+                    || curf.blks[self.curb.0] /*curb*/
+                        .s2
+                        == curf.start
+                {
                     return Err(self.err("invalid jump to the start block"));
                 }
                 goto_close = true;
             }
             // Halt instruction - ends block
             Token::Thlt => {
-                curb.jmp.type_ = J::Jhlt;
+                curf.blks[self.curb.0] /*curb*/
+                    .jmp
+                    .type_ = J::Jhlt;
                 goto_close = true;
             }
             // Debug line/column location tag
@@ -1943,7 +1980,7 @@ impl Parser<'_> {
             return Ok(PState::PLbl);
         }
 
-        let op: O;
+        let mut op: O = O::Oxxx;
 
         if !goto_ins {
             if op_tok == Token::Tcall {
@@ -1992,7 +2029,7 @@ impl Parser<'_> {
                         //     err("too many arguments");
                         if op_tok == Token::Tphi {
                             self.expect(Token::Tlbl)?;
-                            blk.push(self.findblk(&self.tokval.str, curf));
+                            blk.push(self.findblk(&self.tokval.str.clone(), curf));
                         }
                         let argi: Ref = self.parseref(curf)?;
                         if let Ref::R = argi {
@@ -2030,7 +2067,8 @@ impl Parser<'_> {
                         curf.phis
                             .push(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
                         if self.plink == PhiIdx::INVALID {
-                            curb.phi = phii;
+                            curf.blks[self.curb.0] /*curb*/
+                                .phi = phii;
                         } else {
                             let prev_phi = &mut curf.phis[self.plink.0];
                             prev_phi.link = phii;
@@ -2053,8 +2091,8 @@ impl Parser<'_> {
                         self.insb
                             .push(Ins::new2(O::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
                         let coni: ConIdx;
-                        if let Ref::RCon(coni) = arg[2] {
-                            () // Ok
+                        if let Ref::RCon(coni0) = arg[2] {
+                            coni = coni0;
                         } else {
                             return Err(self.err("blit size must be constant"));
                         }
@@ -2352,7 +2390,8 @@ impl Parser<'_> {
         for i in 0..TMASK + 1 {
             self.tmph[i] = TmpIdx::INVALID;
         }
-        self.typecheck(&curf)?;
+        panic!("Do typecheck()");
+        //self.typecheck(&curf)?;
         //return curf;
 
         Ok(curf)

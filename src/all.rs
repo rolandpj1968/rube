@@ -840,7 +840,10 @@ pub struct Sym {
 }
 
 impl Sym {
-    const UNDEF: Sym = Sym::new(SymT::SGlo, InternId::INVALID); // Ugh, sort out Con
+    const UNDEF: Sym = Sym {
+        type_: SymT::SGlo,
+        id: InternId::INVALID,
+    }; // Ugh, sort out Con
 }
 
 // impl Sym {
