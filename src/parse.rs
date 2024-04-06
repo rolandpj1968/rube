@@ -10,12 +10,12 @@ use std::path::Path;
 
 use chomp1::ascii::{is_alpha, is_digit, is_whitespace};
 use strum::IntoEnumIterator;
-use strum_macros::EnumIter;
+use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
-    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, ORanges, Phi, PhiIdx,
-    Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD,
-    KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
+    isstore, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, ORanges,
+    Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J,
+    K0, KC, KD, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, intern, newcon, newtmp, Bucket, IMask, InternId};
@@ -69,11 +69,11 @@ enum PState {
     PEnd,
 }
 
-#[derive(Clone, Copy, EnumIter, PartialEq)]
+#[derive(Clone, Copy, EnumIter, FromRepr, PartialEq)]
 enum Token {
     Txxx = 0,
 
-    // These have 1:1 correspondence with enum O and MUST be the same value as usize
+    // These have 1:1 correspondence with enum O and MUST be the same values
     TOadd,
     TOsub,
     TOneg,
@@ -174,58 +174,59 @@ enum Token {
 
     TOdbgloc,
 
-    TOnop,
-    TOaddr,
-    TOblit0,
-    TOblit1,
-    TOswap,
-    TOsign,
-    TOsalloc,
-    TOxidiv,
-    TOxdiv,
-    TOxcmp,
-    TOxtest,
-    TOacmp,
-    TOacmn,
-    TOafcmp,
-    TOreqz,
-    TOrnez,
+    // TODO - these are non-public ops - but why is "nop" non-public?
+    // TOnop,
+    // TOaddr,
+    // TOblit0,
+    // TOblit1,
+    // TOswap,
+    // TOsign,
+    // TOsalloc,
+    // TOxidiv,
+    // TOxdiv,
+    // TOxcmp,
+    // TOxtest,
+    // TOacmp,
+    // TOacmn,
+    // TOafcmp,
+    // TOreqz,
+    // TOrnez,
 
-    TOpar,
-    TOparsb,
-    TOparub,
-    TOparsh,
-    TOparuh,
-    TOparc,
-    TOpare,
-    TOarg,
-    TOargsb,
-    TOargub,
-    TOargsh,
-    TOarguh,
-    TOargc,
-    TOarge,
-    TOargv,
-    TOcall,
+    // TOpar,
+    // TOparsb,
+    // TOparub,
+    // TOparsh,
+    // TOparuh,
+    // TOparc,
+    // TOpare,
+    // TOarg,
+    // TOargsb,
+    // TOargub,
+    // TOargsh,
+    // TOarguh,
+    // TOargc,
+    // TOarge,
+    // TOargv,
+    // TOcall,
 
-    TOflagieq,
-    TOflagine,
-    TOflagisge,
-    TOflagisgt,
-    TOflagisle,
-    TOflagislt,
-    TOflagiuge,
-    TOflagiugt,
-    TOflagiule,
-    TOflagiult,
-    TOflagfeq,
-    TOflagfge,
-    TOflagfgt,
-    TOflagfle,
-    TOflagflt,
-    TOflagfne,
-    TOflagfo,
-    TOflagfuo,
+    // TOflagieq,
+    // TOflagine,
+    // TOflagisge,
+    // TOflagisgt,
+    // TOflagisle,
+    // TOflagislt,
+    // TOflagiuge,
+    // TOflagiugt,
+    // TOflagiule,
+    // TOflagiult,
+    // TOflagfeq,
+    // TOflagfge,
+    // TOflagfgt,
+    // TOflagfle,
+    // TOflagflt,
+    // TOflagfne,
+    // TOflagfo,
+    // TOflagfuo,
 
     /* aliases */
     Tloadw = ORanges::NPubOp as isize,
@@ -285,6 +286,8 @@ enum Token {
 
     Ntok,
 }
+
+const_assert_eq!(O::from_repr(Token::Txx as usize), O::Oxxx);
 
 /*
 static char *kwmap[Ntok] = {
@@ -1688,17 +1691,21 @@ impl Parser<'_> {
         // Con *c;
         // int t, op, i, k, ty;
 
+        // Instruction (or pphi) arguments
         let arg: Vec<Ref> = vec![];
+        // Phi targets
+        let blk: Vec<BlkIdx> = vec![];
         let r: Ref;
         let k: KExt;
         let ty: TypIdx;
+        // let op: O; not yet...
+
         let op_tok: Token;
-        let op_op: O;
 
         if self.curb == BlkIdx::INVALID {
             return Err(self.err("BUG: no current block"));
         }
-        let curb: &mut Blk = curf.blks[blki.0];
+        let curb: &mut Blk = curf.blks[self.curb.0];
 
         let t: Token = self.nextnl()?;
 
@@ -1709,33 +1716,39 @@ impl Parser<'_> {
         let mut goto_close: bool = false;
         let mut goto_ins: bool = false;
 
+        // In this block we produce an op_tok Token.
+        // Below we will translate it to the corresponding O:: op.
         match t {
+            // Instruction returning a value
             Token::Ttmp => {
                 r = tmpref(self.tokval.str);
-                self.expect(Teq)?;
+                self.expect(Token::Teq)?;
                 (k, ty) = self.parsecls();
                 op_tok = next()?;
             }
-            Token::Tblit | Token::Tcall | Token::Ovastart => {
-                // case Ovastart: TODO TODO, what to do?
+            // Void instructions
+            Token::Tblit | Token::Tcall | Token::TOvastart => {
                 /* operations without result */
                 r = Ref::R;
-                k = KW;
+                k = KW; // why not T0?
                 op_tok = t;
             }
-            Token::Trbrace => return Ok(PEnd),
+            // End of function
+            Token::Trbrace => return Ok(PState::PEnd),
+            // New block
             Token::Tlbl => {
                 let new_blki: BlkIdx = self.findblk(&self.tokval.str)?;
-                if (curb && curb.jmp.type_ == J::Jxxx) {
+                if self.curb != BlkIdx::INVALID && curb.jmp.type_ == J::Jxxx {
+                    // When is curb not valid? Maybe start block with explicit label?
                     self.closeblk(curf);
                     curb.jmp.type_ = J::Jjmp;
-                    curb.s1 = b_idx;
+                    curb.s1 = new_blki;
                 }
                 let new_b: &mut Blk = curf.blks[new_blki.0];
                 if new_b.jmp.type_ != J::Jxxx {
                     return Err(self.err(
                         "multiple definitions of block @{}",
-                        String::from_utf8_lossy(&b.name),
+                        String::from_utf8_lossy(&new_b.name),
                     ));
                 }
                 if self.blink == BlkIdx::INVALID {
@@ -1749,9 +1762,10 @@ impl Parser<'_> {
                 self.expect(Token::Tnl)?;
                 return PState::PPhi;
             }
+            // Return instruction - ends block
             Token::Tret => {
                 curb.jmp.type_ = J::Jretw + self.rcls;
-                if self.peek()? == Tnl {
+                if self.peek()? == Token::Tnl {
                     curb.jmp.type_ = J::Jret0;
                 } else if self.rcls != K0 {
                     let r: Ref = self.parseref()?;
@@ -1762,6 +1776,7 @@ impl Parser<'_> {
                 }
                 goto_close = true;
             }
+            // Jump instruction - ends block
             Token::Tjmp | Token::Tjnz => {
                 if t == Token::Tjmp {
                     curb.jmp.type_ = J::Jjmp;
@@ -1772,12 +1787,12 @@ impl Parser<'_> {
                         return Err(self.err("invalid argument for jnz jump"));
                     }
                     curb.jmp.arg = r;
-                    self.expect(Tcomma)?;
+                    self.expect(Token::Tcomma)?;
                 }
                 // Jump:
                 self.expect(Token::Tlbl)?;
                 curb.s1 = self.findblk(&self.tokval.str, curf);
-                if (curb.jmp.type_ != J::Jjmp) {
+                if curb.jmp.type_ != J::Jjmp {
                     expect(Token::Tcomma)?;
                     expect(Token::Tlbl)?;
                     curb.s2 = self.findblk(&self.tokval.str, curf);
@@ -1787,20 +1802,24 @@ impl Parser<'_> {
                 }
                 goto_close = true;
             }
+            // Halt instruction - ends block
             Token::Thlt => {
                 curb.jmp.type_ = J::Jhlt;
                 goto_close = true;
             }
-            Token::Odbgloc => {
+            // Debug line/column location tag
+            Token::TOdbgloc => {
                 // How can an op end up here?
-                op = t;
+                op_tok = t;
                 k = KW;
                 r = Ref::R;
                 self.expect(Token::Tint)?;
                 let ln: u32 = self.tokval.num as u32;
                 if (ln as i64) != self.tokval.num {
-                    /// ??? this cannot work???
-                    return Err(self.err(&format!("line number {} too big", self.tokval.num)));
+                    return Err(self.err(&format!(
+                        "line number {} negative or too big",
+                        self.tokval.num
+                    )));
                 }
                 arg.push(Ref::RInt(ln));
                 let cn: u32 = {
@@ -1808,10 +1827,11 @@ impl Parser<'_> {
                         self.next()?;
                         self.expect(Token::Tint)?;
                         let cn0: u32 = self.tokval.num as u32;
-                        if ((cn0 as i64) != self.tokval.num) {
-                            return Err(
-                                self.err(&format!("column number {} too big", self.tokval.num))
-                            );
+                        if (cn0 as i64) != self.tokval.num {
+                            return Err(self.err(&format!(
+                                "column number {} negative or too big",
+                                self.tokval.num
+                            )));
                         }
                         cn0
                     } else {
@@ -1826,7 +1846,14 @@ impl Parser<'_> {
                     /* operations without result */
                     r = Ref::R;
                     k = KW; // TODO why not K0?
-                    op_tok = t;
+                    if let Some(op) = O::from_repr(t as usize) {
+                        () // Ok
+                    } else {
+                        return Err(self.err(
+                            "BUG: failed to convert store token {:?} to instruction op",
+                            t,
+                        ));
+                    }
                 } else {
                     return Err(self.err("label, instruction or jump expected"));
                 }
@@ -1842,133 +1869,145 @@ impl Parser<'_> {
             return Ok(PState::PLbl);
         }
 
+        let op: O;
+
         if !goto_ins {
             if op_tok == Token::Tcall {
-                arg[0] = self.parseref()?;
+                // Call instruction
+                arg.push(self.parseref()?);
                 self.parserefl(true)?;
-                op_op = O::Ocall;
+                op = O::Ocall;
                 self.expect(Token::Tnl)?;
-                if k == KC {
-                    k = Kl;
-                    arg[1] = TYPE(ty);
-                }
+                let arg1 = {
+                    if k == KC {
+                        k = KL;
+                        Ref::RTyp(ty)
+                    } else {
+                        Ref::R
+                    }
+                };
+                arg.push(arg1);
                 if k >= KSB {
                     // else if ???
-                    k = Kw;
+                    k = KW;
                 }
-                goto_ins = true;
-            }
-            if op_tok == Token::Tloadw {
-                op_op = O::Oloadsw;
-            }
-            if op_tok >= Token::Tloadl && op <= Token::Tloadd {
-                // else if ???
-                op_op = O::Oload;
-            }
-            if op_tok == Token::Talloc1 || op == Token::Talloc2 {
-                // else if ???
-                op_op = O::Oalloc;
-            }
-            if op_dunno == O::Ovastart && !curf.vararg {
-                return Err(self.err("cannot use vastart in non-variadic function"));
-            }
-            if k >= KSB {
-                return Err(self.err("size class must be w, l, s, or d"));
-            }
-            let i = 0;
-            if self.peek()? != Token::Tnl {
-                //for (;;) {
-                loop {
-                    // if (i == NPred)
-                    //     err("too many arguments");
-                    if op_tok == Token::Tphi {
-                        self.expect(Tlbl)?;
-                        blk[i] = curf.findblk(&self.tokval.str)?;
-                    }
-                    arg[i] = self.parseref()?;
-                    if let Ref::R = arg[i] {
-                        err("invalid instruction argument");
-                    }
-                    i += 1;
-                    t = self.peek()?;
-                    if t == Token::Tnl {
-                        break;
-                    }
-                    if t != Token::Tcomma {
-                        return Err(self.err(", or end of line expected"));
-                    }
-                    self.next()?;
+                // panic!("TODO");
+                // goto_ins = true;
+            } else {
+                // Alias instructions
+                if op_tok == Token::Tloadw {
+                    op_tok = Token::TOloadsw;
+                } else if op_tok >= Token::Tloadl && op_tok <= Token::Tloadd {
+                    op_tok = Token::TOload;
+                } else if op_tok == Token::Talloc1 || op_tok == Token::Talloc2 {
+                    op_tok = Token::TOalloc;
                 }
-            }
-            self.next()?;
-            match op_tok {
-                Token::Tphi => {
-                    if ps != PState::PPhi || curb == curf.start {
-                        return Err(self.err("unexpected phi instruction"));
-                    }
-                    // phi = alloc(sizeof *phi);
-                    // phi.to = r;
-                    // phi.cls = k;
-                    // phi->arg = vnew(i, sizeof arg[0], PFn);
-                    // memcpy(phi->arg, arg, i * sizeof arg[0]);
-                    // phi->blk = vnew(i, sizeof blk[0], PFn);
-                    // memcpy(phi->blk, blk, i * sizeof blk[0]);
-                    // phi->narg = i;
-                    if self.plink == BlkIdx.INVALID {
-                        return Err(self.err("No current block when parsing phi"));
-                    }
-                    // *plink = phi;
-                    // plink = &phi->link;
-                    curf.blks[self.plink.0].phi = Phi::new(to, arg.clone(), blk.clone(), k, r);
-                    return Ok(PState::PPhi);
+                if op_tok == O::Ovastart && !curf.vararg {
+                    return Err(self.err("cannot use vastart in non-variadic function"));
                 }
-                Token::Tblit => {
-                    // if curi - insb >= NIns-1 {
-                    //     err("too many instructions");
-                    // }
-                    // memset(curi, 0, 2 * sizeof(Ins));
-                    // curi->op = Oblit0;
-                    // curi->arg[0] = arg[0];
-                    // curi->arg[1] = arg[1];
-                    // curi++;
-                    if arg.len() < 3 {
-                        Err(self.err("insufficient args for blit"));
+                if k >= KSB {
+                    return Err(self.err("size class must be w, l, s, or d"));
+                }
+                // Instruction args
+                //let i = 0;
+                if self.peek()? != Token::Tnl {
+                    //for (;;) {
+                    loop {
+                        // if (i == NPred)
+                        //     err("too many arguments");
+                        if op_tok == Token::Tphi {
+                            self.expect(Token::Tlbl)?;
+                            blk.push(curf.findblk(&self.tokval.str))?;
+                        }
+                        let argi: Ref = self.parseref()?;
+                        if let Ref::R = argi {
+                            err("invalid instruction argument");
+                        }
+                        arg.push(argi);
+                        //i += 1;
+                        t = self.peek()?;
+                        if t == Token::Tnl {
+                            break;
+                        }
+                        if t != Token::Tcomma {
+                            return Err(self.err(", or end of line expected"));
+                        }
+                        self.next()?;
                     }
-                    self.insb
-                        .push(Ins.new2(o::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
-                    if let R::RCon(coni) = arg[2] {
-                        () // Ok
-                    } else {
-                        return Err(self.err("blit size must be constant"));
+                }
+                self.next()?;
+                match op_tok {
+                    Token::Tphi => {
+                        if ps != PState::PPhi || curb == curf.start {
+                            return Err(self.err("unexpected phi instruction"));
+                        }
+                        // phi = alloc(sizeof *phi);
+                        // phi.to = r;
+                        // phi.cls = k;
+                        // phi->arg = vnew(i, sizeof arg[0], PFn);
+                        // memcpy(phi->arg, arg, i * sizeof arg[0]);
+                        // phi->blk = vnew(i, sizeof blk[0], PFn);
+                        // memcpy(phi->blk, blk, i * sizeof blk[0]);
+                        // phi->narg = i;
+                        if self.plink == BlkIdx.INVALID {
+                            return Err(self.err("No current block when parsing phi"));
+                        }
+                        // *plink = phi;
+                        // plink = &phi->link;
+                        curf.blks[self.plink.0].phi = Phi::new(r, arg.clone(), blk.clone(), k, r);
+                        return Ok(PState::PPhi);
                     }
-                    let c: &Con = &curf.con[coni];
-                    let sz: u32 = {
-                        let mut sz_u32: u32 = 0;
-                        let mut is_valid_size: bool = c.type_ == CBits;
-                        if is_valid_size {
-                            if let ConBits::I(sz_i64) = c.bits {
-                                sz_u32 = sz_i64 as u32;
-                                is_valid_size = sz_i64 >= 0 && sz_i64 == (sz_u32 as i64);
-                            } else {
-                                return Err(self.err("blit size must be integer constant"));
+                    Token::Tblit => {
+                        // if curi - insb >= NIns-1 {
+                        //     err("too many instructions");
+                        // }
+                        // memset(curi, 0, 2 * sizeof(Ins));
+                        // curi->op = Oblit0;
+                        // curi->arg[0] = arg[0];
+                        // curi->arg[1] = arg[1];
+                        // curi++;
+                        if arg.len() < 3 {
+                            Err(self.err("insufficient args for blit"));
+                        }
+                        self.insb
+                            .push(Ins::new2(o::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
+                        let coni: ConIdx;
+                        if let R::RCon(coni) = arg[2] {
+                            () // Ok
+                        } else {
+                            return Err(self.err("blit size must be constant"));
+                        }
+                        let c: &Con = &curf.con[coni];
+                        let sz: u32 = {
+                            let mut sz_u32: u32 = 0;
+                            let mut is_valid_size: bool = c.type_ == ConT::CBits;
+                            if is_valid_size {
+                                if let ConBits::I(sz_i64) = c.bits {
+                                    sz_u32 = sz_i64 as u32;
+                                    is_valid_size = sz_i64 >= 0 && sz_i64 == (sz_u32 as i64);
+                                } else {
+                                    return Err(self.err("blit size must be integer constant"));
+                                }
                             }
-                        }
-                        if !is_valid_size {
-                            return Err(self.err("blit size negative or too large"));
-                        }
-                    };
-                    // let r: Ref = Ref::RInt(c.bits.i);
-                    // curi->op = Oblit1;
-                    // curi->arg[0] = r;
-                    // curi++;
-                    self.insb.push(Ins::new1(O::Oblit1, K0, Ref::R, [r]));
-                    return PIns;
-                }
-                _ => {
-                    if op_op >= O::NPubOp {
-                        return Err(self.err("invalid instruction"));
+                            if !is_valid_size {
+                                return Err(self.err("blit size negative or too large"));
+                            }
+                        };
+                        // let r: Ref = Ref::RInt(c.bits.i);
+                        // curi->op = Oblit1;
+                        // curi->arg[0] = r;
+                        // curi++;
+                        self.insb.push(Ins::new1(O::Oblit1, K0, Ref::R, [r]));
+                        return Ok(PState::PIns);
                     }
-                    // goto_ins = true; no effect?
+                    _ => {
+                        if let Some(op) = O::from_repr(op_tok as usize) {
+                            () // Ok
+                        } else {
+                            return Err(self.err("invalid instruction"));
+                        }
+                        // goto_ins = true; no effect?
+                    }
                 }
             }
         }
@@ -1986,7 +2025,7 @@ impl Parser<'_> {
         }
         self.insb.push(Ins::new2(op, k, r, [arg[0], arg[1]]));
 
-        return PIns;
+        return PState::PIns;
     }
 }
 

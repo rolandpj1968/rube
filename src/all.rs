@@ -3,6 +3,7 @@
 
 // TODO - use this more prevalently...
 use derive_new::new;
+use strum_macros::FromRepr;
 
 use crate::util::InternId;
 
@@ -159,7 +160,7 @@ pub enum Ref {
     RTmp(TmpIdx),
     RCon(ConIdx),
     RInt(u32),
-    RType(TypIdx), /* last kind to come out of the parser */
+    RTyp(TypIdx), /* last kind to come out of the parser */
     RSlot(u32),
     RCall(u32),
     RMem(u32),
@@ -230,7 +231,7 @@ enum O {
  */
 
 // Generated from 'gcc -E' on QBE
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, FromRepr, PartialEq)]
 pub enum O {
     Oxxx,
 
