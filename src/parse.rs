@@ -13,9 +13,9 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
-    isstore, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, ORanges,
-    Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J,
-    K0, KC, KD, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
+    jmp_for_cls, /*isstore, */ Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn,
+    Ins, KExt, Lnk, ORanges, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx, Typ,
+    TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, intern, newcon, newtmp, Bucket, IMask, InternId};
@@ -69,11 +69,12 @@ enum PState {
     PEnd,
 }
 
-#[derive(Clone, Copy, EnumIter, FromRepr, PartialEq)]
+#[derive(Clone, Copy, EnumIter, FromRepr, PartialEq, PartialOrd)]
+#[repr(u8)]
 enum Token {
     Txxx = 0,
 
-    // These have 1:1 correspondence with enum O and MUST be the same values
+    // These have 1:1 correspondence with enum O public ops and MUST be the same values
     TOadd,
     TOsub,
     TOneg,
@@ -229,7 +230,7 @@ enum Token {
     // TOflagfuo,
 
     /* aliases */
-    Tloadw = ORanges::NPubOp as isize,
+    Tloadw = ORanges::NPubOp as u8,
     Tloadl,
     Tloads,
     Tloadd,
@@ -287,7 +288,27 @@ enum Token {
     Ntok,
 }
 
-const_assert_eq!(O::from_repr(Token::Txx as usize), O::Oxxx);
+// This range must be numerically equal
+const_assert_eq!(Token::TOadd as u8, O::Oadd as u8);
+const_assert_eq!(Token::TOdbgloc as u8, O::Odbgloc as u8);
+
+fn in_range_t(t: Token, l: Token, u: Token) -> bool {
+    // QBE code uses integer overflow
+    // (x as usize) - (l as usize) <= (u as usize) - (l as usize) /* linear in x */
+    (l as u8) <= (t as u8) && (t as u8) <= (u as u8)
+}
+
+fn tok_to_pub_op(t: Token) -> Option<O> {
+    if in_range_t(t, Token::TOadd, Token::TOdbgloc) {
+        O::from_repr(t as u8)
+    } else {
+        None
+    }
+}
+
+pub fn isstore(t: Token) -> bool {
+    in_range_t(t, Token::TOstoreb, Token::TOstored)
+}
 
 /*
 static char *kwmap[Ntok] = {
@@ -445,7 +466,7 @@ pub struct Parser<'a> {
     lnum: i32,
     //curf: Option<Fn>,
     tmph: [TmpIdx; TMASK + 1],
-    plink: BlkIdx, // BlkIdx::INVALID before start parsing first blk
+    plink: PhiIdx, // BlkIdx::INVALID before first phi of curb
     curb: BlkIdx,  // BlkIdx::INVALID before start parsing first blk
     blink: BlkIdx, // BlkIdx::INVALID before finished parsing first blk, else prev blk
     blkh: [BlkIdx; BMASK + 1],
@@ -1418,9 +1439,9 @@ impl Parser<'_> {
                         }
                     } else if k == KC {
                         if arg {
-                            Ins::new2(O::Oargc, KL, Ref::R, [Ref::RType(ty), r])
+                            Ins::new2(O::Oargc, KL, Ref::R, [Ref::RTyp(ty), r])
                         } else {
-                            Ins::new1(O::Oparc, KL, r, [Ref::RType(ty)])
+                            Ins::new1(O::Oparc, KL, r, [Ref::RTyp(ty)])
                         }
                     } else if k >= KSB {
                         if arg {
@@ -1705,7 +1726,7 @@ impl Parser<'_> {
         if self.curb == BlkIdx::INVALID {
             return Err(self.err("BUG: no current block"));
         }
-        let curb: &mut Blk = curf.blks[self.curb.0];
+        let curb: &mut Blk = &mut curf.blks[self.curb.0];
 
         let t: Token = self.nextnl()?;
 
@@ -1721,10 +1742,10 @@ impl Parser<'_> {
         match t {
             // Instruction returning a value
             Token::Ttmp => {
-                r = tmpref(self.tokval.str);
+                r = self.tmpref(&self.tokval.str, curf);
                 self.expect(Token::Teq)?;
-                (k, ty) = self.parsecls();
-                op_tok = next()?;
+                (k, ty) = self.parsecls()?;
+                op_tok = self.next()?;
             }
             // Void instructions
             Token::Tblit | Token::Tcall | Token::TOvastart => {
@@ -1746,10 +1767,10 @@ impl Parser<'_> {
                 }
                 let new_b: &mut Blk = curf.blks[new_blki.0];
                 if new_b.jmp.type_ != J::Jxxx {
-                    return Err(self.err(
+                    return Err(self.err(&format!(
                         "multiple definitions of block @{}",
                         String::from_utf8_lossy(&new_b.name),
-                    ));
+                    )));
                 }
                 if self.blink == BlkIdx::INVALID {
                     // First block
@@ -1758,17 +1779,20 @@ impl Parser<'_> {
                     curb.link = new_blki;
                 }
                 self.curb = new_blki;
-                self.plink = new_blki;
+                self.plink = PhiIdx::INVALID;
                 self.expect(Token::Tnl)?;
-                return PState::PPhi;
+                return Ok(PState::PPhi);
             }
             // Return instruction - ends block
             Token::Tret => {
-                curb.jmp.type_ = J::Jretw + self.rcls;
+                curb.jmp.type_ = match jmp_for_cls(self.rcls) {
+                    None => return Err(self.err("BUG: invalid type for ret")),
+                    Some(j) => j,
+                };
                 if self.peek()? == Token::Tnl {
                     curb.jmp.type_ = J::Jret0;
                 } else if self.rcls != K0 {
-                    let r: Ref = self.parseref()?;
+                    let r: Ref = self.parseref(curf)?;
                     if let Ref::R = r {
                         return Err(self.err("invalid return value"));
                     }
@@ -1782,7 +1806,7 @@ impl Parser<'_> {
                     curb.jmp.type_ = J::Jjmp;
                 } else {
                     curb.jmp.type_ = J::Jjnz;
-                    let r: Ref = parseref()?;
+                    let r: Ref = self.parseref(curf)?;
                     if let Ref::R = r {
                         return Err(self.err("invalid argument for jnz jump"));
                     }
@@ -1793,8 +1817,8 @@ impl Parser<'_> {
                 self.expect(Token::Tlbl)?;
                 curb.s1 = self.findblk(&self.tokval.str, curf);
                 if curb.jmp.type_ != J::Jjmp {
-                    expect(Token::Tcomma)?;
-                    expect(Token::Tlbl)?;
+                    self.expect(Token::Tcomma)?;
+                    self.expect(Token::Tlbl)?;
                     curb.s2 = self.findblk(&self.tokval.str, curf);
                 }
                 if curb.s1 == curf.start || curb.s2 == curf.start {
@@ -1846,21 +1870,22 @@ impl Parser<'_> {
                     /* operations without result */
                     r = Ref::R;
                     k = KW; // TODO why not K0?
-                    if let Some(op) = O::from_repr(t as usize) {
-                        () // Ok
-                    } else {
-                        return Err(self.err(
-                            "BUG: failed to convert store token {:?} to instruction op",
-                            t,
-                        ));
-                    }
+                    op_tok = t;
+                    // if let Some(op) = O::from_repr(t as usize) {
+                    //     () // Ok
+                    // } else {
+                    //     return Err(self.err(format!(
+                    //         "BUG: failed to convert store token {:?} to instruction op",
+                    //         t,
+                    //     )));
+                    // }
                 } else {
                     return Err(self.err("label, instruction or jump expected"));
                 }
             }
         }
 
-        assert(!(goto_close && goto_ins));
+        assert!(!(goto_close && goto_ins));
 
         if goto_close {
             // Close:
@@ -1874,8 +1899,8 @@ impl Parser<'_> {
         if !goto_ins {
             if op_tok == Token::Tcall {
                 // Call instruction
-                arg.push(self.parseref()?);
-                self.parserefl(true)?;
+                arg.push(self.parseref(curf)?);
+                self.parserefl(true, curf)?;
                 op = O::Ocall;
                 self.expect(Token::Tnl)?;
                 let arg1 = {
@@ -1898,13 +1923,14 @@ impl Parser<'_> {
                 if op_tok == Token::Tloadw {
                     op_tok = Token::TOloadsw;
                 } else if op_tok >= Token::Tloadl && op_tok <= Token::Tloadd {
-                    op_tok = Token::TOload;
-                } else if op_tok == Token::Talloc1 || op_tok == Token::Talloc2 {
-                    op_tok = Token::TOalloc;
+                    op_tok = Token::TOload; // TODO - weird, weaking type?
                 }
-                if op_tok == O::Ovastart && !curf.vararg {
+                if op_tok == Token::TOvastart && !curf.vararg {
                     return Err(self.err("cannot use vastart in non-variadic function"));
+                } else if op_tok == Token::Talloc1 || op_tok == Token::Talloc2 {
+                    op_tok = Token::TOalloc4; // Interesting, byte/short alloc promoted to word
                 }
+
                 if k >= KSB {
                     return Err(self.err("size class must be w, l, s, or d"));
                 }
@@ -1917,11 +1943,11 @@ impl Parser<'_> {
                         //     err("too many arguments");
                         if op_tok == Token::Tphi {
                             self.expect(Token::Tlbl)?;
-                            blk.push(curf.findblk(&self.tokval.str))?;
+                            blk.push(curf.findblk(&self.tokval.str)?);
                         }
-                        let argi: Ref = self.parseref()?;
+                        let argi: Ref = self.parseref(curf)?;
                         if let Ref::R = argi {
-                            err("invalid instruction argument");
+                            return Err(self.err("invalid instruction argument"));
                         }
                         arg.push(argi);
                         //i += 1;
@@ -1938,7 +1964,7 @@ impl Parser<'_> {
                 self.next()?;
                 match op_tok {
                     Token::Tphi => {
-                        if ps != PState::PPhi || curb == curf.start {
+                        if ps != PState::PPhi || self.curb == curf.start {
                             return Err(self.err("unexpected phi instruction"));
                         }
                         // phi = alloc(sizeof *phi);
@@ -1949,12 +1975,18 @@ impl Parser<'_> {
                         // phi->blk = vnew(i, sizeof blk[0], PFn);
                         // memcpy(phi->blk, blk, i * sizeof blk[0]);
                         // phi->narg = i;
-                        if self.plink == BlkIdx.INVALID {
-                            return Err(self.err("No current block when parsing phi"));
-                        }
                         // *plink = phi;
                         // plink = &phi->link;
-                        curf.blks[self.plink.0].phi = Phi::new(r, arg.clone(), blk.clone(), k, r);
+                        let phii = PhiIdx(curf.phis.len());
+                        curf.phis
+                            .push(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
+                        if self.plink == PhiIdx::INVALID {
+                            curb.phi = phii;
+                        } else {
+                            let prev_phi = &mut curf.phis[self.plink.0];
+                            prev_phi.link = phii;
+                        }
+                        self.plink = phii;
                         return Ok(PState::PPhi);
                     }
                     Token::Tblit => {
@@ -1970,14 +2002,14 @@ impl Parser<'_> {
                             Err(self.err("insufficient args for blit"));
                         }
                         self.insb
-                            .push(Ins::new2(o::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
+                            .push(Ins::new2(O::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
                         let coni: ConIdx;
-                        if let R::RCon(coni) = arg[2] {
+                        if let Ref::RCon(coni) = arg[2] {
                             () // Ok
                         } else {
                             return Err(self.err("blit size must be constant"));
                         }
-                        let c: &Con = &curf.con[coni];
+                        let c: &Con = &curf.con[coni.0];
                         let sz: u32 = {
                             let mut sz_u32: u32 = 0;
                             let mut is_valid_size: bool = c.type_ == ConT::CBits;
@@ -1992,6 +2024,7 @@ impl Parser<'_> {
                             if !is_valid_size {
                                 return Err(self.err("blit size negative or too large"));
                             }
+                            sz_u32
                         };
                         // let r: Ref = Ref::RInt(c.bits.i);
                         // curi->op = Oblit1;
@@ -2001,11 +2034,10 @@ impl Parser<'_> {
                         return Ok(PState::PIns);
                     }
                     _ => {
-                        if let Some(op) = O::from_repr(op_tok as usize) {
-                            () // Ok
-                        } else {
-                            return Err(self.err("invalid instruction"));
-                        }
+                        op = match tok_to_pub_op(op_tok) {
+                            None => return Err(self.err("invalid instruction")),
+                            Some(op0) => op0,
+                        };
                         // goto_ins = true; no effect?
                     }
                 }
@@ -2025,7 +2057,7 @@ impl Parser<'_> {
         }
         self.insb.push(Ins::new2(op, k, r, [arg[0], arg[1]]));
 
-        return PState::PIns;
+        return Ok(PState::PIns);
     }
 }
 
@@ -2235,7 +2267,7 @@ impl Parser<'_> {
         }
         // strncpy(curf->name, tokval.str, NString-1);
         curf.name = self.tokval.str.clone();
-        curf.vararg = self.parserefl(false, curf)?;
+        curf.vararg = self.parserefl(false, &mut curf)?;
         if self.nextnl()? != Token::Tlbrace {
             return Err(self.err("function body must start with {"));
         }
@@ -2246,15 +2278,12 @@ impl Parser<'_> {
                 break;
             }
         }
-        match self.curb {
-            None => {
-                return Err(self.err("empty function"));
-            }
-            Some(blki) => {
-                let b: &Blk = &curf.blks[blki.0]; // TODO accessor fn rather?
-                if b.jmp.type_ == J::Jxxx {
-                    return Err(self.err("last block misses jump"));
-                }
+        if self.curb == BlkIdx::INVALID {
+            return Err(self.err("empty function"));
+        } else {
+            let b: &Blk = &curf.blks[self.curb.0]; // TODO accessor fn rather?
+            if b.jmp.type_ == J::Jxxx {
+                return Err(self.err("last block misses jump"));
             }
         }
         // curf->mem = vnew(0, sizeof curf->mem[0], PFn);
@@ -2974,7 +3003,8 @@ impl Parser<'_> {
             lnum: 0,
             //curf: None,
             tmph: [TmpIdx::INVALID; TMASK + 1],
-            curb: None,
+            plink: PhiIdx::INVALID,
+            curb: BlkIdx::INVALID,
             blink: BlkIdx::INVALID,
             blkh: [BlkIdx::INVALID; BMASK + 1],
             //nblk: 0,
