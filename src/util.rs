@@ -40,8 +40,8 @@ enum {
 };
  */
 
-const IBits: usize = 12;
-pub const IMask: usize = (1 << IBits) - 1;
+const IBits: u32 = 12;
+pub const IMask: u32 = (1 << IBits) - 1;
 
 /*
 Typ *typ;
@@ -64,11 +64,11 @@ hash(char *s)
 }
  */
 
-pub fn hash(s: &[u8]) -> usize {
-    let mut h: usize = 0;
+pub fn hash(s: &[u8]) -> u32 {
+    let mut h: u32 = 0;
 
     for c in s {
-        h = (*c as usize) + 17 * h;
+        h = (*c as u32).wrapping_add(17u32.wrapping_mul(h));
     }
 
     h
@@ -220,10 +220,10 @@ intern(char *s)
  */
 
 #[derive(PartialEq)]
-pub struct InternId(usize);
+pub struct InternId(u32);
 
 impl InternId {
-    pub const INVALID: InternId = InternId(usize::MAX);
+    pub const INVALID: InternId = InternId(u32::MAX);
 }
 
 pub fn intern(s: &[u8], parser: &mut Parser) -> InternId {
@@ -232,12 +232,12 @@ pub fn intern(s: &[u8], parser: &mut Parser) -> InternId {
     // uint32_t h;
     // uint i, n;
 
-    let h = hash(s) & IMask;
-    let b = &mut parser.itbl[h];
-    let n = b.len();
+    let h: u32 = hash(s) & IMask;
+    let b: &mut Bucket = &mut parser.itbl[h as usize];
+    let n: u32 = b.len() as u32;
 
     for i in 0..n {
-        if s == b[i] {
+        if s == b[i as usize] {
             return InternId(h + (i << IBits));
         }
     }

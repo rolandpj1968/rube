@@ -69,7 +69,7 @@ enum PState {
     PEnd,
 }
 
-#[derive(Clone, Copy, EnumIter, FromRepr, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, EnumIter, FromRepr, PartialEq, PartialOrd)]
 #[repr(u8)]
 enum Token {
     Txxx = 0,
@@ -350,9 +350,9 @@ static char *kwmap[Ntok] = {
  */
 
 lazy_static! {
-    static ref KWMAP: [&'static [u8]; O::NOp as usize] = {
+    static ref KWMAP: [&'static [u8]; Token::Ntok as usize] = {
     // Crazy indent courtesy of emacs rustic.
-    let mut kwmap0: [&'static [u8]; O::NOp as usize] = [b""; O::NOp as usize];
+    let mut kwmap0: [&'static [u8]; Token::Ntok as usize] = [b""; Token::Ntok as usize];
 
     kwmap0[Token::Tloadw as usize] = b"loadw";
     kwmap0[Token::Tloadl as usize] = b"loadl";
@@ -400,11 +400,11 @@ lazy_static! {
     };
 }
 
-const NPRED: usize = 63;
-const TMASK: usize = 16383; /* for temps hash */
-const BMASK: usize = 8191; /* for blocks hash */
-const K: usize = 9583425; /* found using tools/lexh.c */
-const M: usize = 23;
+//const NPRED: usize = 63;
+const TMASK: u32 = 16383; /* for temps hash */
+const BMASK: u32 = 8191; /* for blocks hash */
+const K: u32 = 9583425; /* found using tools/lexh.c */
+const M: u32 = 23;
 
 /*
 static uchar lexh[1 << (32-M)];
@@ -465,17 +465,17 @@ pub struct Parser<'a> {
     tokval: TokVal,
     lnum: i32,
     //curf: Option<Fn>,
-    tmph: [TmpIdx; TMASK + 1],
+    tmph: [TmpIdx; (TMASK + 1) as usize],
     plink: PhiIdx, // BlkIdx::INVALID before first phi of curb
     curb: BlkIdx,  // BlkIdx::INVALID before start parsing first blk
     blink: BlkIdx, // BlkIdx::INVALID before finished parsing first blk, else prev blk
-    blkh: [BlkIdx; BMASK + 1],
+    blkh: [BlkIdx; (BMASK + 1) as usize],
     //nblk: i32,
     rcls: KExt,
     //ntyp: u32,
     typ: Vec<Typ>,                 // from util.c
     insb: Vec<Ins>,                // from util.c
-    pub itbl: [Bucket; IMask + 1], // from util.c; string interning table; ugh pub for util::intern
+    pub itbl: [Bucket; (IMask + 1) as usize], // from util.c; string interning table; ugh pub for util::intern
 }
 
 /*
@@ -529,15 +529,19 @@ lexinit()
  */
 
 lazy_static! {
-    static ref LEXH: [Token; 1 << (32 - M)] = {
-        let mut lexh0: [Token; 1 << (32 - M)] = [Token::Txxx; 1 << (32 - M)];
+    static ref LEXH: [Token; (1 << (32 - M)) as usize] = {
+        let mut lexh0: [Token; (1 << (32 - M)) as usize] = [Token::Txxx; (1 << (32 - M)) as usize];
 
         for t in Token::iter() {
+	    // println!("        adding Token {:?} to LEXH", t);
             let i = t as usize;
-            if !KWMAP[i].is_empty() {
-                let h = ((hash(KWMAP[i]) as usize) * K) >> M;
-                assert!(lexh0[h] == Token::Txxx);
-                lexh0[h] = t;
+            if t != Token::Ntok && !KWMAP[i].is_empty() {
+                let h: u32 = hash(KWMAP[i]).wrapping_mul(K) >> M;
+		if (h as usize) > lexh0.len() {
+		    eprintln!("M is {}, 1 << (32 - M) is {}, lexh0.len() is {}. h is {}", M, 1 << (32 - M), lexh0.len(), h);
+		}
+                assert!(lexh0[h as usize] == Token::Txxx);
+                lexh0[h as usize] = t;
             }
         }
 
@@ -926,7 +930,8 @@ impl Parser<'_> {
             if t != Token::Txxx {
                 return Ok(t);
             }
-            t = LEXH[(hash(&tok) as usize) * K >> M];
+	    let h: u32 = hash(&tok).wrapping_mul(K) >> M;
+            t = LEXH[h as usize];
             if t == Token::Txxx || KWMAP[t as usize] != tok {
                 return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
             }
@@ -1499,8 +1504,8 @@ impl Parser<'_> {
         // Blk *b;
         // uint32_t h;
 
-        let h = hash(name) & BMASK;
-        let mut bi: BlkIdx = self.blkh[h];
+        let h: u32 = hash(name) & BMASK;
+        let mut bi: BlkIdx = self.blkh[h as usize];
 
         while bi != BlkIdx::INVALID {
             // for (b=blkh[h]; b; b=b->dlink)
@@ -1514,12 +1519,12 @@ impl Parser<'_> {
 
         let id: usize = curf.blks.len();
         bi = BlkIdx(id);
-        curf.blks.push(Blk::new(name, id, self.blkh[h]));
+        curf.blks.push(Blk::new(name, id, self.blkh[h as usize]));
         // b = newblk();
         // b->id = nblk++;
         // strcpy(b->name, name);
         // b->dlink = blkh[h];
-        self.blkh[h] = bi;
+        self.blkh[h as usize] = bi;
 
         return bi;
     }
@@ -2381,16 +2386,17 @@ impl Parser<'_> {
         // WTF is this for loop doing? It starts at 0????? TODO TODO TODO - Notify QBE?
         // See fix - https://c9x.me/git/qbe.git/commit/parse.c?id=dc3f7d7c4a7a5c74f2de1c1de051057050066393
         //   should be curf->start
+	println!("TODO fix bug reminder - clear dlink's");
         // for (b=0; b; b=b->link)
         //     b->dlink = 0; /* was trashed by findblk() */
         for i in 0..BMASK + 1 {
-            self.blkh[i] = BlkIdx::INVALID;
+            self.blkh[i as usize] = BlkIdx::INVALID;
         }
         // memset(tmph, 0, sizeof tmph);
         for i in 0..TMASK + 1 {
-            self.tmph[i] = TmpIdx::INVALID;
+            self.tmph[i as usize] = TmpIdx::INVALID;
         }
-        panic!("Do typecheck()");
+        println!("TODO - missing typecheck()");
         //self.typecheck(&curf)?;
         //return curf;
 
@@ -3090,17 +3096,17 @@ impl Parser<'_> {
             tokval: TokVal::new(),
             lnum: 0,
             //curf: None,
-            tmph: [TmpIdx::INVALID; TMASK + 1],
+            tmph: [TmpIdx::INVALID; (TMASK + 1) as usize],
             plink: PhiIdx::INVALID,
             curb: BlkIdx::INVALID,
             blink: BlkIdx::INVALID,
-            blkh: [BlkIdx::INVALID; BMASK + 1],
+            blkh: [BlkIdx::INVALID; (BMASK + 1) as usize],
             //nblk: 0,
             rcls: K0,
             //ntyp: 0,
             typ: vec![],
             insb: vec![],
-            itbl: [(); IMask + 1].map(|_| Vec::new()), //[Bucket::EMPTY; IMask + 1],
+            itbl: [(); (IMask + 1) as usize].map(|_| Vec::new()), //[Bucket::EMPTY; IMask + 1],
         }
     }
 }
@@ -3142,7 +3148,7 @@ impl Parser<'_> {
                 }
 
                 Token::Tfunc => {
-                    //func(parsefn(&lnk));
+                    func(&self.parsefn(&lnk)?);
                 }
 
                 Token::Tdata => {

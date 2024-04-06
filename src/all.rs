@@ -106,8 +106,8 @@ pub struct Target {
     pub isel: fn(&mut Fn),
     pub emitfn: fn(&Fn /*, FILE **/), // TODO
     pub emitfin: fn(/*FILE **/),      // TODO
-    pub asloc: &'static [u8; 4],
-    pub assym: &'static [u8; 4],
+    pub asloc: &'static [u8],
+    pub assym: &'static [u8],
 }
 
 /*
