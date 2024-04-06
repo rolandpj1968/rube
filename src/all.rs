@@ -647,7 +647,7 @@ struct Ins {
     Ref arg[2];
 };
  */
-#[derive(new)]
+#[derive(Clone, new)]
 pub struct Ins {
     op: O,
     cls: KExt, // Must be one of Kw, Kl, Ks, Kd

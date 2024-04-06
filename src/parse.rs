@@ -1532,7 +1532,23 @@ closeblk()
     blink = &curb->link;
     curi = insb;
 }
+ */
 
+impl Parser<'_> {
+    fn closeblk(&self, curf: &mut Fn) {
+        // TODO - should really check if self.curb is valid
+        let curb: &mut Blk = &mut curf.blks[self.curb.0];
+        // curb->nins = curi - insb;
+        // idup(&curb->ins, insb, curb->nins);
+        // TODO - this is silly, just use Blk::ins directly
+        curb.ins = self.insb.clone();
+        // blink = &curb->link;
+        // curi = insb;
+        self.blink = self.curb;
+    }
+}
+
+/*
 static PState
 parseline(PState ps)
 {
@@ -2032,7 +2048,7 @@ impl Parser<'_> {
                         // curi->arg[1] = arg[1];
                         // curi++;
                         if arg.len() < 3 {
-                            Err(self.err("insufficient args for blit"));
+                            return Err(self.err("insufficient args for blit"));
                         }
                         self.insb
                             .push(Ins::new2(O::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
