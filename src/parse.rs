@@ -537,9 +537,9 @@ lazy_static! {
             let i = t as usize;
             if t != Token::Ntok && !KWMAP[i].is_empty() {
                 let h: u32 = hash(KWMAP[i]).wrapping_mul(K) >> M;
-		if (h as usize) > lexh0.len() {
-		    eprintln!("M is {}, 1 << (32 - M) is {}, lexh0.len() is {}. h is {}", M, 1 << (32 - M), lexh0.len(), h);
-		}
+		// if (h as usize) > lexh0.len() {
+		//     eprintln!("M is {}, 1 << (32 - M) is {}, lexh0.len() is {}. h is {}", M, 1 << (32 - M), lexh0.len(), h);
+		// }
                 assert!(lexh0[h as usize] == Token::Txxx);
                 lexh0[h as usize] = t;
             }
@@ -585,7 +585,7 @@ impl Parser<'_> {
         }
         let mut craw = c.unwrap();
         let m = craw == b'-';
-        if m || craw == b'+' {
+        if m {
             c = self.getc()?;
             if c.is_none() {
                 return Err(self.err("end-of-file in integer constant"));
@@ -772,7 +772,7 @@ Alpha:
  */
 
 impl Parser<'_> {
-    fn getc(&mut self) -> RubeResult<Option<u8>> {
+    fn getc_real(&mut self) -> RubeResult<Option<u8>> {
         match self.ungetc {
             None => match self.inf.next() {
                 None => Ok(None),
@@ -786,6 +786,16 @@ impl Parser<'_> {
         }
     }
 
+    fn getc(&mut self) -> RubeResult<Option<u8>> {
+	let r = self.getc_real();
+	// if let Ok(Some(byte)) = r {
+	//     println!("                      getc '{}' ({:#02x?})", escape_default(byte), byte);
+	// } else {
+	//     println!("                      getc {:?}", r);
+	// }
+	r
+    }
+
     fn ungetc(&mut self, c: Option<u8>) {
         assert!(self.ungetc.is_none());
         self.ungetc = c;
@@ -794,16 +804,20 @@ impl Parser<'_> {
     fn lex(&mut self) -> RubeResult<Token> {
         let mut c: Option<u8> = Some(b' ');
 
-        while c.is_some() && is_whitespace(c.unwrap()) {
-            c = self.getc()?;
-        }
-
-        self.tokval.chr = c;
-
-        if c.is_none() {
-            return Ok(Token::Teof);
-        }
-        let mut craw = c.unwrap();
+        let mut craw: u8;
+	loop {
+	    self.tokval.chr = c;
+	    match c {
+		None => return Ok(Token::Teof),
+		Some(craw0) => {
+		    craw = craw0;
+		    if craw != b' ' && craw != b'\t' {
+			break;
+		    }
+		}
+	    }
+	    c = self.getc()?;
+	}
 
         let mut t: Token = Token::Txxx;
         let mut take_alpha = false;
@@ -824,6 +838,7 @@ impl Parser<'_> {
                     return Ok(Token::Tflts);
                 } else {
                     self.ungetc(c2);
+		    take_alpha = true;
                 }
             }
             b'd' => {
@@ -833,6 +848,7 @@ impl Parser<'_> {
                     return Ok(Token::Tfltd);
                 } else {
                     self.ungetc(c2);
+		    take_alpha = true;
                 }
             }
             b'%' => {
@@ -862,16 +878,18 @@ impl Parser<'_> {
                 // goto Alpha;
             }
             b'#' => {
+		//while ((c=fgetc(inf)) != '\n' && c != EOF)
+		//    ;
                 while c.is_some() && c.unwrap() != b'\n' {
 		    c = self.getc()?;
 		}
-		//while ((c=fgetc(inf)) != '\n' && c != EOF)
-		    ;
                 self.lnum += 1;
+		// println!("                                            parsed comment - lnum is {}", self.lnum);
                 return Ok(Token::Tnl);
             }
             b'\n' => {
                 self.lnum += 1;
+		// println!("                                            parsed newline - lnum is {}", self.lnum);
                 return Ok(Token::Tnl);
             }
             b'"' => {
@@ -879,14 +897,18 @@ impl Parser<'_> {
                 take_quote = true;
             }
             _ => {
-                // Expect a keyword
-                take_alpha = true;
+		// println!("                                                                  lex(): craw is '{}' ({:#02x?}) so take_alpha = true", escape_default(craw), craw);
+                // Expect a keyword or integer literal
+		if !(is_digit(craw) || craw == b'-') {
+                    take_alpha = true;
+		}
             }
         }
 
         assert!(!(take_alpha && take_quote));
 
         if take_alpha {
+	    // println!("                                                                  lex(): taking alpha for {:?}", t);
             if t != Token::Txxx {
                 let prev_craw = craw;
                 c = self.getc()?;
@@ -928,6 +950,7 @@ impl Parser<'_> {
             self.ungetc(c); // Hope EOF is idempotent
             self.tokval.str = tok.clone();
             if t != Token::Txxx {
+		// println!("                                                                  lex(): found {:?} with value {:?}", t, String::from_utf8_lossy(&self.tokval.str));
                 return Ok(t);
             }
 	    let h: u32 = hash(&tok).wrapping_mul(K) >> M;
@@ -935,6 +958,8 @@ impl Parser<'_> {
             if t == Token::Txxx || KWMAP[t as usize] != tok {
                 return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
             }
+	    // println!("                                                                  lex(): found keyword {:?}", t);
+	    return Ok(t);
         } else if take_quote {
             assert!(t != Token::Txxx);
             self.tokval.str = vec![];
@@ -954,7 +979,7 @@ impl Parser<'_> {
             }
         }
 
-        if is_digit(craw) || craw == b'-' || craw == b'+' {
+        if is_digit(craw) || craw == b'-' {
             self.ungetc(c);
             self.tokval.num = self.getint()?;
             return Ok(Token::Tint);
@@ -1023,6 +1048,7 @@ impl Parser<'_> {
     fn nextnl(&mut self) -> RubeResult<Token> {
         loop {
             let t = self.next()?;
+	    // println!("                                                        nextnl() - next() returned token {:?}", t);
 
             if t != Token::Tnl {
                 return Ok(t);
@@ -1779,9 +1805,9 @@ impl Parser<'_> {
 
         let mut op_tok: Token = Token::Txxx;
 
-        if self.curb == BlkIdx::INVALID {
-            return Err(self.err("BUG: no current block"));
-        }
+        // if self.curb == BlkIdx::INVALID {
+        //     return Err(self.err("BUG: no current block"));
+        // }
         //let curb: &mut Blk = &mut curf.blks[self.curb.0];
 
         let mut t: Token = self.nextnl()?;
@@ -1924,7 +1950,6 @@ impl Parser<'_> {
             }
             // Debug line/column location tag
             Token::TOdbgloc => {
-                // How can an op end up here?
                 op_tok = t;
                 k = KW;
                 r = Ref::R;
@@ -2998,6 +3023,7 @@ impl Parser<'_> {
 
             match t {
                 Token::Texport => {
+		    // println!("Got Token::Texport");
                     lnk.export = true;
                 }
 
@@ -3094,7 +3120,7 @@ impl Parser<'_> {
             inpath: path,
             thead: Token::Txxx,
             tokval: TokVal::new(),
-            lnum: 0,
+            lnum: 1,
             //curf: None,
             tmph: [TmpIdx::INVALID; (TMASK + 1) as usize],
             plink: PhiIdx::INVALID,

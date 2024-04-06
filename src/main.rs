@@ -83,15 +83,15 @@ static amd64_sysv: Target = Target {
 // )
 
 fn dump_dbgfile(name: &[u8]) {
-    println!("Got dbgfile {:?}", name);
+    println!("Got dbgfile {:?}", String::from_utf8_lossy(name));
 }
 
 fn dump_data(dat: &Dat) {
-    println!("Got dat {:?}", dat.name);
+    println!("Got dat {:?}", String::from_utf8_lossy(&dat.name));
 }
 
 fn dump_func(fn_: &Fn) {
-    println!("Got fn {:?}", fn_.name);
+    println!("Got fn {:?}", String::from_utf8_lossy(&fn_.name));
 }
 
 fn main() {
