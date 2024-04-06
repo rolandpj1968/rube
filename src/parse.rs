@@ -13,9 +13,9 @@ use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
 use crate::all::{
-    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, ORanges, Ref, RubeResult,
-    Sym, SymT, Target, Tmp0, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KL, KS, KSB, KSH,
-    KUB, KUH, KW, KX, O,
+    Blk, BlkIdx, Con, ConBits, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, ORanges, Phi, PhiIdx,
+    Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD,
+    KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, intern, newcon, newtmp, Bucket, IMask, InternId};
@@ -72,6 +72,160 @@ enum PState {
 #[derive(Clone, Copy, EnumIter, PartialEq)]
 enum Token {
     Txxx = 0,
+
+    // These have 1:1 correspondence with enum O and MUST be the same value as usize
+    TOadd,
+    TOsub,
+    TOneg,
+    TOdiv,
+    TOrem,
+    TOudiv,
+    TOurem,
+    TOmul,
+    TOand,
+    TOor,
+    TOxor,
+    TOsar,
+    TOshr,
+    TOshl,
+
+    TOceqw,
+    TOcnew,
+    TOcsgew,
+    TOcsgtw,
+    TOcslew,
+    TOcsltw,
+    TOcugew,
+    TOcugtw,
+    TOculew,
+    TOcultw,
+
+    TOceql,
+    TOcnel,
+    TOcsgel,
+    TOcsgtl,
+    TOcslel,
+    TOcsltl,
+    TOcugel,
+    TOcugtl,
+    TOculel,
+    TOcultl,
+
+    TOceqs,
+    TOcges,
+    TOcgts,
+    TOcles,
+    TOclts,
+    TOcnes,
+    TOcos,
+    TOcuos,
+
+    TOceqd,
+    TOcged,
+    TOcgtd,
+    TOcled,
+    TOcltd,
+    TOcned,
+    TOcod,
+    TOcuod,
+
+    TOstoreb,
+    TOstoreh,
+    TOstorew,
+    TOstorel,
+    TOstores,
+    TOstored,
+
+    TOloadsb,
+    TOloadub,
+    TOloadsh,
+    TOloaduh,
+    TOloadsw,
+    TOloaduw,
+    TOload,
+
+    TOextsb,
+    TOextub,
+    TOextsh,
+    TOextuh,
+    TOextsw,
+    TOextuw,
+
+    TOexts,
+    TOtruncd,
+    TOstosi,
+    TOstoui,
+    TOdtosi,
+    TOdtoui,
+    TOswtof,
+    TOuwtof,
+    TOsltof,
+    TOultof,
+    TOcast,
+
+    TOalloc4,
+    TOalloc8,
+    TOalloc16,
+
+    TOvaarg,
+    TOvastart,
+
+    TOcopy,
+
+    TOdbgloc,
+
+    TOnop,
+    TOaddr,
+    TOblit0,
+    TOblit1,
+    TOswap,
+    TOsign,
+    TOsalloc,
+    TOxidiv,
+    TOxdiv,
+    TOxcmp,
+    TOxtest,
+    TOacmp,
+    TOacmn,
+    TOafcmp,
+    TOreqz,
+    TOrnez,
+
+    TOpar,
+    TOparsb,
+    TOparub,
+    TOparsh,
+    TOparuh,
+    TOparc,
+    TOpare,
+    TOarg,
+    TOargsb,
+    TOargub,
+    TOargsh,
+    TOarguh,
+    TOargc,
+    TOarge,
+    TOargv,
+    TOcall,
+
+    TOflagieq,
+    TOflagine,
+    TOflagisge,
+    TOflagisgt,
+    TOflagisle,
+    TOflagislt,
+    TOflagiuge,
+    TOflagiugt,
+    TOflagiule,
+    TOflagiult,
+    TOflagfeq,
+    TOflagfge,
+    TOflagfgt,
+    TOflagfle,
+    TOflagflt,
+    TOflagfne,
+    TOflagfo,
+    TOflagfuo,
 
     /* aliases */
     Tloadw = ORanges::NPubOp as isize,
@@ -288,9 +442,9 @@ pub struct Parser<'a> {
     lnum: i32,
     //curf: Option<Fn>,
     tmph: [TmpIdx; TMASK + 1],
-    //static Phi **plink;
-    curb: Option<BlkIdx>,
-    //static Blk **blink;
+    plink: BlkIdx, // BlkIdx::INVALID before start parsing first blk
+    curb: BlkIdx,  // BlkIdx::INVALID before start parsing first blk
+    blink: BlkIdx, // BlkIdx::INVALID before finished parsing first blk, else prev blk
     blkh: [BlkIdx; BMASK + 1],
     //nblk: i32,
     rcls: KExt,
@@ -1521,7 +1675,322 @@ parseline(PState ps)
         return PIns;
     }
 }
+ */
 
+impl Parser<'_> {
+    fn parseline(&mut self, ps: PState, curf: &mut Fn) -> RubeResult<PState> {
+        // ugh, ownership
+        // Ref arg[NPred] = {R};
+        // Blk *blk[NPred];
+        // Phi *phi;
+        // Ref r;
+        // Blk *b;
+        // Con *c;
+        // int t, op, i, k, ty;
+
+        let arg: Vec<Ref> = vec![];
+        let r: Ref;
+        let k: KExt;
+        let ty: TypIdx;
+        let op_tok: Token;
+        let op_op: O;
+
+        if self.curb == BlkIdx::INVALID {
+            return Err(self.err("BUG: no current block"));
+        }
+        let curb: &mut Blk = curf.blks[blki.0];
+
+        let t: Token = self.nextnl()?;
+
+        if ps == PState::PLbl && t != Token::Tlbl && t != Token::Trbrace {
+            return Err(self.err("label or } expected"));
+        }
+
+        let mut goto_close: bool = false;
+        let mut goto_ins: bool = false;
+
+        match t {
+            Token::Ttmp => {
+                r = tmpref(self.tokval.str);
+                self.expect(Teq)?;
+                (k, ty) = self.parsecls();
+                op_tok = next()?;
+            }
+            Token::Tblit | Token::Tcall | Token::Ovastart => {
+                // case Ovastart: TODO TODO, what to do?
+                /* operations without result */
+                r = Ref::R;
+                k = KW;
+                op_tok = t;
+            }
+            Token::Trbrace => return Ok(PEnd),
+            Token::Tlbl => {
+                let new_blki: BlkIdx = self.findblk(&self.tokval.str)?;
+                if (curb && curb.jmp.type_ == J::Jxxx) {
+                    self.closeblk(curf);
+                    curb.jmp.type_ = J::Jjmp;
+                    curb.s1 = b_idx;
+                }
+                let new_b: &mut Blk = curf.blks[new_blki.0];
+                if new_b.jmp.type_ != J::Jxxx {
+                    return Err(self.err(
+                        "multiple definitions of block @{}",
+                        String::from_utf8_lossy(&b.name),
+                    ));
+                }
+                if self.blink == BlkIdx::INVALID {
+                    // First block
+                    curf.start = new_blki;
+                } else {
+                    curb.link = new_blki;
+                }
+                self.curb = new_blki;
+                self.plink = new_blki;
+                self.expect(Token::Tnl)?;
+                return PState::PPhi;
+            }
+            Token::Tret => {
+                curb.jmp.type_ = J::Jretw + self.rcls;
+                if self.peek()? == Tnl {
+                    curb.jmp.type_ = J::Jret0;
+                } else if self.rcls != K0 {
+                    let r: Ref = self.parseref()?;
+                    if let Ref::R = r {
+                        return Err(self.err("invalid return value"));
+                    }
+                    curb.jmp.arg = r;
+                }
+                goto_close = true;
+            }
+            Token::Tjmp | Token::Tjnz => {
+                if t == Token::Tjmp {
+                    curb.jmp.type_ = J::Jjmp;
+                } else {
+                    curb.jmp.type_ = J::Jjnz;
+                    let r: Ref = parseref()?;
+                    if let Ref::R = r {
+                        return Err(self.err("invalid argument for jnz jump"));
+                    }
+                    curb.jmp.arg = r;
+                    self.expect(Tcomma)?;
+                }
+                // Jump:
+                self.expect(Token::Tlbl)?;
+                curb.s1 = self.findblk(&self.tokval.str, curf);
+                if (curb.jmp.type_ != J::Jjmp) {
+                    expect(Token::Tcomma)?;
+                    expect(Token::Tlbl)?;
+                    curb.s2 = self.findblk(&self.tokval.str, curf);
+                }
+                if curb.s1 == curf.start || curb.s2 == curf.start {
+                    return Err(self.err("invalid jump to the start block"));
+                }
+                goto_close = true;
+            }
+            Token::Thlt => {
+                curb.jmp.type_ = J::Jhlt;
+                goto_close = true;
+            }
+            Token::Odbgloc => {
+                // How can an op end up here?
+                op = t;
+                k = KW;
+                r = Ref::R;
+                self.expect(Token::Tint)?;
+                let ln: u32 = self.tokval.num as u32;
+                if (ln as i64) != self.tokval.num {
+                    /// ??? this cannot work???
+                    return Err(self.err(&format!("line number {} too big", self.tokval.num)));
+                }
+                arg.push(Ref::RInt(ln));
+                let cn: u32 = {
+                    if self.peek()? == Token::Tcomma {
+                        self.next()?;
+                        self.expect(Token::Tint)?;
+                        let cn0: u32 = self.tokval.num as u32;
+                        if ((cn0 as i64) != self.tokval.num) {
+                            return Err(
+                                self.err(&format!("column number {} too big", self.tokval.num))
+                            );
+                        }
+                        cn0
+                    } else {
+                        0
+                    }
+                };
+                arg.push(Ref::RInt(cn));
+                goto_ins = true;
+            }
+            _ => {
+                if isstore(t) {
+                    /* operations without result */
+                    r = Ref::R;
+                    k = KW; // TODO why not K0?
+                    op_tok = t;
+                } else {
+                    return Err(self.err("label, instruction or jump expected"));
+                }
+            }
+        }
+
+        assert(!(goto_close && goto_ins));
+
+        if goto_close {
+            // Close:
+            self.expect(Token::Tnl)?;
+            self.closeblk(curf);
+            return Ok(PState::PLbl);
+        }
+
+        if !goto_ins {
+            if op_tok == Token::Tcall {
+                arg[0] = self.parseref()?;
+                self.parserefl(true)?;
+                op_op = O::Ocall;
+                self.expect(Token::Tnl)?;
+                if k == KC {
+                    k = Kl;
+                    arg[1] = TYPE(ty);
+                }
+                if k >= KSB {
+                    // else if ???
+                    k = Kw;
+                }
+                goto_ins = true;
+            }
+            if op_tok == Token::Tloadw {
+                op_op = O::Oloadsw;
+            }
+            if op_tok >= Token::Tloadl && op <= Token::Tloadd {
+                // else if ???
+                op_op = O::Oload;
+            }
+            if op_tok == Token::Talloc1 || op == Token::Talloc2 {
+                // else if ???
+                op_op = O::Oalloc;
+            }
+            if op_dunno == O::Ovastart && !curf.vararg {
+                return Err(self.err("cannot use vastart in non-variadic function"));
+            }
+            if k >= KSB {
+                return Err(self.err("size class must be w, l, s, or d"));
+            }
+            let i = 0;
+            if self.peek()? != Token::Tnl {
+                //for (;;) {
+                loop {
+                    // if (i == NPred)
+                    //     err("too many arguments");
+                    if op_tok == Token::Tphi {
+                        self.expect(Tlbl)?;
+                        blk[i] = curf.findblk(&self.tokval.str)?;
+                    }
+                    arg[i] = self.parseref()?;
+                    if let Ref::R = arg[i] {
+                        err("invalid instruction argument");
+                    }
+                    i += 1;
+                    t = self.peek()?;
+                    if t == Token::Tnl {
+                        break;
+                    }
+                    if t != Token::Tcomma {
+                        return Err(self.err(", or end of line expected"));
+                    }
+                    self.next()?;
+                }
+            }
+            self.next()?;
+            match op_tok {
+                Token::Tphi => {
+                    if ps != PState::PPhi || curb == curf.start {
+                        return Err(self.err("unexpected phi instruction"));
+                    }
+                    // phi = alloc(sizeof *phi);
+                    // phi.to = r;
+                    // phi.cls = k;
+                    // phi->arg = vnew(i, sizeof arg[0], PFn);
+                    // memcpy(phi->arg, arg, i * sizeof arg[0]);
+                    // phi->blk = vnew(i, sizeof blk[0], PFn);
+                    // memcpy(phi->blk, blk, i * sizeof blk[0]);
+                    // phi->narg = i;
+                    if self.plink == BlkIdx.INVALID {
+                        return Err(self.err("No current block when parsing phi"));
+                    }
+                    // *plink = phi;
+                    // plink = &phi->link;
+                    curf.blks[self.plink.0].phi = Phi::new(to, arg.clone(), blk.clone(), k, r);
+                    return Ok(PState::PPhi);
+                }
+                Token::Tblit => {
+                    // if curi - insb >= NIns-1 {
+                    //     err("too many instructions");
+                    // }
+                    // memset(curi, 0, 2 * sizeof(Ins));
+                    // curi->op = Oblit0;
+                    // curi->arg[0] = arg[0];
+                    // curi->arg[1] = arg[1];
+                    // curi++;
+                    if arg.len() < 3 {
+                        Err(self.err("insufficient args for blit"));
+                    }
+                    self.insb
+                        .push(Ins.new2(o::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
+                    if let R::RCon(coni) = arg[2] {
+                        () // Ok
+                    } else {
+                        return Err(self.err("blit size must be constant"));
+                    }
+                    let c: &Con = &curf.con[coni];
+                    let sz: u32 = {
+                        let mut sz_u32: u32 = 0;
+                        let mut is_valid_size: bool = c.type_ == CBits;
+                        if is_valid_size {
+                            if let ConBits::I(sz_i64) = c.bits {
+                                sz_u32 = sz_i64 as u32;
+                                is_valid_size = sz_i64 >= 0 && sz_i64 == (sz_u32 as i64);
+                            } else {
+                                return Err(self.err("blit size must be integer constant"));
+                            }
+                        }
+                        if !is_valid_size {
+                            return Err(self.err("blit size negative or too large"));
+                        }
+                    };
+                    // let r: Ref = Ref::RInt(c.bits.i);
+                    // curi->op = Oblit1;
+                    // curi->arg[0] = r;
+                    // curi++;
+                    self.insb.push(Ins::new1(O::Oblit1, K0, Ref::R, [r]));
+                    return PIns;
+                }
+                _ => {
+                    if op_op >= O::NPubOp {
+                        return Err(self.err("invalid instruction"));
+                    }
+                    // goto_ins = true; no effect?
+                }
+            }
+        }
+        // Ins:
+        // if (curi - insb >= NIns)
+        //     err("too many instructions");
+        // curi->op = op;
+        // curi->cls = k;
+        // curi->to = r;
+        // curi->arg[0] = arg[0];
+        // curi->arg[1] = arg[1];
+        // curi++;
+        while arg.len() < 2 {
+            arg.push(Ref::R);
+        }
+        self.insb.push(Ins::new2(op, k, r, [arg[0], arg[1]]));
+
+        return PIns;
+    }
+}
+
+/*
 static int
 usecheck(Ref r, int k, Fn *fn)
 {
@@ -1715,9 +2184,7 @@ impl Parser<'_> {
             Sym::new(SymT::SGlo, InternId::INVALID),
             ConBits::I(0),
         )); // ??? what's this for?
-            // curf->lnk = *lnk;
-            // blink = &curf->start; // TODO - ???
-            // curf.retty = Some(KX); // Handled in Fn::new() as TypIdx::INVALID
+        curf.lnk = lnk.clone();
         if self.peek()? != Token::Tglo {
             (self.rcls, curf.retty) = self.parsecls()?;
         } /*else {
@@ -1729,13 +2196,13 @@ impl Parser<'_> {
         }
         // strncpy(curf->name, tokval.str, NString-1);
         curf.name = self.tokval.str.clone();
-        curf.vararg = self.parserefl(false, &mut curf)?;
+        curf.vararg = self.parserefl(false, curf)?;
         if self.nextnl()? != Token::Tlbrace {
             return Err(self.err("function body must start with {"));
         }
         let mut ps: PState = PState::PLbl;
         loop {
-            ps = self.parseline(ps)?;
+            ps = self.parseline(ps, &mut curf)?;
             if ps == PState::PEnd {
                 break;
             }
@@ -1757,6 +2224,8 @@ impl Parser<'_> {
         // curf->rpo = 0;
 
         // WTF is this for loop doing? It starts at 0????? TODO TODO TODO - Notify QBE?
+        // See fix - https://c9x.me/git/qbe.git/commit/parse.c?id=dc3f7d7c4a7a5c74f2de1c1de051057050066393
+        //   should be curf->start
         // for (b=0; b; b=b->link)
         //     b->dlink = 0; /* was trashed by findblk() */
         for i in 0..BMASK + 1 {
@@ -2467,6 +2936,7 @@ impl Parser<'_> {
             //curf: None,
             tmph: [TmpIdx::INVALID; TMASK + 1],
             curb: None,
+            blink: BlkIdx::INVALID,
             blkh: [BlkIdx::INVALID; BMASK + 1],
             //nblk: 0,
             rcls: K0,

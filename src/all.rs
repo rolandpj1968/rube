@@ -667,12 +667,13 @@ struct Phi {
 };
  */
 
+#[derive(new)]
 pub struct Phi {
     to: Ref,
     arg: Vec<Ref>,
     blk: Vec<BlkIdx>,
     //uint narg;
-    cls: bool,
+    cls: KExt,
     link: PhiIdx,
 }
 
@@ -717,12 +718,12 @@ pub struct BlkJmp {
 
 pub struct Blk {
     pub phi: PhiIdx,
-    pub ins: Vec<Ins>,
+    pub ins: Vec<Ins>, // not gonna work! Maybe InsIdx?
     //pub uint nins;
     pub jmp: BlkJmp,
-    pub s1: Option<BlkIdx>,
-    pub s2: Option<BlkIdx>,
-    pub link: Option<BlkIdx>,
+    pub s1: BlkIdx,
+    pub s2: BlkIdx,
+    pub link: BlkIdx,
 
     pub id: u32,
     pub visit: u32,
@@ -741,7 +742,7 @@ pub struct Blk {
 }
 
 // Index into Fn::blks
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct BlkIdx(pub usize);
 
 impl BlkIdx {
@@ -1024,7 +1025,7 @@ struct Fn {
 
 pub struct Fn {
     pub blks: Vec<Blk>,
-    pub start: Option<BlkIdx>,
+    pub start: BlkIdx,
     pub tmp: Vec<Tmp>,
     pub con: Vec<Con>,
     pub mem: Vec<Mem>,
@@ -1047,7 +1048,7 @@ impl Fn {
     pub fn new(lnk: Lnk) -> Fn {
         Fn {
             blks: vec![],
-            start: None,
+            start: BlkIdx::INVALID,
             tmp: vec![],
             con: vec![],
             mem: vec![],
