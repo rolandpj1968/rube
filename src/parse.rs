@@ -1490,7 +1490,40 @@ findblk(char *name)
     blkh[h] = b;
     return b;
 }
+ */
 
+impl Parser<'_> {
+    fn findblk(&mut self, name: &[u8], curf: &mut Fn) -> BlkIdx {
+        // Blk *b;
+        // uint32_t h;
+
+        let h = hash(name) & BMASK;
+        let mut bi: BlkIdx = self.blkh[h];
+
+        while bi != BlkIdx::INVALID {
+            // for (b=blkh[h]; b; b=b->dlink)
+            let b: &Blk = &curf.blks[bi.0];
+            if b.name == name {
+                return bi;
+            }
+
+            bi = b.dlink;
+        }
+
+        let id: usize = curf.blks.len();
+        bi = BlkIdx(id);
+        curf.blks.push(Blk::new(name, id, self.blkh[h]));
+        // b = newblk();
+        // b->id = nblk++;
+        // strcpy(b->name, name);
+        // b->dlink = blkh[h];
+        self.blkh[h] = bi;
+
+        return bi;
+    }
+}
+
+/*
 static void
 closeblk()
 {
@@ -1758,14 +1791,14 @@ impl Parser<'_> {
             Token::Trbrace => return Ok(PState::PEnd),
             // New block
             Token::Tlbl => {
-                let new_blki: BlkIdx = self.findblk(&self.tokval.str)?;
+                let new_blki: BlkIdx = self.findblk(&self.tokval.str, curf);
                 if self.curb != BlkIdx::INVALID && curb.jmp.type_ == J::Jxxx {
                     // When is curb not valid? Maybe start block with explicit label?
                     self.closeblk(curf);
                     curb.jmp.type_ = J::Jjmp;
                     curb.s1 = new_blki;
                 }
-                let new_b: &mut Blk = curf.blks[new_blki.0];
+                let new_b: &mut Blk = &mut curf.blks[new_blki.0];
                 if new_b.jmp.type_ != J::Jxxx {
                     return Err(self.err(&format!(
                         "multiple definitions of block @{}",
@@ -1943,7 +1976,7 @@ impl Parser<'_> {
                         //     err("too many arguments");
                         if op_tok == Token::Tphi {
                             self.expect(Token::Tlbl)?;
-                            blk.push(curf.findblk(&self.tokval.str)?);
+                            blk.push(self.findblk(&self.tokval.str, curf));
                         }
                         let argi: Ref = self.parseref(curf)?;
                         if let Ref::R = argi {

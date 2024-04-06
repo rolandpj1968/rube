@@ -733,6 +733,15 @@ pub struct BlkJmp {
     pub arg: Ref,
 }
 
+impl BlkJmp {
+    pub fn new() -> BlkJmp {
+        BlkJmp {
+            type_: J::Jxxx,
+            arg: Ref::R,
+        }
+    }
+}
+
 pub struct Blk {
     pub phi: PhiIdx,
     pub ins: Vec<Ins>, // not gonna work! Maybe InsIdx?
@@ -742,7 +751,7 @@ pub struct Blk {
     pub s2: BlkIdx,
     pub link: BlkIdx,
 
-    pub id: u32,
+    pub id: usize, // Same as BlkIdx for this block
     pub visit: u32,
 
     pub idom: BlkIdx, // maybe Vec<BlkIdx>?
@@ -756,6 +765,35 @@ pub struct Blk {
     pub nlive: [u32; 2],
     pub loop_: bool, // i32?
     pub name: Vec<u8>,
+}
+
+impl Blk {
+    pub fn new(name: &[u8], id: usize, dlink: BlkIdx) -> Blk {
+        Blk {
+            phi: PhiIdx::INVALID,
+            ins: vec![], // not gonna work! Maybe InsIdx?
+            //pub uint nins;
+            jmp: BlkJmp::new(),
+            s1: BlkIdx::INVALID,
+            s2: BlkIdx::INVALID,
+            link: BlkIdx::INVALID,
+
+            id, // Same as BlkIdx for this block
+            visit: 0,
+
+            idom: BlkIdx::INVALID, // maybe Vec<BlkIdx>?
+            dom: BlkIdx::INVALID,  // maybe Vec<BlkIdx>?
+            dlink,
+            fron: vec![],
+            //pub uint nfron;
+            pred: vec![],
+            //pub uint npred;
+            //pub BSet in[1], out[1], gen[1]; // TODO
+            nlive: [0u32; 2],
+            loop_: false, // i32?
+            name: name.to_vec(),
+        }
+    }
 }
 
 // Index into Fn::blks
