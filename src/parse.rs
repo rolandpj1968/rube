@@ -633,7 +633,10 @@ impl Parser<'_> {
             match c {
                 None => break, // EOF
                 Some(craw) => {
-                    if !(is_alphanumeric(craw) || craw == b'.') {
+                    if !(is_alphanumeric(craw)
+                        || craw == b'.'
+                        || (bytes.is_empty() && craw == b'-'))
+                    {
                         break;
                     }
                 }
@@ -798,16 +801,20 @@ impl Parser<'_> {
     }
 
     fn getc(&mut self) -> RubeResult<Option<u8>> {
+        static DUMP_BYTES: bool = false;
+
         let r = self.getc_real();
-        // if let Ok(Some(byte)) = r {
-        //     println!(
-        //         "                      getc '{}' ({:#02x?})",
-        //         escape_default(byte),
-        //         byte
-        //     );
-        // } else {
-        //     println!("                      getc {:?}", r);
-        // }
+        if DUMP_BYTES {
+            if let Ok(Some(byte)) = r {
+                println!(
+                    "                      getc '{}' ({:#02x?})",
+                    escape_default(byte),
+                    byte
+                );
+            } else {
+                println!("                      getc {:?}", r);
+            }
+        }
         r
     }
 
