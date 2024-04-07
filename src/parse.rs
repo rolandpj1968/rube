@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::{BufReader, Bytes, Read};
 use std::path::Path;
 
-use chomp1::ascii::{is_alpha, is_digit, is_whitespace};
+use chomp1::ascii::{is_alpha, is_alphanumeric, is_digit, is_whitespace};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, FromRepr};
 
@@ -607,7 +607,7 @@ impl Parser<'_> {
                 None => break,
                 Some(craw0) => {
                     craw = craw0;
-                    if craw < b'0' || craw > b'9' {
+                    if !is_digit(craw) {
                         break;
                     }
                 }
@@ -624,19 +624,23 @@ impl Parser<'_> {
 
 impl Parser<'_> {
     // TODO - this is wrong cos it will slurp the next comma - rather do alphanum and '.'
-    fn take_non_ws_as_utf8(&mut self) -> RubeResult<String> {
+    fn take_float_as_utf8(&mut self) -> RubeResult<String> {
         let mut bytes: Vec<u8> = vec![];
+        let mut c: Option<u8>;
 
         loop {
-            let c = self.getc()?;
-
-            if c.is_none() || !is_whitespace(c.unwrap()) {
-                self.ungetc(c);
-                break;
+            c = self.getc()?;
+            match c {
+                None => break, // EOF
+                Some(craw) => {
+                    if !(is_alphanumeric(craw) || craw == b'.') {
+                        break;
+                    }
+                }
             }
-
             bytes.push(c.unwrap());
         }
+        self.ungetc(c);
 
         match String::from_utf8(bytes.clone()) {
             Ok(s) => Ok(s),
@@ -648,7 +652,7 @@ impl Parser<'_> {
     }
 
     fn get_float(&mut self) -> RubeResult<f32> {
-        let s = self.take_non_ws_as_utf8()?;
+        let s = self.take_float_as_utf8()?;
         let f: Result<f32, _> = s.parse();
         match f {
             Ok(v) => Ok(v),
@@ -657,7 +661,7 @@ impl Parser<'_> {
     }
 
     fn get_double(&mut self) -> RubeResult<f64> {
-        let s = self.take_non_ws_as_utf8()?;
+        let s = self.take_float_as_utf8()?;
         let f: Result<f64, _> = s.parse();
         match f {
             Ok(v) => Ok(v),
