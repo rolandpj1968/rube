@@ -1471,12 +1471,13 @@ impl Parser<'_> {
                 let r: Ref = self.parseref(curf)?;
                 match r {
                     Ref::R => return Err(self.err("invalid argument")),
-                    Ref::RTmp(_) => {
+                    Ref::RTmp(_) => (), // Ok
+                    _ => {
                         if !arg {
+                            //println!("    Got function param ref {:?} expecting Ref::RTmp", r);
                             return Err(self.err("invalid function parameter"));
                         }
                     }
-                    _ => (),
                 }
                 let ins: Ins = {
                     if env {
