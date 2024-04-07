@@ -1236,6 +1236,7 @@ struct Dat {
 };
  */
 
+#[derive(Debug)]
 pub enum DatT {
     DStart,
     DEnd,

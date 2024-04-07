@@ -580,20 +580,23 @@ impl Parser<'_> {
 
         let mut n: u64 = 0;
         let mut c = self.getc()?;
-        if c.is_none() {
-            return Err(self.err("end-of-file expecting integer constant"));
+	let mut craw: u8;
+	match c {
+	    None => return Err(self.err("end-of-file expecting integer constant")),
+	    Some(craw0) => craw = craw0,
         }
-        let mut craw = c.unwrap();
         let m = craw == b'-';
         if m {
             c = self.getc()?;
-            if c.is_none() {
-                return Err(self.err("end-of-file in integer constant"));
+	    match c {
+		None => return Err(self.err("end-of-file after '-' in integer constant")),
+		Some(craw0) => craw = craw0,
             }
-        }
+	    if !is_digit(craw) {
+		return Err(self.err(&format!("invalid character '{}' ({:#02x?}) after '-' in integer constant", escape_default(craw), craw)));
+	    }
+	}
         loop {
-            //do {
-            // ugh integer overflow TODO
             n = n.wrapping_mul(10).wrapping_add((craw - b'0') as u64);
             c = self.getc()?;
             match c {

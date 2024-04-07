@@ -87,7 +87,7 @@ fn dump_dbgfile(name: &[u8]) {
 }
 
 fn dump_data(dat: &Dat) {
-    println!("Got dat {:?}", String::from_utf8_lossy(&dat.name));
+    println!("Got dat {:?} {:?}", String::from_utf8_lossy(&dat.name), dat.type_);
 }
 
 fn dump_func(fn_: &Fn) {
