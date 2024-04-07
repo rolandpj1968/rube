@@ -451,7 +451,7 @@ pub enum J {
 }
 
 pub fn jmp_for_cls(k: KExt) -> Option<J> {
-    if KW < k && k <= K0 {
+    if KW <= k && k <= K0 {
         J::from_repr((J::Jretw) as u8 + (k as u8))
     } else {
         None
