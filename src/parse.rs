@@ -1548,10 +1548,18 @@ impl Parser<'_> {
         let h: u32 = hash(name) & BMASK;
         let mut bi: BlkIdx = self.blkh[h as usize];
 
+        // println!(
+        //     "    findblk @{} h is {}, bi is {:?}",
+        //     String::from_utf8_lossy(name),
+        //     h,
+        //     bi
+        // );
+
         while bi != BlkIdx::INVALID {
             // for (b=blkh[h]; b; b=b->dlink)
             let b: &Blk = &curf.blks[bi.0];
             if b.name == name {
+                // println!("        -> found {:?}", bi);
                 return bi;
             }
 
@@ -1566,6 +1574,8 @@ impl Parser<'_> {
         // strcpy(b->name, name);
         // b->dlink = blkh[h];
         self.blkh[h as usize] = bi;
+
+        // println!("        -> new {:?}", bi);
 
         return bi;
     }
@@ -1855,6 +1865,11 @@ impl Parser<'_> {
             Token::Trbrace => return Ok(PState::PEnd),
             // New block
             Token::Tlbl => {
+                // println!(
+                //     "Got label @{} self.curb is {:?}",
+                //     String::from_utf8_lossy(&self.tokval.str.clone()),
+                //     self.curb
+                // );
                 let new_blki: BlkIdx = self.findblk(&self.tokval.str.clone(), curf);
                 if self.curb != BlkIdx::INVALID
                     && curf.blks[self.curb.0] /*.curb*/
@@ -2357,7 +2372,7 @@ impl Parser<'_> {
         // int i;
         // PState ps;
 
-        // self.curb = None;
+        self.curb = BlkIdx::INVALID;
         // nblk = 0;
         // curi = insb;
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
@@ -2390,6 +2405,11 @@ impl Parser<'_> {
             ConBits::I(0),
         )); // ??? what's this for?
         curf.lnk = lnk.clone();
+
+        // blink = &curf->start;
+        // curf->retty = Kx;
+        self.blink = BlkIdx::INVALID;
+
         if self.peek()? != Token::Tglo {
             (self.rcls, curf.retty) = self.parsecls()?;
         } /*else {

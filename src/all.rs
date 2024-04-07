@@ -797,7 +797,7 @@ impl Blk {
 }
 
 // Index into Fn::blks
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BlkIdx(pub usize);
 
 impl BlkIdx {
