@@ -154,7 +154,7 @@ enum {
  */
 
 // TODO we can tighten up these types
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Ref {
     R,
     RTmp(TmpIdx),
@@ -1018,7 +1018,7 @@ impl Con {
 }
 
 // Index in Fn::con
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ConIdx(pub usize);
 
 /*
@@ -1042,7 +1042,7 @@ pub struct Addr {
 }
 
 pub type Mem = Addr;
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MemIdx(pub usize); // Index into Fn::mem
 
 /*
@@ -1192,7 +1192,7 @@ pub struct Typ {
     pub fields: Vec<TypFld>, // TODO need indirection???
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TypIdx(pub usize);
 
 impl TypIdx {

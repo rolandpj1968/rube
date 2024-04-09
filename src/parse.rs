@@ -3636,17 +3636,49 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             //             case Oxidiv:
             //                 fputc(ktoc[i->cls], f);
             //             }
+            if let Ref::R = i.to {
+                match i.op {
+                    O::Oarg
+                    | O::Oswap
+                    | O::Oxcmp
+                    | O::Oacmp
+                    | O::Oacmn
+                    | O::Oafcmp
+                    | O::Oxtest
+                    | O::Oxdiv
+                    | O::Oxidiv => {
+                        write!(f, "{}", escape_default(ktoc[i.cls as usize]));
+                    }
+                    _ => { // nada
+                    }
+                }
+            }
             //         if (!req(i->arg[0], R)) {
             //             fprintf(f, " ");
             //             printref(i->arg[0], fn, f);
             //         }
+            if let Ref::R = i.arg[0] {
+                // nada
+            } else {
+                write!(f, " ");
+                printref(f, fn_, &i.arg[0]);
+            }
             //         if (!req(i->arg[1], R)) {
             //             fprintf(f, ", ");
             //             printref(i->arg[1], fn, f);
             //         }
+            if let Ref::R = i.arg[1] {
+                // nada
+            } else {
+                write!(f, ", ");
+                printref(f, fn_, &i.arg[1]);
+            }
             //         fprintf(f, "\n");
             //     }
-            //     switch (b->jmp.type) {
+            writeln!(f);
+        }
+        //     switch (b->jmp.type) {
+        match b.jmp.type_ {
             //     case Jret0:
             //     case Jretsb:
             //     case Jretub:
@@ -3666,13 +3698,48 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             //             fprintf(f, ", :%s", typ[fn->retty].name);
             //         fprintf(f, "\n");
             //         break;
+            J::Jret0
+            | J::Jretsb
+            | J::Jretub
+            | J::Jretsh
+            | J::Jretuh
+            | J::Jretw
+            | J::Jretl
+            | J::Jrets
+            | J::Jretd
+            | J::Jretc => {
+                write!(f, "\t{}", "<its-a-ret>" /*TODO jtoa[b->jmp.type]*/);
+                if b.jmp.type_ != J::Jret0 || b.jmp.arg == Ref::R {
+                    write!(f, " ");
+                    printref(f, fn_, &b.jmp.arg);
+                }
+                if b.jmp.type_ == J::Jretc {
+                    write!(
+                        f,
+                        ", :{}",
+                        "<its-a-type>" /*TODO String::from_utf8_lossy(self.typ[fn_.retty.0].name)*/
+                    );
+                }
+            }
             //     case Jhlt:
             //         fprintf(f, "\thlt\n");
             //         break;
+            J::Jhlt => {
+                write!(f, "\thlt");
+            }
             //     case Jjmp:
             //         if (b->s1 != b->link)
             //             fprintf(f, "\tjmp @%s\n", b->s1->name);
             //         break;
+            J::Jjmp => {
+                if (b.s1 != b.link) {
+                    write!(
+                        f,
+                        "\tjmp @{}",
+                        String::from_utf8_lossy(&fn_.blks[b.s1.0].name)
+                    );
+                }
+            }
             //     default:
             //         fprintf(f, "\t%s ", jtoa[b->jmp.type]);
             //         if (b->jmp.type == Jjnz) {
@@ -3683,8 +3750,22 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             //         fprintf(f, "@%s, @%s\n", b->s1->name, b->s2->name);
             //         break;
             //     }
-            writeln!(f);
+            _ => {
+                write!(f, "\t{} ", "<its-a-jmp>" /*TODOjtoa[b->jmp.type]*/);
+                if b.jmp.type_ == J::Jjnz {
+                    printref(f, fn_, &b.jmp.arg);
+                    write!(f, ", ");
+                }
+                assert!(b.s1 != BlkIdx::INVALID && b.s2 != BlkIdx::INVALID);
+                write!(
+                    f,
+                    "@%{}, @%{}\n",
+                    String::from_utf8_lossy(&fn_.blks[b.s1.0].name),
+                    String::from_utf8_lossy(&fn_.blks[b.s2.0].name)
+                );
+            }
         }
+        writeln!(f);
         bi = b.link;
     }
     // }
