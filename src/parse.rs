@@ -1,6 +1,3 @@
-// TODO remove eventually
-#![allow(dead_code, unused_variables)]
-
 use std::ascii::escape_default;
 use std::error::Error;
 use std::fmt;
@@ -62,7 +59,6 @@ Op optab[NOp] = {
 
 #[derive(PartialEq)]
 enum PState {
-    PXXX,
     PLbl,
     PPhi,
     PIns,
@@ -1433,7 +1429,7 @@ impl Parser<'_> {
         let mut env: bool = false;
         let mut hasenv: bool = false;
         let mut vararg: bool = false;
-        let r: Ref;
+        //let r: Ref;
 
         self.expect(Token::Tlparen)?;
 
@@ -2192,7 +2188,7 @@ impl Parser<'_> {
                             }
                             sz_u32
                         };
-                        // let r: Ref = Ref::RInt(c.bits.i);
+                        let r: Ref = Ref::RInt(sz as i32); /* Mmm */
                         // curi->op = Oblit1;
                         // curi->arg[0] = r;
                         // curi++;
