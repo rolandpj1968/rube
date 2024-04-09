@@ -1611,6 +1611,7 @@ impl Parser<'_> {
         // blink = &curb->link;
         // curi = insb;
         self.blink = self.curb;
+        self.insb.clear();
     }
 }
 
@@ -3279,33 +3280,42 @@ printcon(Con *c, FILE *f)
  */
 
 pub fn printcon(f: &mut dyn Write, c: &Con) {
-    // match c.type_ {
-    //     ConT::CUndef => {
-    //         assert!(false); // nada
-    //         write!(f, "")
-    //     }
-    //     ConT::CAddr => {
-    //         if c.sym.type_ == SymT::SThr {
-    //             write!(f, "thread ");
-    //         }
-    //         write!(f, "${}", "<TODO-str(c->sym.id)>");
-    //         match c.bits {
-    //             // TODO - ugh, sort Con out
-    //             ConBits::I(i) => write!(f, "{}", i),
-    //             _ => write!(f, "<confused>"),
-    //         }
-    //     }
-    //     ConT::CBits => match c.bits {
-    //         ConBits::None => {
-    //             assert!(false);
-    //             write!(f, "")
-    //         }
-    //         ConBits::F(s) => write!(f, "s_{}", s),
-    //         ConBits::D(d) => write!(f, "d_{}", d),
-    //         ConBits::I(i) => write!(f, "{}", i),
-    //     },
-    // }
-    write!(f, "<its-a-con>");
+    match c.type_ {
+        ConT::CUndef => {
+            assert!(false); // nada
+            write!(f, "");
+        }
+        ConT::CAddr => {
+            if c.sym.type_ == SymT::SThr {
+                write!(f, "thread ");
+            }
+            write!(f, "${}", "<TODO-str(c->sym.id)>");
+            match c.bits {
+                // TODO - ugh, sort Con out
+                ConBits::I(i) => {
+                    write!(f, "{}", i);
+                }
+                _ => {
+                    write!(f, "<confused>");
+                }
+            }
+        }
+        ConT::CBits => match c.bits {
+            ConBits::None => {
+                assert!(false);
+                write!(f, "");
+            }
+            ConBits::F(s) => {
+                write!(f, "s_{}", s);
+            }
+            ConBits::D(d) => {
+                write!(f, "d_{}", d);
+            }
+            ConBits::I(i) => {
+                write!(f, "{}", i);
+            }
+        },
+    }
 }
 
 /*
@@ -3377,12 +3387,6 @@ fn printref(f: &mut dyn Write, fn_: &Fn, r: &Ref) {
             if ti.0 < Tmp0 {
                 write!(f, "R{}", ti.0);
             } else {
-                // println!(
-                //     "             printref {:?} ti is {:?} fn_.tmp.len() is {}",
-                //     r,
-                //     ti,
-                //     fn_.tmp.len()
-                // );
                 write!(f, "%{}", String::from_utf8_lossy(&fn_.tmp[ti.0].name));
             }
         }
@@ -3603,73 +3607,84 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             pi = p.link;
         }
         //     for (i=b->ins; i<&b->ins[b->nins]; i++) {
-        //         fprintf(f, "\t");
-        //         if (!req(i->to, R)) {
-        //             printref(i->to, fn, f);
-        //             fprintf(f, " =%c ", ktoc[i->cls]);
-        //         }
-        //         assert(optab[i->op].name);
-        //         fprintf(f, "%s", optab[i->op].name);
-        //         if (req(i->to, R))
-        //             switch (i->op) {
-        //             case Oarg:
-        //             case Oswap:
-        //             case Oxcmp:
-        //             case Oacmp:
-        //             case Oacmn:
-        //             case Oafcmp:
-        //             case Oxtest:
-        //             case Oxdiv:
-        //             case Oxidiv:
-        //                 fputc(ktoc[i->cls], f);
-        //             }
-        //         if (!req(i->arg[0], R)) {
-        //             fprintf(f, " ");
-        //             printref(i->arg[0], fn, f);
-        //         }
-        //         if (!req(i->arg[1], R)) {
-        //             fprintf(f, ", ");
-        //             printref(i->arg[1], fn, f);
-        //         }
-        //         fprintf(f, "\n");
-        //     }
-        //     switch (b->jmp.type) {
-        //     case Jret0:
-        //     case Jretsb:
-        //     case Jretub:
-        //     case Jretsh:
-        //     case Jretuh:
-        //     case Jretw:
-        //     case Jretl:
-        //     case Jrets:
-        //     case Jretd:
-        //     case Jretc:
-        //         fprintf(f, "\t%s", jtoa[b->jmp.type]);
-        //         if (b->jmp.type != Jret0 || !req(b->jmp.arg, R)) {
-        //             fprintf(f, " ");
-        //             printref(b->jmp.arg, fn, f);
-        //         }
-        //         if (b->jmp.type == Jretc)
-        //             fprintf(f, ", :%s", typ[fn->retty].name);
-        //         fprintf(f, "\n");
-        //         break;
-        //     case Jhlt:
-        //         fprintf(f, "\thlt\n");
-        //         break;
-        //     case Jjmp:
-        //         if (b->s1 != b->link)
-        //             fprintf(f, "\tjmp @%s\n", b->s1->name);
-        //         break;
-        //     default:
-        //         fprintf(f, "\t%s ", jtoa[b->jmp.type]);
-        //         if (b->jmp.type == Jjnz) {
-        //             printref(b->jmp.arg, fn, f);
-        //             fprintf(f, ", ");
-        //         }
-        //         assert(b->s1 && b->s2);
-        //         fprintf(f, "@%s, @%s\n", b->s1->name, b->s2->name);
-        //         break;
-        //     }
+        for i in &b.ins {
+            //         fprintf(f, "\t");
+            write!(f, "\t");
+            //         if (!req(i->to, R)) {
+            //             printref(i->to, fn, f);
+            //             fprintf(f, " =%c ", ktoc[i->cls]);
+            //         }
+            if let Ref::R = i.to {
+                () // nada
+            } else {
+                printref(f, fn_, &i.to);
+                write!(f, " ={} ", escape_default(ktoc[i.cls as usize]));
+            }
+            //         assert(optab[i->op].name);
+            //         fprintf(f, "%s", optab[i->op].name);
+            write!(f, "{}", String::from_utf8_lossy(&OPTAB[i.op as usize].name));
+            //         if (req(i->to, R))
+            //             switch (i->op) {
+            //             case Oarg:
+            //             case Oswap:
+            //             case Oxcmp:
+            //             case Oacmp:
+            //             case Oacmn:
+            //             case Oafcmp:
+            //             case Oxtest:
+            //             case Oxdiv:
+            //             case Oxidiv:
+            //                 fputc(ktoc[i->cls], f);
+            //             }
+            //         if (!req(i->arg[0], R)) {
+            //             fprintf(f, " ");
+            //             printref(i->arg[0], fn, f);
+            //         }
+            //         if (!req(i->arg[1], R)) {
+            //             fprintf(f, ", ");
+            //             printref(i->arg[1], fn, f);
+            //         }
+            //         fprintf(f, "\n");
+            //     }
+            //     switch (b->jmp.type) {
+            //     case Jret0:
+            //     case Jretsb:
+            //     case Jretub:
+            //     case Jretsh:
+            //     case Jretuh:
+            //     case Jretw:
+            //     case Jretl:
+            //     case Jrets:
+            //     case Jretd:
+            //     case Jretc:
+            //         fprintf(f, "\t%s", jtoa[b->jmp.type]);
+            //         if (b->jmp.type != Jret0 || !req(b->jmp.arg, R)) {
+            //             fprintf(f, " ");
+            //             printref(b->jmp.arg, fn, f);
+            //         }
+            //         if (b->jmp.type == Jretc)
+            //             fprintf(f, ", :%s", typ[fn->retty].name);
+            //         fprintf(f, "\n");
+            //         break;
+            //     case Jhlt:
+            //         fprintf(f, "\thlt\n");
+            //         break;
+            //     case Jjmp:
+            //         if (b->s1 != b->link)
+            //             fprintf(f, "\tjmp @%s\n", b->s1->name);
+            //         break;
+            //     default:
+            //         fprintf(f, "\t%s ", jtoa[b->jmp.type]);
+            //         if (b->jmp.type == Jjnz) {
+            //             printref(b->jmp.arg, fn, f);
+            //             fprintf(f, ", ");
+            //         }
+            //         assert(b->s1 && b->s2);
+            //         fprintf(f, "@%s, @%s\n", b->s1->name, b->s2->name);
+            //         break;
+            //     }
+            writeln!(f);
+        }
         bi = b.link;
     }
     // }

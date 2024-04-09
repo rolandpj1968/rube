@@ -653,10 +653,10 @@ struct Ins {
  */
 #[derive(Clone, new)]
 pub struct Ins {
-    op: O,
-    cls: KExt, // Must be one of Kw, Kl, Ks, Kd
-    to: Ref,
-    arg: [Ref; 2],
+    pub op: O,
+    pub cls: KExt, // Must be one of Kw, Kl, Ks, Kd
+    pub to: Ref,
+    pub arg: [Ref; 2],
 }
 
 impl Ins {
