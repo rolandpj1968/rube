@@ -18,7 +18,7 @@ use std::fs::File;
 use std::io::stdout;
 use std::path::Path;
 
-use all::{Bits, Dat, Fn, Ref, Target};
+use all::{Bits, Dat, Fn, Ref, Target, Typ};
 use parse::{parse, printfn};
 
 // Target T_amd64_sysv = {
@@ -87,14 +87,14 @@ fn dump_dbgfile(name: &[u8]) {
     println!("Got dbgfile {:?}", String::from_utf8_lossy(name));
 }
 
-fn dump_data(dat: &Dat) {
+fn dump_data(dat: &Dat, typ: &[Typ]) {
     println!("Got dat {:?} {:?}", String::from_utf8_lossy(&dat.name), dat.type_);
 }
 
-fn dump_func(fn_: &Fn) {
+fn dump_func(fn_: &Fn, typ: &[Typ]) {
     println!("Got fn {:?}:", String::from_utf8_lossy(&fn_.name));
     println!();
-    printfn(&mut stdout(), fn_);
+    printfn(&mut stdout(), fn_, typ);
 }
 
 fn main() {
