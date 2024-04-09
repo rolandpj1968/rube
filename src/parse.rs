@@ -3549,8 +3549,46 @@ printfn(Fn *fn, FILE *f)
  */
 
 pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
-    static ktoc: &'static [u8; 4] = b"wlsd";
+    static KTOC: [&str; 4] = ["w", "l", "s", "d"];
     // static char ktoc[] = "wlsd";
+    // Generated from gcc -E and hand-munged
+    static jtoa: [&str; J::NJmp as usize] = {
+        let mut jtoa0: [&str; J::NJmp as usize] = [""; J::NJmp as usize];
+
+        jtoa0[J::Jretw as usize] = "retw";
+        jtoa0[J::Jretl as usize] = "retl";
+        jtoa0[J::Jrets as usize] = "rets";
+        jtoa0[J::Jretd as usize] = "retd";
+        jtoa0[J::Jretsb as usize] = "retsb";
+        jtoa0[J::Jretub as usize] = "retub";
+        jtoa0[J::Jretsh as usize] = "retsh";
+        jtoa0[J::Jretuh as usize] = "retuh";
+        jtoa0[J::Jretc as usize] = "retc";
+        jtoa0[J::Jret0 as usize] = "ret0";
+        jtoa0[J::Jjmp as usize] = "jmp";
+        jtoa0[J::Jjnz as usize] = "jnz";
+        jtoa0[J::Jjfieq as usize] = "jfieq";
+        jtoa0[J::Jjfine as usize] = "jfine";
+        jtoa0[J::Jjfisge as usize] = "jfisge";
+        jtoa0[J::Jjfisgt as usize] = "jfisgt";
+        jtoa0[J::Jjfisle as usize] = "jfisle";
+        jtoa0[J::Jjfislt as usize] = "jfislt";
+        jtoa0[J::Jjfiuge as usize] = "jfiuge";
+        jtoa0[J::Jjfiugt as usize] = "jfiugt";
+        jtoa0[J::Jjfiule as usize] = "jfiule";
+        jtoa0[J::Jjfiult as usize] = "jfiult";
+        jtoa0[J::Jjffeq as usize] = "jffeq";
+        jtoa0[J::Jjffge as usize] = "jffge";
+        jtoa0[J::Jjffgt as usize] = "jffgt";
+        jtoa0[J::Jjffle as usize] = "jffle";
+        jtoa0[J::Jjfflt as usize] = "jfflt";
+        jtoa0[J::Jjffne as usize] = "jffne";
+        jtoa0[J::Jjffo as usize] = "jffo";
+        jtoa0[J::Jjffuo as usize] = "jffuo";
+        jtoa0[J::Jhlt as usize] = "hlt";
+
+        jtoa0
+    };
     // static char *jtoa[NJmp] = {
     // #define X(j) [J##j] = #j,
     //     JMPS(X)
@@ -3582,7 +3620,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             //         assert(p->narg);
             write!(f, "\t");
             printref(f, fn_, &p.to);
-            write!(f, " ={} phi ", escape_default(ktoc[p.cls as usize]));
+            write!(f, " ={} phi ", KTOC[p.cls as usize]);
             //         for (n=0;; n++) {
             //             fprintf(f, "@%s ", p->blk[n]->name);
             //             printref(p->arg[n], fn, f);
@@ -3618,7 +3656,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
                 () // nada
             } else {
                 printref(f, fn_, &i.to);
-                write!(f, " ={} ", escape_default(ktoc[i.cls as usize]));
+                write!(f, " ={} ", KTOC[i.cls as usize]);
             }
             //         assert(optab[i->op].name);
             //         fprintf(f, "%s", optab[i->op].name);
@@ -3647,7 +3685,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
                     | O::Oxtest
                     | O::Oxdiv
                     | O::Oxidiv => {
-                        write!(f, "{}", escape_default(ktoc[i.cls as usize]));
+                        write!(f, "{}", KTOC[i.cls as usize]);
                     }
                     _ => { // nada
                     }
@@ -3708,7 +3746,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             | J::Jrets
             | J::Jretd
             | J::Jretc => {
-                write!(f, "\t{}", "<its-a-ret>" /*TODO jtoa[b->jmp.type]*/);
+                write!(f, "\t{}", jtoa[b.jmp.type_ as usize]);
                 if b.jmp.type_ != J::Jret0 || b.jmp.arg == Ref::R {
                     write!(f, " ");
                     printref(f, fn_, &b.jmp.arg);
@@ -3732,7 +3770,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             //             fprintf(f, "\tjmp @%s\n", b->s1->name);
             //         break;
             J::Jjmp => {
-                if (b.s1 != b.link) {
+                if b.s1 != b.link {
                     write!(
                         f,
                         "\tjmp @{}",
@@ -3751,7 +3789,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
             //         break;
             //     }
             _ => {
-                write!(f, "\t{} ", "<its-a-jmp>" /*TODOjtoa[b->jmp.type]*/);
+                write!(f, "\t{} ", jtoa[b.jmp.type_ as usize]);
                 if b.jmp.type_ == J::Jjnz {
                     printref(f, fn_, &b.jmp.arg);
                     write!(f, ", ");
