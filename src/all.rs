@@ -154,16 +154,16 @@ enum {
  */
 
 // TODO we can tighten up these types
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Ref {
     R,
     RTmp(TmpIdx),
     RCon(ConIdx),
-    RInt(u32),
-    RTyp(TypIdx), /* last kind to come out of the parser */
-    RSlot(u32),
+    RInt(i32),
+    RTyp(TypIdx), /* last kind to come out of the parser - ??? what does the comment mean? */
+    RSlot(i32),
     RCall(u32),
-    RMem(u32),
+    RMem(MemIdx),
 }
 
 /*
@@ -194,7 +194,11 @@ static inline int rsval(Ref r)
 {
     return (int32_t)((int64_t)r.val << 3) >> 3;
 }
+ */
 
+// TODO - de funk is this ^^^ doing?
+
+/*
 enum CmpI {
     Cieq,
     Cine,
@@ -690,7 +694,7 @@ pub struct Phi {
     pub link: PhiIdx,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PhiIdx(pub usize); // Index into Fn::phi
 
 impl PhiIdx {
@@ -827,13 +831,13 @@ struct Sym {
     uint32_t id;
 };
  */
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum SymT {
     SGlo,
     SThr,
 }
 
-#[derive(new, PartialEq)]
+#[derive(new, Debug, PartialEq)]
 pub struct Sym {
     pub type_: SymT,
     pub id: InternId,
@@ -955,7 +959,7 @@ impl Tmp {
 }
 
 // Index in Fn::tmp
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TmpIdx(pub usize);
 
 impl TmpIdx {
@@ -979,14 +983,14 @@ struct Con {
 };
  */
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ConT {
     CUndef,
     CBits,
     CAddr,
 }
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ConBits {
     None,
     I(i64),
@@ -994,7 +998,7 @@ pub enum ConBits {
     F(f32),
 }
 
-#[derive(new, PartialEq)]
+#[derive(new, Debug, PartialEq)]
 pub struct Con {
     pub type_: ConT,
     pub sym: Sym,
@@ -1014,7 +1018,7 @@ impl Con {
 }
 
 // Index in Fn::con
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ConIdx(pub usize);
 
 /*
@@ -1028,16 +1032,17 @@ struct Addr { /* amd64 addressing */
 };
  */
 
+#[derive(Debug)]
 pub struct Addr {
     // amd64 addressing
-    offset: Con,
-    base: Ref,
-    index: Ref,
-    scale: i32,
+    pub offset: Con,
+    pub base: Ref,
+    pub index: Ref,
+    pub scale: i32,
 }
 
 pub type Mem = Addr;
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct MemIdx(pub usize); // Index into Fn::mem
 
 /*
@@ -1187,7 +1192,7 @@ pub struct Typ {
     pub fields: Vec<TypFld>, // TODO need indirection???
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TypIdx(pub usize);
 
 impl TypIdx {

@@ -15,10 +15,11 @@ mod util;
 use std::env;
 use std::ffi::OsString;
 use std::fs::File;
+use std::io::stdout;
 use std::path::Path;
 
 use all::{Bits, Dat, Fn, Ref, Target};
-use parse::parse;
+use parse::{parse, printfn};
 
 // Target T_amd64_sysv = {
 // 	.name = "amd64_sysv",
@@ -91,7 +92,9 @@ fn dump_data(dat: &Dat) {
 }
 
 fn dump_func(fn_: &Fn) {
-    println!("Got fn {:?}", String::from_utf8_lossy(&fn_.name));
+    println!("Got fn {:?}:", String::from_utf8_lossy(&fn_.name));
+    println!();
+    printfn(&mut stdout(), fn_);
 }
 
 fn main() {

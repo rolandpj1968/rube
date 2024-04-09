@@ -5,7 +5,7 @@ use std::ascii::escape_default;
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
-use std::io::{BufReader, Bytes, Read};
+use std::io::{BufReader, Bytes, Read, Write};
 use std::path::Path;
 
 use chomp1::ascii::{is_alpha, is_alphanumeric, is_digit, is_whitespace};
@@ -14,8 +14,8 @@ use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
     jmp_for_cls, /*isstore, */ Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn,
-    Ins, KExt, Lnk, ORanges, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx, Typ,
-    TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
+    Ins, KExt, Lnk, Mem, ORanges, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp0, TmpIdx,
+    Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O,
 };
 use crate::optab::OPTAB;
 use crate::util::{hash, intern, newcon, newtmp, Bucket, IMask, InternId};
@@ -1166,7 +1166,6 @@ impl Parser<'_> {
 
         // h = &tmph[hash(v) & TMask];
         // t = *h;
-
         let tmp_idx: TmpIdx = self.tmph[(hash(v) & TMASK) as usize];
         if tmp_idx != TmpIdx::INVALID {
             if curf.tmp[tmp_idx.0].name == v {
@@ -1183,9 +1182,10 @@ impl Parser<'_> {
         // newtmp(0, Kx, curf);
         // strcpy(curf->tmp[t].name, v);
         let t = curf.tmp.len();
-        let _ = newtmp(None, KX, curf);
+        let r = newtmp(None, KX, curf);
+        curf.tmp[t].name = v.to_vec();
 
-        Ref::RTmp(TmpIdx(t))
+        r
     }
 }
 
@@ -1994,20 +1994,20 @@ impl Parser<'_> {
                 k = KW;
                 r = Ref::R;
                 self.expect(Token::Tint)?;
-                let ln: u32 = self.tokval.num as u32;
-                if (ln as i64) != self.tokval.num {
+                let ln: i32 = self.tokval.num as i32;
+                if ln < 0 || (ln as i64) != self.tokval.num {
                     return Err(self.err(&format!(
                         "line number {} negative or too big",
                         self.tokval.num
                     )));
                 }
                 arg.push(Ref::RInt(ln));
-                let cn: u32 = {
+                let cn: i32 = {
                     if self.peek()? == Token::Tcomma {
                         self.next()?;
                         self.expect(Token::Tint)?;
-                        let cn0: u32 = self.tokval.num as u32;
-                        if (cn0 as i64) != self.tokval.num {
+                        let cn0: i32 = self.tokval.num as i32;
+                        if cn0 < 0 || (cn0 as i64) != self.tokval.num {
                             return Err(self.err(&format!(
                                 "column number {} negative or too big",
                                 self.tokval.num
@@ -2133,12 +2133,20 @@ impl Parser<'_> {
                         // phi->narg = i;
                         // *plink = phi;
                         // plink = &phi->link;
+                        println!(
+                            "   got a phi with {} args and {} blks, curb is {:?}, plink is {:?}",
+                            arg.len(),
+                            blk.len(),
+                            self.curb,
+                            self.plink
+                        );
                         let phii = PhiIdx(curf.phis.len());
                         curf.phis
                             .push(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
                         if self.plink == PhiIdx::INVALID {
                             curf.blks[self.curb.0] /*curb*/
                                 .phi = phii;
+                            println!("              setting {:?}.phi = {:?}", self.curb, phii);
                         } else {
                             let prev_phi = &mut curf.phis[self.plink.0];
                             prev_phi.link = phii;
@@ -3160,7 +3168,7 @@ impl Parser<'_> {
         // let itbl0 = [(); IMask + 1].map(|_| Vec::new()); //[Bucket::EMPTY; IMask + 1],
         Parser {
             T,
-            inf: BufReader::new(f).bytes(),
+            inf: BufReader::new(f).bytes(), // TODO use .peekable() instead of ungetc()
             ungetc: None,
             inpath: path,
             thead: Token::Txxx,
@@ -3268,7 +3276,39 @@ printcon(Con *c, FILE *f)
         break;
     }
 }
+ */
 
+pub fn printcon(f: &mut dyn Write, c: &Con) {
+    // match c.type_ {
+    //     ConT::CUndef => {
+    //         assert!(false); // nada
+    //         write!(f, "")
+    //     }
+    //     ConT::CAddr => {
+    //         if c.sym.type_ == SymT::SThr {
+    //             write!(f, "thread ");
+    //         }
+    //         write!(f, "${}", "<TODO-str(c->sym.id)>");
+    //         match c.bits {
+    //             // TODO - ugh, sort Con out
+    //             ConBits::I(i) => write!(f, "{}", i),
+    //             _ => write!(f, "<confused>"),
+    //         }
+    //     }
+    //     ConT::CBits => match c.bits {
+    //         ConBits::None => {
+    //             assert!(false);
+    //             write!(f, "")
+    //         }
+    //         ConBits::F(s) => write!(f, "s_{}", s),
+    //         ConBits::D(d) => write!(f, "d_{}", d),
+    //         ConBits::I(i) => write!(f, "{}", i),
+    //     },
+    // }
+    write!(f, "<its-a-con>");
+}
+
+/*
 void
 printref(Ref r, Fn *fn, FILE *f)
 {
@@ -3324,7 +3364,80 @@ printref(Ref r, Fn *fn, FILE *f)
         break;
     }
 }
+ */
 
+fn printref(f: &mut dyn Write, fn_: &Fn, r: &Ref) {
+    // int i;
+    // Mem *m;
+
+    // switch (rtype(r)) {
+    match r {
+        Ref::R => assert!(false),
+        Ref::RTmp(ti) => {
+            if ti.0 < Tmp0 {
+                write!(f, "R{}", ti.0);
+            } else {
+                // println!(
+                //     "             printref {:?} ti is {:?} fn_.tmp.len() is {}",
+                //     r,
+                //     ti,
+                //     fn_.tmp.len()
+                // );
+                write!(f, "%{}", String::from_utf8_lossy(&fn_.tmp[ti.0].name));
+            }
+        }
+        Ref::RCon(ci) => {
+            if ci.0 == 0 {
+                //(req(r, UNDEF)) { TODO - this seems missing
+                write!(f, "UNDEF");
+            } else {
+                printcon(f, &fn_.con[ci.0]);
+            }
+        }
+        Ref::RSlot(i) => {
+            write!(f, "S{}", *i as i32);
+        }
+        Ref::RCall(n) => {
+            write!(f, "{:04x}", n);
+        }
+        Ref::RTyp(ti) => {
+            write!(f, ":{}", "<TODO-typ>" /*typ[r.val].name*/);
+        }
+        Ref::RMem(mi) => {
+            let mut i: bool = false;
+            let m: &Mem = &fn_.mem[mi.0];
+            write!(f, "[");
+            if m.offset.type_ != ConT::CUndef {
+                printcon(f, &m.offset);
+                i = true;
+            }
+            if let Ref::R = m.base {
+                () // Nada
+            } else {
+                if i {
+                    write!(f, " + ");
+                }
+                printref(f, fn_, &m.base);
+                i = true;
+            }
+            if let Ref::R = m.index {
+                () // Nada
+            } else {
+                if i {
+                    write!(f, " + ");
+                }
+                write!(f, "{} * ", m.scale);
+                printref(f, fn_, &m.index);
+            }
+            write!(f, "]");
+        }
+        Ref::RInt(i) => {
+            write!(f, "{}", *i as i32);
+        }
+    }
+}
+
+/*
 void
 printfn(Fn *fn, FILE *f)
 {
@@ -3430,3 +3543,136 @@ printfn(Fn *fn, FILE *f)
 }
 
  */
+
+pub fn printfn(f: &mut dyn Write, fn_: &Fn) {
+    static ktoc: &'static [u8; 4] = b"wlsd";
+    // static char ktoc[] = "wlsd";
+    // static char *jtoa[NJmp] = {
+    // #define X(j) [J##j] = #j,
+    //     JMPS(X)
+    // #undef X
+    // };
+    // Blk *b;
+    // Phi *p;
+    // Ins *i;
+    // uint n;
+    // fprintf(f, "function $%s() {\n", fn->name);
+    writeln!(f, "function ${}() {{", String::from_utf8_lossy(&fn_.name));
+    // for (b=fn->start; b; b=b->link) {
+    //     fprintf(f, "@%s\n", b->name);
+    let mut bi: BlkIdx = fn_.start;
+    while bi != BlkIdx::INVALID {
+        let b: &Blk = &fn_.blks[bi.0];
+        writeln!(f, "@{}", String::from_utf8_lossy(&b.name));
+        //     for (p=b->phi; p; p=p->link) {
+        let mut pi: PhiIdx = b.phi;
+        println!(
+            "                        for blk {:?} we start with phi {:?}",
+            bi, pi
+        );
+        while pi != PhiIdx::INVALID {
+            let p: &Phi = &fn_.phis[pi.0];
+            //         fprintf(f, "\t");
+            //         printref(p->to, fn, f);
+            //         fprintf(f, " =%c phi ", ktoc[p->cls]);
+            //         assert(p->narg);
+            write!(f, "\t");
+            printref(f, fn_, &p.to);
+            write!(f, " ={} phi ", escape_default(ktoc[p.cls as usize]));
+            //         for (n=0;; n++) {
+            //             fprintf(f, "@%s ", p->blk[n]->name);
+            //             printref(p->arg[n], fn, f);
+            //             if (n == p->narg-1) {
+            //                 fprintf(f, "\n");
+            //                 break;
+            //             } else
+            //                 fprintf(f, ", ");
+            //         }
+            //     }
+            assert!(p.arg.len() == p.blk.len());
+            for n in 0..p.arg.len() {
+                let bi: BlkIdx = p.blk[n];
+                let pb = &fn_.blks[bi.0];
+                write!(f, "@{} ", String::from_utf8_lossy(&pb.name));
+                printref(f, fn_, &p.arg[n]);
+                if n != p.arg.len() - 1 {
+                    write!(f, ", ");
+                }
+            }
+            writeln!(f);
+            pi = p.link;
+        }
+        //     for (i=b->ins; i<&b->ins[b->nins]; i++) {
+        //         fprintf(f, "\t");
+        //         if (!req(i->to, R)) {
+        //             printref(i->to, fn, f);
+        //             fprintf(f, " =%c ", ktoc[i->cls]);
+        //         }
+        //         assert(optab[i->op].name);
+        //         fprintf(f, "%s", optab[i->op].name);
+        //         if (req(i->to, R))
+        //             switch (i->op) {
+        //             case Oarg:
+        //             case Oswap:
+        //             case Oxcmp:
+        //             case Oacmp:
+        //             case Oacmn:
+        //             case Oafcmp:
+        //             case Oxtest:
+        //             case Oxdiv:
+        //             case Oxidiv:
+        //                 fputc(ktoc[i->cls], f);
+        //             }
+        //         if (!req(i->arg[0], R)) {
+        //             fprintf(f, " ");
+        //             printref(i->arg[0], fn, f);
+        //         }
+        //         if (!req(i->arg[1], R)) {
+        //             fprintf(f, ", ");
+        //             printref(i->arg[1], fn, f);
+        //         }
+        //         fprintf(f, "\n");
+        //     }
+        //     switch (b->jmp.type) {
+        //     case Jret0:
+        //     case Jretsb:
+        //     case Jretub:
+        //     case Jretsh:
+        //     case Jretuh:
+        //     case Jretw:
+        //     case Jretl:
+        //     case Jrets:
+        //     case Jretd:
+        //     case Jretc:
+        //         fprintf(f, "\t%s", jtoa[b->jmp.type]);
+        //         if (b->jmp.type != Jret0 || !req(b->jmp.arg, R)) {
+        //             fprintf(f, " ");
+        //             printref(b->jmp.arg, fn, f);
+        //         }
+        //         if (b->jmp.type == Jretc)
+        //             fprintf(f, ", :%s", typ[fn->retty].name);
+        //         fprintf(f, "\n");
+        //         break;
+        //     case Jhlt:
+        //         fprintf(f, "\thlt\n");
+        //         break;
+        //     case Jjmp:
+        //         if (b->s1 != b->link)
+        //             fprintf(f, "\tjmp @%s\n", b->s1->name);
+        //         break;
+        //     default:
+        //         fprintf(f, "\t%s ", jtoa[b->jmp.type]);
+        //         if (b->jmp.type == Jjnz) {
+        //             printref(b->jmp.arg, fn, f);
+        //             fprintf(f, ", ");
+        //         }
+        //         assert(b->s1 && b->s2);
+        //         fprintf(f, "@%s, @%s\n", b->s1->name, b->s2->name);
+        //         break;
+        //     }
+        bi = b.link;
+    }
+    // }
+    // fprintf(f, "}\n");
+    write!(f, "}}\n");
+}
