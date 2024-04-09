@@ -60,7 +60,7 @@ enum {
 };
  */
 
-pub const NBit: usize = 8 * std::mem::size_of::<Bits>();
+pub const NBIT: usize = 8 * std::mem::size_of::<Bits>();
 
 /*
 struct Target {
@@ -120,7 +120,7 @@ enum {
  */
 
 pub const RXX: usize = 0;
-pub const Tmp0: usize = NBit;
+pub const TMP0: usize = NBIT;
 
 /*
 struct BSet {
@@ -914,7 +914,7 @@ struct Tmp {
 };
  */
 
-enum TmpWdth {
+pub enum TmpWdth {
     WFull,
     Wsb, /* must match Oload/Oext order */
     Wub,

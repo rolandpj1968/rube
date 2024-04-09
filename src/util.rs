@@ -40,8 +40,8 @@ enum {
 };
  */
 
-const IBits: u32 = 12;
-pub const IMask: u32 = (1 << IBits) - 1;
+const IBITS: u32 = 12;
+pub const IMASK: u32 = (1 << IBITS) - 1;
 
 /*
 Typ *typ;
@@ -232,17 +232,17 @@ pub fn intern(s: &[u8], parser: &mut Parser) -> InternId {
     // uint32_t h;
     // uint i, n;
 
-    let h: u32 = hash(s) & IMask;
+    let h: u32 = hash(s) & IMASK;
     let b: &mut Bucket = &mut parser.itbl[h as usize];
     let n: u32 = b.len() as u32;
 
     for i in 0..n {
         if s == b[i as usize] {
-            return InternId(h + (i << IBits));
+            return InternId(h + (i << IBITS));
         }
     }
 
-    if n == 1 << (32 - IBits) {
+    if n == 1 << (32 - IBITS) {
         panic!("interning table overflow");
     }
 
@@ -257,7 +257,7 @@ pub fn intern(s: &[u8], parser: &mut Parser) -> InternId {
 
     b.push(s.to_vec());
 
-    InternId(h + (n << IBits))
+    InternId(h + (n << IBITS))
 }
 
 /*
@@ -424,7 +424,7 @@ newtmp(char *prfx, int k,  Fn *fn)
 
 pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
     // TODO why a globally unique name?
-    static mut n: i32 = 0;
+    static mut N: i32 = 0;
     // int t;
 
     // t = fn_->ntmp++;
@@ -439,8 +439,8 @@ pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
         name.push(b'.');
         unsafe {
             // TODO
-            n += 1;
-            name.extend_from_slice(&format!("{}", n).as_bytes());
+            N += 1;
+            name.extend_from_slice(&format!("{}", N).as_bytes());
         }
     }
 

@@ -42,16 +42,16 @@ use parse::{parse, printfn};
 // 	.emitfn = amd64_emitfn, \
 // };
 
-fn dummy_retregs(r: Ref, something: [i32; 2]) -> Bits { 0 }
-fn dummy_argregs(r: Ref, something: [i32; 2]) -> Bits { 0 }
-fn dummy_memargs(something: i32) -> i32 { 0 }
-fn dummy_abi0(fn_: &mut Fn) {}
-fn dummy_abi1(fn_: &mut Fn) {}
-fn dummy_isel(fn_: &mut Fn) {}
-fn dummy_emitfn(fn_: & Fn) {}
+fn dummy_retregs(_r: Ref, _something: [i32; 2]) -> Bits { 0 }
+fn dummy_argregs(_r: Ref, _something: [i32; 2]) -> Bits { 0 }
+fn dummy_memargs(_something: i32) -> i32 { 0 }
+fn dummy_abi0(_fn_: &mut Fn) {}
+fn dummy_abi1(_fn_: &mut Fn) {}
+fn dummy_isel(_fn_: &mut Fn) {}
+fn dummy_emitfn(_fn_: & Fn) {}
 fn dummy_emitfin() {}
 
-static amd64_sysv: Target = Target {
+static AMD64_SYSV: Target = Target {
     name: b"amd64_sysv",
     apple: false,
     gpr0: 1, //i32, // first general purpose reg
@@ -87,7 +87,7 @@ fn dump_dbgfile(name: &[u8]) {
     println!("Got dbgfile {:?}", String::from_utf8_lossy(name));
 }
 
-fn dump_data(dat: &Dat, typ: &[Typ]) {
+fn dump_data(dat: &Dat, _typ: &[Typ]) {
     println!("Got dat {:?} {:?}", String::from_utf8_lossy(&dat.name), dat.type_);
 }
 
@@ -109,7 +109,7 @@ fn main() {
     let path: &Path = Path::new(&path_osstr);
     let infile = File::open(args[1].clone()).unwrap();
 
-    match parse(&amd64_sysv, &infile, path, dump_dbgfile, dump_data, dump_func) {
+    match parse(&AMD64_SYSV, &infile, path, dump_dbgfile, dump_data, dump_func) {
 	Ok(()) => println!("Finished parsing"),
 	Err(e) => {
 	    eprintln!("Error parsing {:?} - {:?}", path, e);
