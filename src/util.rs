@@ -267,7 +267,19 @@ str(uint32_t id)
     assert(id>>IBits < itbl[id&IMask].nstr);
     return itbl[id&IMask].str[id>>IBits];
 }
+ */
 
+// pub fn str_<'a>(id: InternId, parser: &'a Parser<'a>) -> &'a [u8] {
+//     assert!(((id.0 >> IBITS) as usize) < parser.itbl[(id.0 & IMASK) as usize].len());
+//     &parser.itbl[(id.0 & IMASK) as usize][(id.0 >> IBITS) as usize]
+// }
+
+pub fn str_<'a>(id: &'a InternId, itbl: &'a [Bucket]) -> &'a [u8] {
+    assert!(((id.0 >> IBITS) as usize) < itbl[(id.0 & IMASK) as usize].len());
+    &itbl[(id.0 & IMASK) as usize][(id.0 >> IBITS) as usize]
+}
+
+/*
 int
 isreg(Ref r)
 {

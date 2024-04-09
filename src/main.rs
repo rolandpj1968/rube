@@ -20,6 +20,7 @@ use std::path::Path;
 
 use all::{Bits, Dat, Fn, Ref, Target, Typ};
 use parse::{parse, printfn};
+use util::Bucket;
 
 // Target T_amd64_sysv = {
 // 	.name = "amd64_sysv",
@@ -42,22 +43,28 @@ use parse::{parse, printfn};
 // 	.emitfn = amd64_emitfn, \
 // };
 
-fn dummy_retregs(_r: Ref, _something: [i32; 2]) -> Bits { 0 }
-fn dummy_argregs(_r: Ref, _something: [i32; 2]) -> Bits { 0 }
-fn dummy_memargs(_something: i32) -> i32 { 0 }
+fn dummy_retregs(_r: Ref, _something: [i32; 2]) -> Bits {
+    0
+}
+fn dummy_argregs(_r: Ref, _something: [i32; 2]) -> Bits {
+    0
+}
+fn dummy_memargs(_something: i32) -> i32 {
+    0
+}
 fn dummy_abi0(_fn_: &mut Fn) {}
 fn dummy_abi1(_fn_: &mut Fn) {}
 fn dummy_isel(_fn_: &mut Fn) {}
-fn dummy_emitfn(_fn_: & Fn) {}
+fn dummy_emitfn(_fn_: &Fn) {}
 fn dummy_emitfin() {}
 
 static AMD64_SYSV: Target = Target {
     name: b"amd64_sysv",
     apple: false,
-    gpr0: 1, //i32, // first general purpose reg
-    ngpr: 16, //i32,
-    fpr0: 17, //i32, // first floating point reg
-    nfpr: 15, //i32,
+    gpr0: 1,                //i32, // first general purpose reg
+    ngpr: 16,               //i32,
+    fpr0: 17,               //i32, // first floating point reg
+    nfpr: 15,               //i32,
     rglob: 0, // not right but not needed for parser // Bits, // globally live regs (e.g., sp, fp)
     nrglob: 0, // not right but not needed for parser // i32,
     rsave: vec![], // not right but not needed for parser // Vec<i32>, // caller-save [Vec???]
@@ -88,32 +95,41 @@ fn dump_dbgfile(name: &[u8]) {
 }
 
 fn dump_data(dat: &Dat, _typ: &[Typ]) {
-    println!("Got dat {:?} {:?}", String::from_utf8_lossy(&dat.name), dat.type_);
+    println!(
+        "Got dat {:?} {:?}",
+        String::from_utf8_lossy(&dat.name),
+        dat.type_
+    );
 }
 
-fn dump_func(fn_: &Fn, typ: &[Typ]) {
+fn dump_func(fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
     println!("Got fn {:?}:", String::from_utf8_lossy(&fn_.name));
     println!();
-    printfn(&mut stdout(), fn_, typ);
+    printfn(&mut stdout(), fn_, typ, itbl);
 }
 
 fn main() {
-    println!("Hello, world!");
     let args: Vec<OsString> = env::args_os().collect();
-    dbg!(args.clone());
     if args.len() != 2 {
-	eprintln!("usage: {:?} <infile>", args[0]);
-	std::process::exit(1);
+        eprintln!("usage: {:?} <infile>", args[0]);
+        std::process::exit(1);
     }
     let path_osstr = args[1].clone();
     let path: &Path = Path::new(&path_osstr);
     let infile = File::open(args[1].clone()).unwrap();
 
-    match parse(&AMD64_SYSV, &infile, path, dump_dbgfile, dump_data, dump_func) {
-	Ok(()) => println!("Finished parsing"),
-	Err(e) => {
-	    eprintln!("Error parsing {:?} - {:?}", path, e);
-	    std::process::exit(1);
-	}
+    match parse(
+        &AMD64_SYSV,
+        &infile,
+        path,
+        dump_dbgfile,
+        dump_data,
+        dump_func,
+    ) {
+        Ok(()) => println!("Finished parsing"),
+        Err(e) => {
+            eprintln!("Error parsing {:?} - {:?}", path, e);
+            std::process::exit(1);
+        }
     }
 }
