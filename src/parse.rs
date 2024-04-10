@@ -338,6 +338,20 @@ impl TokVal2 {
         }
     }
 
+    fn as_s(&self) -> f32 {
+        match self {
+            TokVal2::S(s) => *s,
+            _ => panic!("BUG - expecting float token value"),
+        }
+    }
+
+    fn as_d(&self) -> f64 {
+        match self {
+            TokVal2::D(d) => *d,
+            _ => panic!("BUG - expecting double token value"),
+        }
+    }
+
     fn as_i(&self) -> i64 {
         match self {
             TokVal2::I(i) => *i,
@@ -557,7 +571,7 @@ impl Parser<'_> {
         let mut craw: u8;
         // Skip blanks
         loop {
-            self.tokval.chr = c;
+            //self.tokval.chr = c;
             match c {
                 None => return Ok((Token::Teof, TokVal2::Eof)),
                 Some(craw0) => {
@@ -813,16 +827,22 @@ impl Parser<'_> {
     fn parseref(&mut self, curf: &mut Fn) -> RubeResult<Ref> {
         let (t, tv) = self.next()?;
         let c: Con = match t {
-            Token::Ttmp => return Ok(self.tmpref(&self.tokval.str.clone(), curf)),
-            Token::Tint => Con::new_bits(ConBits::I(self.tokval.num)),
-            Token::Tflts => Con::new_bits(ConBits::F(self.tokval.flts)), // c.flt = 1;
-            Token::Tfltd => Con::new_bits(ConBits::D(self.tokval.fltd)), // c.flt = 2;
+            Token::Ttmp => return Ok(self.tmpref(&/*self.tokval.str*/tv.as_str().clone(), curf)),
+            Token::Tint => Con::new_bits(ConBits::I(/*self.tokval.num*/ tv.as_i())),
+            Token::Tflts => Con::new_bits(ConBits::F(/*self.tokval.flts*/ tv.as_s())), // c.flt = 1;
+            Token::Tfltd => Con::new_bits(ConBits::D(/*self.tokval.fltd*/ tv.as_d())), // c.flt = 2;
             Token::Tthread => {
-                let _str = self.expect(Token::Tglo)?;
-                Con::new_sym(Sym::new(SymT::SThr, intern(&self.tokval.str.clone(), self)))
+                let name = self.expect(Token::Tglo)?;
+                Con::new_sym(Sym::new(
+                    SymT::SThr,
+                    intern(&/*self.tokval.str.clone()*/name.as_str(), self),
+                ))
             }
             Token::Tglo => {
-                Con::new_sym(Sym::new(SymT::SGlo, intern(&self.tokval.str.clone(), self)))
+                Con::new_sym(Sym::new(
+                    SymT::SGlo,
+                    intern(&/*self.tokval.str.clone()*/tv.as_str(), self),
+                ))
             } // Ugh
             _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
         };
