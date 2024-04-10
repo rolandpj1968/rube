@@ -724,7 +724,13 @@ bsequal(BSet *a, BSet *b)
             return 0;
     return 1;
 }
+ */
 
+pub fn bsequal(a: &BSet, b: &BSet) -> bool {
+    a == b
+}
+
+/*
 void
 bszero(BSet *bs)
 {

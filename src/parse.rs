@@ -17,7 +17,7 @@ use crate::all::{
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
 use crate::util::{
-    bsinit, bsset, clsmerge, hash, intern, newcon, newtmp, str_, Bucket, InternId, IMASK,
+    bsequal, bsinit, bsset, clsmerge, hash, intern, newcon, newtmp, str_, Bucket, InternId, IMASK,
 };
 
 #[derive(Debug)]
@@ -1446,6 +1446,14 @@ impl Parser<'_> {
                         }
                         bsset(&mut ppb, pbi.0);
                     }
+
+                    if !bsequal(&pb, &ppb) {
+                        return Err(self.err(&format!(
+                            "predecessors not matched in phi %{}",
+                            String::from_utf8_lossy(&t.name)
+                        )));
+                    }
+
                     pi = fn_.phi(pi).link;
                 } else {
                     assert!(false); // Already checked above
@@ -1520,8 +1528,8 @@ impl Parser<'_> {
         for i in 0..TMASK + 1 {
             self.tmph[i as usize] = TmpIdx::INVALID;
         }
-        println!("TODO - missing typecheck()");
-        //self.typecheck(&curf)?;
+
+        self.typecheck(&mut curf)?;
 
         Ok(curf)
     }
