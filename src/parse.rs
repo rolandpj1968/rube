@@ -1427,9 +1427,23 @@ impl Parser<'_> {
                                 String::from_utf8_lossy(&t.name)
                             )));
                         }
-                        // if (!usecheck(p->arg[n], k, fn))
-                        //     err("invalid type for operand %%%s in phi %%%s",
-                        // 	fn->tmp[p->arg[n].val].name, t->name);
+                        if !usecheck(fn_, &p.arg[n], k) {
+                            // TODO - notify QBE - this might not be a tmp - could be a constant
+                            let argr: &Ref = &p.arg[n];
+                            if let Ref::RTmp(ti) = argr {
+                                return Err(self.err(&format!(
+                                    "invalid type for operand %{} in phi %{}",
+                                    String::from_utf8_lossy(&fn_.tmp(*ti).name),
+                                    String::from_utf8_lossy(&t.name)
+                                )));
+                            } else {
+                                return Err(self.err(&format!(
+                                    "invalid type for operand {} in phi %{}",
+                                    n,
+                                    String::from_utf8_lossy(&t.name)
+                                )));
+                            }
+                        }
                         bsset(&mut ppb, pbi.0);
                     }
                     pi = fn_.phi(pi).link;
