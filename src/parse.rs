@@ -1655,20 +1655,21 @@ impl Parser<'_> {
 
     // TODO - should return Typ???
     // TODO: need to pass tv
-    fn parsetyp(&mut self, name: &[u8]) -> RubeResult<()> {
+    fn parsetyp(&mut self) -> RubeResult<()> {
         /* be careful if extending the syntax
          * to handle nested types, any pointer
          * held to typ[] might be invalidated!
          */
         let mut ty = Typ::new(); // Ugh construct upwards
 
-        if self.nextnl()?.0 != Token::Ttyp || self.nextnl()?.0 != Token::Teq {
+        let (mut t, mut tv) = self.nextnl()?;
+        if t != Token::Ttyp || self.nextnl()?.0 != Token::Teq {
             return Err(self.err("type name and then = expected"));
         }
 
         // TODO - we need to pass tvparam here and move this up...
-        ty.name = self.tokval.str.clone();
-        let (mut t, mut tv) = self.nextnl()?;
+        ty.name = tv.as_str(); // self.tokval.str.clone();
+        (t, tv) = self.nextnl()?;
         if t == Token::Talign {
             (t, tv) = self.nextnl()?;
             if t != Token::Tint {
@@ -1914,7 +1915,7 @@ impl Parser<'_> {
                 }
 
                 Token::Ttype => {
-                    self.parsetyp(&tv.as_str())?;
+                    self.parsetyp()?;
                 }
 
                 Token::Teof => {
