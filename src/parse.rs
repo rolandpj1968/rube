@@ -1745,10 +1745,9 @@ impl Parser<'_> {
         Ok(())
     }
 
-    // TODO - need to pass tv.as_str()
     fn parsedatstr(&self, d: &mut Dat, str: &[u8]) {
         d.isstr = true;
-        d.u = DatU::Str(str.to_vec() /*self.tokval.str.clone()*/);
+        d.u = DatU::Str(str.to_vec());
     }
 
     // TODO - need to pass tv.as_str()
@@ -1758,8 +1757,8 @@ impl Parser<'_> {
         if t != Token::Tglo || self.nextnl()?.0 != Token::Teq {
             return Err(self.err("data name, then = expected"));
         }
+        let name = tv.as_str();
 
-        let name: Vec<u8> = self.tokval.str.clone();
         (t, tv) = self.nextnl()?;
         lnk.align = 8;
         if t == Token::Talign {
