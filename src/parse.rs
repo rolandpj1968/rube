@@ -572,7 +572,6 @@ impl Parser<'_> {
         let mut craw: u8;
         // Skip blanks
         loop {
-            //self.tokval.chr = c;
             match c {
                 None => return Ok((Token::Teof, TokVal2::Eof)),
                 Some(craw0) => {
@@ -602,7 +601,6 @@ impl Parser<'_> {
             b's' => {
                 let c2 = self.getc()?;
                 if c2 == Some(b'_') {
-                    //self.tokval.flts = self.get_float()?;
                     return Ok((Token::Tflts, TokVal2::S(self.get_float()?)));
                 } else {
                     self.ungetc(c2);
@@ -612,7 +610,6 @@ impl Parser<'_> {
             b'd' => {
                 let c2 = self.getc()?;
                 if c2 == Some(b'_') {
-                    //self.tokval.fltd = self.get_double()?;
                     return Ok((Token::Tfltd, TokVal2::D(self.get_double()?)));
                 } else {
                     self.ungetc(c2);
@@ -844,7 +841,8 @@ impl Parser<'_> {
     }
 
     // TODO: pass tv.as_str()
-    fn findtyp(&self /*, int i*/) -> RubeResult<TypIdx> {
+    fn findtyp(&self, name: &[u8]) -> RubeResult<TypIdx> {
+        assert!(name == self.tokval.str);
         for i in (0..self.typ.len()).rev() {
             if self.tokval.str == self.typ[i].name {
                 return Ok(TypIdx(i));
@@ -854,9 +852,9 @@ impl Parser<'_> {
     }
 
     fn parsecls(&mut self) -> RubeResult<(KExt, TypIdx)> {
-        let (t, _) = self.next()?;
+        let (t, tv) = self.next()?;
         match t {
-            Token::Ttyp => Ok((KC, self.findtyp()?)),
+            Token::Ttyp => Ok((KC, self.findtyp(&tv.as_str())?)),
             Token::Tsb => Ok((KSB, TypIdx::INVALID)),
             Token::Tub => Ok((KUB, TypIdx::INVALID)),
             Token::Tsh => Ok((KSH, TypIdx::INVALID)),
@@ -1143,7 +1141,9 @@ impl Parser<'_> {
                 let ln_i = self.expect(Token::Tint)?.as_i();
                 //assert!(ln_i == self.tokval.num);
                 let ln: i32 = /*self.tokval.num*/ln_i as i32;
-                if ln < 0 || (ln as i64) != self.tokval.num {
+                if ln < 0 || (ln as i64) != ln_i
+                /*self.tokval.num*/
+                {
                     return Err(self.err(&format!(
                         "line number {} negative or too big",
                         /*self.tokval.num*/ ln_i
@@ -1605,9 +1605,9 @@ impl Parser<'_> {
     }
 
     // TODO - this should just return a Vec<TypField>
-    fn parsefields(&mut self, ty: &mut Typ, tparam: Token) -> RubeResult<()> {
+    fn parsefields(&mut self, ty: &mut Typ, tparam: Token, tvparam: TokVal2) -> RubeResult<()> {
         let mut t: Token = tparam;
-        let mut tv: TokVal2 = TokVal2::None;
+        let mut tv: TokVal2 = tvparam;
         let mut sz: u64 = 0;
         let mut al = ty.align;
         while t != Token::Trbrace {
@@ -1625,7 +1625,7 @@ impl Parser<'_> {
                 Token::Th => (TypFldT::Fh, 2u64, 1i32),
                 Token::Tb => (TypFldT::Fb, 1u64, 0i32),
                 Token::Ttyp => {
-                    let TypIdx(idx) = self.findtyp()?;
+                    let TypIdx(idx) = self.findtyp(&tv.as_str())?;
                     ftyp_idx = idx;
                     (TypFldT::FTyp, self.typ[idx].size, self.typ[idx].align)
                 }
@@ -1642,7 +1642,7 @@ impl Parser<'_> {
             (t, tv) = self.nextnl()?;
             let mut c: i32 = 1;
             if t == Token::Tint {
-                assert!(tv.as_i() == self.tokval.num);
+                //assert!(tv.as_i() == self.tokval.num);
                 c = tv.as_i()/*self.tokval.num*/ as i32; // TODO - check cast range?
                 (t, tv) = self.nextnl()?;
             }
@@ -1733,7 +1733,7 @@ impl Parser<'_> {
                     return Err(self.err("invalid union member"));
                 }
                 (t, tv) = self.nextnl()?;
-                self.parsefields(&mut ty, t)?;
+                self.parsefields(&mut ty, t, tv)?;
                 n += 1;
                 (t, tv) = self.nextnl()?;
                 if t == Token::Trbrace {
@@ -1741,7 +1741,7 @@ impl Parser<'_> {
                 }
             }
         } else {
-            self.parsefields(&mut ty, t)?;
+            self.parsefields(&mut ty, t, tv)?;
             n += 1;
         }
         ty.nunion = n;
