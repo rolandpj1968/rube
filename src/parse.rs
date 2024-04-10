@@ -1676,9 +1676,14 @@ impl Parser<'_> {
             if t != Token::Tint {
                 return Err(self.err("alignment expected"));
             }
+            assert!(tv.as_i() == self.tokval.num);
             let mut al: i32 = 0;
             loop {
-                assert!(tv.as_i() == self.tokval.num);
+                // println!(
+                //     "                  tv.as_i() is {} self.tokval.num is {}",
+                //     tv.as_i(),
+                //     self.tokval.num
+                // );
                 self.tokval.num /= 2;
                 if self.tokval.num == 0 {
                     break;
