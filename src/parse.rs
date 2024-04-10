@@ -239,44 +239,44 @@ fn isstore(t: Token) -> bool {
 }
 
 lazy_static! {
-    static ref KWMAP: [&'static [u8]; Token::Ntok as usize] = {
+    static ref KWMAP: [&'static str; Token::Ntok as usize] = {
     // Crazy indent courtesy of emacs rustic.
-    let mut kwmap0: [&'static [u8]; Token::Ntok as usize] = [b""; Token::Ntok as usize];
+    let mut kwmap0: [&'static str; Token::Ntok as usize] = [""; Token::Ntok as usize];
 
-    kwmap0[Token::Tloadw as usize] = b"loadw";
-    kwmap0[Token::Tloadl as usize] = b"loadl";
-    kwmap0[Token::Tloads as usize] = b"loads";
-    kwmap0[Token::Tloadd as usize] = b"loadd";
-    kwmap0[Token::Talloc1 as usize] = b"alloc1";
-    kwmap0[Token::Talloc2 as usize] = b"alloc2";
-    kwmap0[Token::Tblit as usize] = b"blit";
-    kwmap0[Token::Tcall as usize] = b"call";
-    kwmap0[Token::Tenv as usize] = b"env";
-    kwmap0[Token::Tphi as usize] = b"phi";
-    kwmap0[Token::Tjmp as usize] = b"jmp";
-    kwmap0[Token::Tjnz as usize] = b"jnz";
-    kwmap0[Token::Tret as usize] = b"ret";
-    kwmap0[Token::Thlt as usize] = b"hlt";
-    kwmap0[Token::Texport as usize] = b"export";
-    kwmap0[Token::Tthread as usize] = b"thread";
-    kwmap0[Token::Tfunc as usize] = b"function";
-    kwmap0[Token::Ttype as usize] = b"type";
-    kwmap0[Token::Tdata as usize] = b"data";
-    kwmap0[Token::Tsection as usize] = b"section";
-    kwmap0[Token::Talign as usize] = b"align";
-    kwmap0[Token::Tdbgfile as usize] = b"dbgfile";
-    kwmap0[Token::Tsb as usize] = b"sb";
-    kwmap0[Token::Tub as usize] = b"ub";
-    kwmap0[Token::Tsh as usize] = b"sh";
-    kwmap0[Token::Tuh as usize] = b"uh";
-    kwmap0[Token::Tb as usize] = b"b";
-    kwmap0[Token::Th as usize] = b"h";
-    kwmap0[Token::Tw as usize] = b"w";
-    kwmap0[Token::Tl as usize] = b"l";
-    kwmap0[Token::Ts as usize] = b"s";
-    kwmap0[Token::Td as usize] = b"d";
-    kwmap0[Token::Tz as usize] = b"z";
-    kwmap0[Token::Tdots as usize] = b"...";
+    kwmap0[Token::Tloadw as usize] = "loadw";
+    kwmap0[Token::Tloadl as usize] = "loadl";
+    kwmap0[Token::Tloads as usize] = "loads";
+    kwmap0[Token::Tloadd as usize] = "loadd";
+    kwmap0[Token::Talloc1 as usize] = "alloc1";
+    kwmap0[Token::Talloc2 as usize] = "alloc2";
+    kwmap0[Token::Tblit as usize] = "blit";
+    kwmap0[Token::Tcall as usize] = "call";
+    kwmap0[Token::Tenv as usize] = "env";
+    kwmap0[Token::Tphi as usize] = "phi";
+    kwmap0[Token::Tjmp as usize] = "jmp";
+    kwmap0[Token::Tjnz as usize] = "jnz";
+    kwmap0[Token::Tret as usize] = "ret";
+    kwmap0[Token::Thlt as usize] = "hlt";
+    kwmap0[Token::Texport as usize] = "export";
+    kwmap0[Token::Tthread as usize] = "thread";
+    kwmap0[Token::Tfunc as usize] = "function";
+    kwmap0[Token::Ttype as usize] = "type";
+    kwmap0[Token::Tdata as usize] = "data";
+    kwmap0[Token::Tsection as usize] = "section";
+    kwmap0[Token::Talign as usize] = "align";
+    kwmap0[Token::Tdbgfile as usize] = "dbgfile";
+    kwmap0[Token::Tsb as usize] = "sb";
+    kwmap0[Token::Tub as usize] = "ub";
+    kwmap0[Token::Tsh as usize] = "sh";
+    kwmap0[Token::Tuh as usize] = "uh";
+    kwmap0[Token::Tb as usize] = "b";
+    kwmap0[Token::Th as usize] = "h";
+    kwmap0[Token::Tw as usize] = "w";
+    kwmap0[Token::Tl as usize] = "l";
+    kwmap0[Token::Ts as usize] = "s";
+    kwmap0[Token::Td as usize] = "d";
+    kwmap0[Token::Tz as usize] = "z";
+    kwmap0[Token::Tdots as usize] = "...";
 
     // formerly in lexinit()
     for i in 0..(ORanges::NPubOp as usize) {
@@ -309,7 +309,7 @@ impl TokVal {
             fltd: 0.0,
             flts: 0.0,
             num: 0,
-            str: vec![],
+            str: vec![], // Ugh, construct upwards
         }
     }
 }
@@ -654,16 +654,16 @@ impl Parser<'_> {
             if t != Token::Txxx {
                 return Ok(t);
             }
-            let h: u32 = hash(&tok).wrapping_mul(K) >> M;
+            let h: u32 = hash(&self.tokval.str).wrapping_mul(K) >> M;
             t = LEXH[h as usize];
-            if t == Token::Txxx || KWMAP[t as usize] != tok {
-                return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
+            if t == Token::Txxx || KWMAP[t as usize] != self.tokval.str {
+                return Err(self.err(&format!("unknown keyword \"{}\"", self.tokval.str)));
             }
             return Ok(t);
         } else if take_quote {
             assert!(t != Token::Txxx);
-            self.tokval.str = vec![];
-            self.tokval.str.push(craw);
+            let mut tok: Vec<u8> = vec![];
+            tok.push(craw);
             let mut esc = false;
             loop {
                 c = self.getc()?;
@@ -671,8 +671,9 @@ impl Parser<'_> {
                     return Err(self.err("unterminated string"));
                 }
                 craw = c.unwrap();
-                self.tokval.str.push(craw);
+                tok.push(craw);
                 if craw == b'"' && !esc {
+                    self.tokval.str = String::from_utf8_lossy(&tok).to_string(); // TODO - lossy!!!
                     return Ok(t);
                 }
                 esc = craw == b'\\' && !esc;
@@ -744,7 +745,7 @@ impl Parser<'_> {
         )))
     }
 
-    fn tmpref(&mut self, v: &[u8], curf: &mut Fn) -> Ref {
+    fn tmpref(&mut self, v: &str, curf: &mut Fn) -> Ref {
         let tmp_idx: TmpIdx = self.tmph[(hash(v) & TMASK) as usize];
         if tmp_idx != TmpIdx::INVALID {
             if curf.tmps[tmp_idx.0].name == v {
@@ -758,7 +759,7 @@ impl Parser<'_> {
         }
         let t = curf.tmps.len();
         let r = newtmp(None, KX, curf);
-        curf.tmps[t].name = v.to_vec(); // Ugh
+        curf.tmps[t].name = v.to_string(); // Ugh
 
         r
     }
@@ -794,10 +795,7 @@ impl Parser<'_> {
                 return Ok(TypIdx(i));
             }
         }
-        Err(self.err(&format!(
-            "undefined type :{}",
-            String::from_utf8_lossy(&self.tokval.str)
-        )))
+        Err(self.err(&format!("undefined type :{}", &self.tokval.str)))
     }
 
     fn parsecls(&mut self) -> RubeResult<(KExt, TypIdx)> {
@@ -932,7 +930,7 @@ impl Parser<'_> {
 
     // Blk name is always in self.tokval.str
     fn findblk(&mut self, curf: &mut Fn) -> BlkIdx {
-        let name: &[u8] = &self.tokval.str;
+        let name: &str = &self.tokval.str;
         let h: u32 = hash(name) & BMASK;
         let mut bi: BlkIdx = self.blkh[h as usize];
         while bi != BlkIdx::INVALID {
@@ -945,7 +943,7 @@ impl Parser<'_> {
         }
 
         let id: usize = curf.blks.len();
-        bi = curf.add_blk(Blk::new(name, id, self.blkh[h as usize]));
+        bi = curf.add_blk(Blk::new(name.to_string(), id, self.blkh[h as usize]));
         self.blkh[h as usize] = bi;
 
         bi
@@ -1009,10 +1007,9 @@ impl Parser<'_> {
                 }
                 let new_b: &Blk = curf.blk(new_bi);
                 if new_b.jmp.type_ != J::Jxxx {
-                    return Err(self.err(&format!(
-                        "multiple definitions of block @{}",
-                        String::from_utf8_lossy(&new_b.name),
-                    )));
+                    return Err(
+                        self.err(&format!("multiple definitions of block @{}", &new_b.name,))
+                    );
                 }
                 if self.blink == BlkIdx::INVALID {
                     // First block
@@ -1382,7 +1379,7 @@ impl Parser<'_> {
                 } else {
                     return Err(self.err(&format!(
                         "phi to val is not a tmp in block {}",
-                        String::from_utf8_lossy(&fn_.blk(bi).name)
+                        (&fn_.blk(bi).name)
                     )));
                 }
                 pi = fn_.phi(pi).link;
@@ -1394,7 +1391,7 @@ impl Parser<'_> {
                     if clsmerge(&mut t.cls, ins_cls) {
                         return Err(self.err(&format!(
                             "temporary %{} is assigned with multiple types",
-                            String::from_utf8_lossy(&t.name)
+                            &t.name
                         )));
                     }
                 }
@@ -1423,8 +1420,8 @@ impl Parser<'_> {
                         if bshas(&ppb, pbi.0) {
                             return Err(self.err(&format!(
                                 "multiple entries for @{} in phi %{}",
-                                String::from_utf8_lossy(&fn_.blk(pbi).name),
-                                String::from_utf8_lossy(&t.name)
+                                (&fn_.blk(pbi).name),
+                                (&t.name)
                             )));
                         }
                         if !usecheck(fn_, &p.arg[n], k) {
@@ -1433,14 +1430,14 @@ impl Parser<'_> {
                             if let Ref::RTmp(ti) = argr {
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
-                                    String::from_utf8_lossy(&fn_.tmp(*ti).name),
-                                    String::from_utf8_lossy(&t.name)
+                                    (&fn_.tmp(*ti).name),
+                                    (&t.name)
                                 )));
                             } else {
                                 return Err(self.err(&format!(
                                     "invalid type for operand {} in phi %{}",
                                     n,
-                                    String::from_utf8_lossy(&t.name)
+                                    (&t.name)
                                 )));
                             }
                         }
@@ -1448,10 +1445,9 @@ impl Parser<'_> {
                     }
 
                     if !bsequal(&pb, &ppb) {
-                        return Err(self.err(&format!(
-                            "predecessors not matched in phi %{}",
-                            String::from_utf8_lossy(&t.name)
-                        )));
+                        return Err(
+                            self.err(&format!("predecessors not matched in phi %{}", (&t.name)))
+                        );
                     }
 
                     pi = fn_.phi(pi).link;
@@ -1695,7 +1691,7 @@ impl Parser<'_> {
 
     fn parsedatref(&mut self, d: &mut Dat) -> RubeResult<()> {
         d.isref = true;
-        let name: Vec<u8> = self.tokval.str.clone();
+        let name: String = self.tokval.str.clone();
         let mut off: i64 = 0;
         if self.peek()? == Token::Tplus {
             let _ = self.next()?;
@@ -1909,7 +1905,7 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
             if c.sym.type_ == SymT::SThr {
                 let _ = write!(f, "thread ");
             }
-            let _ = write!(f, "${}", String::from_utf8_lossy(str_(&c.sym.id, itbl)));
+            let _ = write!(f, "${}", (str_(&c.sym.id, itbl)));
             if let ConBits::I(i) = c.bits {
                 let _ = write!(f, "{}", i);
             }
@@ -1939,7 +1935,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             if ti.0 < TMP0 {
                 let _ = write!(f, "R{}", ti.0);
             } else {
-                let _ = write!(f, "%{}", String::from_utf8_lossy(&fn_.tmps[ti.0].name));
+                let _ = write!(f, "%{}", (&fn_.tmps[ti.0].name));
             }
         }
         Ref::RCon(ci) => {
@@ -1957,7 +1953,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             let _ = write!(f, "{:04x}", n);
         }
         Ref::RTyp(ti) => {
-            let _ = write!(f, ":{}", String::from_utf8_lossy(&typ[ti.0].name));
+            let _ = write!(f, ":{}", (&typ[ti.0].name));
         }
         Ref::RMem(mi) => {
             let mut i: bool = false;
@@ -2030,11 +2026,11 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
 
         jtoa0
     };
-    let _ = writeln!(f, "function ${}() {{", String::from_utf8_lossy(&fn_.name));
+    let _ = writeln!(f, "function ${}() {{", (&fn_.name));
     let mut bi: BlkIdx = fn_.start;
     while bi != BlkIdx::INVALID {
         let b: &Blk = fn_.blk(bi);
-        let _ = writeln!(f, "@{}", String::from_utf8_lossy(&b.name));
+        let _ = writeln!(f, "@{}", (&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::INVALID {
             let p: &Phi = &fn_.phis[pi.0];
@@ -2046,7 +2042,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             for n in 0..p.arg.len() {
                 let bi: BlkIdx = p.blk[n];
                 let pb = fn_.blk(bi);
-                let _ = write!(f, "@{} ", String::from_utf8_lossy(&pb.name));
+                let _ = write!(f, "@{} ", (&pb.name));
                 printref(f, fn_, typ, itbl, &p.arg[n]);
                 if n != p.arg.len() - 1 {
                     let _ = write!(f, ", ");
@@ -2062,7 +2058,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 let _ = write!(f, " ={} ", KTOC[i.cls as usize]);
             }
             assert!(OPTAB[i.op as usize].name.len() != 0);
-            let _ = write!(f, "{}", String::from_utf8_lossy(&OPTAB[i.op as usize].name));
+            let _ = write!(f, "{}", (&OPTAB[i.op as usize].name));
             if i.to == Ref::R {
                 match i.op {
                     O::Oarg
@@ -2106,7 +2102,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     printref(f, fn_, typ, itbl, &b.jmp.arg);
                 }
                 if b.jmp.type_ == J::Jretc {
-                    let _ = write!(f, ", :{}", String::from_utf8_lossy(&typ[fn_.retty.0].name));
+                    let _ = write!(f, ", :{}", &typ[fn_.retty.0].name);
                 }
             }
             J::Jhlt => {

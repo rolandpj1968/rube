@@ -60,7 +60,7 @@ fn dummy_emitfn(_fn_: &Fn) {}
 fn dummy_emitfin() {}
 
 static AMD64_SYSV: Target = Target {
-    name: b"amd64_sysv",
+    name: "amd64_sysv",
     apple: false,
     gpr0: 1,                //i32, // first general purpose reg
     ngpr: 16,               //i32,
@@ -78,8 +78,8 @@ static AMD64_SYSV: Target = Target {
     isel: dummy_isel, // fn(&mut Fn),
     emitfn: dummy_emitfn, // fn(&Fn /*, FILE **/), // TODO
     emitfin: dummy_emitfin, // (/*FILE **/),      // TODO
-    asloc: b".L", // &'static [u8],
-    assym: b"", //&'static [u8],
+    asloc: ".L", // &'static [u8],
+    assym: "", //&'static [u8],
 };
 
 // pub fn parse(

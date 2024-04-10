@@ -88,7 +88,7 @@ struct Target {
  */
 
 pub struct Target {
-    pub name: &'static [u8],
+    pub name: &'static str,
     pub apple: bool,
     pub gpr0: i32, // first general purpose reg
     pub ngpr: i32,
@@ -106,8 +106,8 @@ pub struct Target {
     pub isel: fn(&mut Fn),
     pub emitfn: fn(&Fn /*, FILE **/), // TODO
     pub emitfin: fn(/*FILE **/),      // TODO
-    pub asloc: &'static [u8],
-    pub assym: &'static [u8],
+    pub asloc: &'static str,
+    pub assym: &'static str,
 }
 
 /*
@@ -636,13 +636,13 @@ struct Op {
 
 #[derive(Clone, Copy)]
 pub struct Op {
-    pub name: &'static [u8],
+    pub name: &'static str,
     pub argcls: [[KExt; 4]; 2],
     pub canfold: bool,
 }
 
 impl Op {
-    pub const fn new(name: &'static [u8], argcls: [[KExt; 4]; 2], canfold: bool) -> Op {
+    pub const fn new(name: &'static str, argcls: [[KExt; 4]; 2], canfold: bool) -> Op {
         Op {
             name,
             argcls,
@@ -773,11 +773,11 @@ pub struct Blk {
     //pub BSet in[1], out[1], gen[1]; // TODO
     pub nlive: [u32; 2],
     pub loop_: bool, // i32?
-    pub name: Vec<u8>,
+    pub name: String,
 }
 
 impl Blk {
-    pub fn new(name: &[u8], id: usize, dlink: BlkIdx) -> Blk {
+    pub fn new(name: String, id: usize, dlink: BlkIdx) -> Blk {
         Blk {
             phi: PhiIdx::INVALID,
             ins: vec![],
@@ -797,7 +797,7 @@ impl Blk {
             //pub BSet in[1], out[1], gen[1]; // TODO
             nlive: [0u32; 2],
             loop_: false, // i32?
-            name: name.to_vec(),
+            name,
         }
     }
 
@@ -931,7 +931,7 @@ pub enum TmpWdth {
 }
 
 pub struct Tmp {
-    pub name: Vec<u8>,
+    pub name: String,
     // Ins *def;
     // Use *use;
     pub ndef: u32,
@@ -952,7 +952,7 @@ pub struct Tmp {
 }
 
 impl Tmp {
-    pub fn new(name: Vec<u8>, ndef: u32, nuse: u32, slot: i32, cls: KExt) -> Tmp {
+    pub fn new(name: String, ndef: u32, nuse: u32, slot: i32, cls: KExt) -> Tmp {
         Tmp {
             name,
             ndef,
@@ -1106,7 +1106,7 @@ pub struct Fn {
     pub slot: i32, // ???
     pub vararg: bool,
     pub dynalloc: bool,
-    pub name: Vec<u8>,
+    pub name: String,
     pub lnk: Lnk,
 }
 
@@ -1126,7 +1126,7 @@ impl Fn {
             slot: -1, // ???
             vararg: false,
             dynalloc: false,
-            name: vec![],
+            name: "".to_string(), // Ugh, construct fn upwards...
             lnk,
         }
     }
@@ -1229,7 +1229,7 @@ impl TypFld {
 }
 
 pub struct Typ {
-    pub name: Vec<u8>,
+    pub name: String,
     pub isdark: bool,
     pub isunion: bool,
     pub align: i32,
@@ -1248,7 +1248,7 @@ impl TypIdx {
 impl Typ {
     pub fn new() -> Typ {
         Typ {
-            name: vec![],
+            name: "".to_string(), // Ugh, construct upwards
             isdark: false,
             isunion: false,
             align: -1,
@@ -1303,13 +1303,13 @@ pub enum DatU {
     Num(i64),
     Fltd(f64),
     Flts(f32),
-    Str(Vec<u8>),
-    Ref { name: Vec<u8>, off: i64 },
+    Str(String), // TODO - this is wrong
+    Ref { name: String, off: i64 },
 }
 
 pub struct Dat {
     pub type_: DatT,
-    pub name: Vec<u8>,
+    pub name: String,
     pub lnk: Lnk,
     pub u: DatU,
     pub isref: bool,
@@ -1317,11 +1317,11 @@ pub struct Dat {
 }
 
 impl Dat {
-    pub fn new(type_: DatT, name: &Vec<u8>, lnk: Lnk) -> Dat {
+    pub fn new(type_: DatT, name: String, lnk: Lnk) -> Dat {
         Dat {
             type_,
-            name: name.clone(),
-            lnk: lnk,
+            name,
+            lnk,
             u: DatU::None,
             isref: false,
             isstr: false,

@@ -27,7 +27,7 @@ struct Bucket {
 };
  */
 
-pub type Bucket = Vec<Vec<u8>>;
+pub type Bucket = Vec<String>;
 
 /*
 
@@ -64,11 +64,11 @@ hash(char *s)
 }
  */
 
-pub fn hash(s: &[u8]) -> u32 {
+pub fn hash(s: &str) -> u32 {
     let mut h: u32 = 0;
 
-    for c in s {
-        h = (*c as u32).wrapping_add(17u32.wrapping_mul(h));
+    for b in s.bytes() {
+        h = (b as u32).wrapping_add(17u32.wrapping_mul(h));
     }
 
     h
@@ -226,7 +226,7 @@ impl InternId {
     pub const INVALID: InternId = InternId(u32::MAX);
 }
 
-pub fn intern(s: &[u8], parser: &mut Parser) -> InternId {
+pub fn intern(s: &str, parser: &mut Parser) -> InternId {
     // Ugh, ownership
     // Bucket *b;
     // uint32_t h;
@@ -255,7 +255,7 @@ pub fn intern(s: &[u8], parser: &mut Parser) -> InternId {
     // b->nstr = n + 1;
     // strcpy(b->str[n], s);
 
-    b.push(s.to_vec());
+    b.push(s.to_string());
 
     InternId(h + (n << IBITS))
 }
