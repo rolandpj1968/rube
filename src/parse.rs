@@ -1727,10 +1727,8 @@ impl Parser<'_> {
     }
 
     // TODO - should just return Dat???
-    // TODO - need to pass tv
     fn parsedatref(&mut self, d: &mut Dat, name: &[u8]) -> RubeResult<()> {
         d.isref = true;
-        let name: Vec<u8> = self.tokval.str.clone();
         let mut off: i64 = 0;
         if self.peek()? == Token::Tplus {
             let _ = self.next()?;
@@ -1740,7 +1738,10 @@ impl Parser<'_> {
             }
             off = tv.as_i();
         }
-        d.u = DatU::Ref { name, off };
+        d.u = DatU::Ref {
+            name: name.to_vec(),
+            off,
+        };
 
         Ok(())
     }
