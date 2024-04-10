@@ -1778,18 +1778,20 @@ impl Parser<'_> {
                 return Err(self.err("invalid token after offset in ref"));
             }
             assert!(tv.as_i() == self.tokval.num);
-            off = self.tokval.num;
+            off = /*self.tokval.num*/tv.as_i();
         }
         d.u = DatU::Ref { name, off };
 
         Ok(())
     }
 
+    // TODO - need to pass tv.as_str()
     fn parsedatstr(&self, d: &mut Dat) {
         d.isstr = true;
         d.u = DatU::Str(self.tokval.str.clone());
     }
 
+    // TODO - need to pass tv.as_str()
     fn parsedat(&mut self, cb: fn(&Dat, &[Typ]) -> (), lnk: &mut Lnk) -> RubeResult<()> {
         if self.nextnl()?.0 != Token::Tglo || self.nextnl()?.0 != Token::Teq {
             return Err(self.err("data name, then = expected"));
@@ -1804,7 +1806,7 @@ impl Parser<'_> {
                 return Err(self.err("alignment expected"));
             }
             assert!(tv.as_i() == self.tokval.num);
-            lnk.align = self.tokval.num as i8; // TODO - check casting range?
+            lnk.align = /*self.tokval.num*/tv.as_i() as i8; // TODO - check casting range?
             (t, tv) = self.nextnl()?;
         }
 
@@ -1826,6 +1828,7 @@ impl Parser<'_> {
                 Token::Td => DatT::DL,
                 Token::Tz => DatT::DZ,
                 _ => {
+                    assert!(tv.as_b() == self.tokval.chr.unwrap());
                     return Err(self.err(&format!(
                         "invalid size specifier '{}' ({:#02x?}) in data",
                         escape_default(self.tokval.chr.unwrap_or(b'?')),
@@ -1841,9 +1844,9 @@ impl Parser<'_> {
 
                 match t {
                     // TODO... hrm needs more unwinding for tv2
-                    Token::Tflts => d.u = DatU::Flts(self.tokval.flts),
-                    Token::Tfltd => d.u = DatU::Fltd(self.tokval.fltd),
-                    Token::Tint => d.u = DatU::Num(self.tokval.num),
+                    Token::Tflts => d.u = DatU::Flts(/*self.tokval.flts*/ tv.as_s()),
+                    Token::Tfltd => d.u = DatU::Fltd(/*self.tokval.fltd*/ tv.as_d()),
+                    Token::Tint => d.u = DatU::Num(/*self.tokval.num*/ tv.as_i()),
                     Token::Tglo => self.parsedatref(&mut d)?,
                     Token::Tstr => self.parsedatstr(&mut d),
                     _ => {
@@ -1898,10 +1901,10 @@ impl Parser<'_> {
                         return Err(self.err("section \"name\" expected"));
                     }
                     assert!(tv.as_str() == self.tokval.str);
-                    lnk.sec = self.tokval.str.clone();
+                    lnk.sec = /*self.tokval.str*/tv.as_str()/*.clone()*/;
                     if self.peek()? == Token::Tstr {
-                        self.next()?;
-                        lnk.secf = self.tokval.str.clone();
+                        (t, tv) = self.next()?;
+                        lnk.secf = /*self.tokval.str.clone()*/tv.as_str();
                     }
                 }
 
@@ -1937,8 +1940,8 @@ impl Parser<'_> {
 
             match self.parselnk(&mut lnk)? {
                 Token::Tdbgfile => {
-                    self.expect(Token::Tstr)?;
-                    dbgfile(&self.tokval.str);
+                    let s = self.expect(Token::Tstr)?;
+                    dbgfile(&/*self.tokval.str*/s.as_str());
                 }
 
                 Token::Tfunc => {
