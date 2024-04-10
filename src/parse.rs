@@ -980,10 +980,7 @@ impl Parser<'_> {
         Ok(vararg)
     }
 
-    // Blk name is always in self.tokval.str
-    // TODO - pass tv.as_str()
     fn findblk(&mut self, curf: &mut Fn, name: &[u8]) -> BlkIdx {
-        let name: &[u8] = &self.tokval.str;
         let h: u32 = hash(name) & BMASK;
         let mut bi: BlkIdx = self.blkh[h as usize];
         while bi != BlkIdx::INVALID {
@@ -1137,15 +1134,9 @@ impl Parser<'_> {
                 k = KW;
                 r = Ref::R;
                 let ln_i = self.expect(Token::Tint)?.as_i();
-                //assert!(ln_i == self.tokval.num);
-                let ln: i32 = /*self.tokval.num*/ln_i as i32;
-                if ln < 0 || (ln as i64) != ln_i
-                /*self.tokval.num*/
-                {
-                    return Err(self.err(&format!(
-                        "line number {} negative or too big",
-                        /*self.tokval.num*/ ln_i
-                    )));
+                let ln: i32 = ln_i as i32;
+                if ln < 0 || (ln as i64) != ln_i {
+                    return Err(self.err(&format!("line number {} negative or too big", ln_i)));
                 }
                 arg.push(Ref::RInt(ln));
                 // TODO - didn't clean this up
@@ -1153,15 +1144,11 @@ impl Parser<'_> {
                     if self.peek()? == Token::Tcomma {
                         self.next()?;
                         let cn_i = self.expect(Token::Tint)?.as_i();
-                        //assert!(cn_i == self.tokval.num);
                         let cn0: i32 = cn_i as i32;
-                        if cn0 < 0 || (cn0 as i64) != cn_i
-                        /*self.tokval.num*/
-                        {
-                            return Err(self.err(&format!(
-                                "column number {} negative or too big",
-                                /*self.tokval.num*/ cn_i
-                            )));
+                        if cn0 < 0 || (cn0 as i64) != cn_i {
+                            return Err(
+                                self.err(&format!("column number {} negative or too big", cn_i))
+                            );
                         }
                         cn0
                     } else {
@@ -1668,7 +1655,7 @@ impl Parser<'_> {
 
     // TODO - should return Typ???
     // TODO: need to pass tv
-    fn parsetyp(&mut self) -> RubeResult<()> {
+    fn parsetyp(&mut self, name: &[u8]) -> RubeResult<()> {
         /* be careful if extending the syntax
          * to handle nested types, any pointer
          * held to typ[] might be invalidated!
@@ -1849,7 +1836,7 @@ impl Parser<'_> {
         Ok(())
     }
 
-    fn parselnk(&mut self, lnk: &mut Lnk) -> RubeResult<Token> {
+    fn parselnk(&mut self, lnk: &mut Lnk) -> RubeResult<(Token, TokVal2)> {
         let mut haslnk: bool = false;
 
         loop {
@@ -1888,7 +1875,7 @@ impl Parser<'_> {
                     if haslnk && t != Token::Tdata && t != Token::Tfunc {
                         return Err(self.err("only data and function have linkage"));
                     }
-                    return Ok(t);
+                    return Ok((t, tv));
                 }
             }
 
@@ -1911,7 +1898,8 @@ impl Parser<'_> {
                 secf: vec![],
             };
 
-            match self.parselnk(&mut lnk)? {
+            let (mut t, mut tv) = self.parselnk(&mut lnk)?;
+            match t {
                 Token::Tdbgfile => {
                     let s = self.expect(Token::Tstr)?;
                     dbgfile(&s.as_str());
@@ -1926,7 +1914,7 @@ impl Parser<'_> {
                 }
 
                 Token::Ttype => {
-                    self.parsetyp()?;
+                    self.parsetyp(&tv.as_str())?;
                 }
 
                 Token::Teof => {
