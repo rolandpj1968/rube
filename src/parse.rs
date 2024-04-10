@@ -840,15 +840,13 @@ impl Parser<'_> {
         Ok(newcon(c, curf))
     }
 
-    // TODO: pass tv.as_str()
     fn findtyp(&self, name: &[u8]) -> RubeResult<TypIdx> {
-        assert!(name == self.tokval.str);
         for i in (0..self.typ.len()).rev() {
-            if self.tokval.str == self.typ[i].name {
+            if name == self.typ[i].name {
                 return Ok(TypIdx(i));
             }
         }
-        Err(self.err(&format!("undefined type :{}", to_s(&self.tokval.str))))
+        Err(self.err(&format!("undefined type :{}", to_s(name))))
     }
 
     fn parsecls(&mut self) -> RubeResult<(KExt, TypIdx)> {
@@ -984,7 +982,7 @@ impl Parser<'_> {
 
     // Blk name is always in self.tokval.str
     // TODO - pass tv.as_str()
-    fn findblk(&mut self, curf: &mut Fn) -> BlkIdx {
+    fn findblk(&mut self, curf: &mut Fn, name: &[u8]) -> BlkIdx {
         let name: &[u8] = &self.tokval.str;
         let h: u32 = hash(name) & BMASK;
         let mut bi: BlkIdx = self.blkh[h as usize];
@@ -1057,7 +1055,7 @@ impl Parser<'_> {
             Token::Trbrace => return Ok(PState::PEnd),
             // New block
             Token::Tlbl => {
-                let new_bi: BlkIdx = self.findblk(curf);
+                let new_bi: BlkIdx = self.findblk(curf, &tv.as_str());
                 if self.cur_bi != BlkIdx::INVALID && curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
                     self.closeblk(curf);
                     let curb: &mut Blk = curf.blk_mut(self.cur_bi);
@@ -1115,12 +1113,12 @@ impl Parser<'_> {
                     self.expect(Token::Tcomma)?;
                 }
                 // Jump:
-                self.expect(Token::Tlbl)?;
-                curf.blk_mut(self.cur_bi).s1 = self.findblk(curf);
+                let name = self.expect(Token::Tlbl)?.as_str();
+                curf.blk_mut(self.cur_bi).s1 = self.findblk(curf, &name);
                 if curf.blk(self.cur_bi).jmp.type_ != J::Jjmp {
                     self.expect(Token::Tcomma)?;
-                    self.expect(Token::Tlbl)?;
-                    curf.blk_mut(self.cur_bi).s2 = self.findblk(curf);
+                    let name = self.expect(Token::Tlbl)?.as_str();
+                    curf.blk_mut(self.cur_bi).s2 = self.findblk(curf, &name);
                 }
                 if curf.blk(self.cur_bi).s1 == curf.start || curf.blk(self.cur_bi).s2 == curf.start
                 {
@@ -1235,8 +1233,8 @@ impl Parser<'_> {
                 if self.peek()? != Token::Tnl {
                     loop {
                         if op_tok == Token::Tphi {
-                            self.expect(Token::Tlbl)?;
-                            blk.push(self.findblk(curf));
+                            let name = self.expect(Token::Tlbl)?.as_str();
+                            blk.push(self.findblk(curf, &name));
                         }
                         let argi: Ref = self.parseref(curf)?;
                         if let Ref::R = argi {
