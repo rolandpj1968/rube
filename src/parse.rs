@@ -298,9 +298,9 @@ const BMASK: u32 = 8191; /* for blocks hash */
 const K: u32 = 9583425; /* found using tools/lexh.c */
 const M: u32 = 23;
 
-// Hrmmm, struggling with copyable vector
+// Hrmmm, struggling with copyable vector for Str
 #[derive(Clone /*, Copy*/)]
-enum TokVal2 {
+enum TokVal {
     None,
     Eof,
     B(u8),
@@ -310,31 +310,31 @@ enum TokVal2 {
     Str(Vec<u8>),
 }
 
-impl TokVal2 {
+impl TokVal {
     fn as_b(&self) -> u8 {
         match self {
-            TokVal2::B(b) => *b,
+            TokVal::B(b) => *b,
             _ => panic!("BUG - expecting single-char token value"),
         }
     }
 
     fn as_s(&self) -> f32 {
         match self {
-            TokVal2::S(s) => *s,
+            TokVal::S(s) => *s,
             _ => panic!("BUG - expecting float token value"),
         }
     }
 
     fn as_d(&self) -> f64 {
         match self {
-            TokVal2::D(d) => *d,
+            TokVal::D(d) => *d,
             _ => panic!("BUG - expecting double token value"),
         }
     }
 
     fn as_i(&self) -> i64 {
         match self {
-            TokVal2::I(i) => *i,
+            TokVal::I(i) => *i,
             _ => panic!("BUG - expecting integer token value"),
         }
     }
@@ -342,7 +342,7 @@ impl TokVal2 {
     // TODO - return &[u8]
     fn as_str(&self) -> Vec<u8> {
         match self {
-            TokVal2::Str(s) => s.clone(), // mmm, can we just return &[u8]?
+            TokVal::Str(s) => s.clone(), // mmm, can we just return &[u8]?
             _ => panic!("BUG - expecting single-char token value"),
         }
     }
@@ -371,7 +371,7 @@ pub struct Parser<'a> {
     inf: Bytes<BufReader<&'a File>>,
     ungetc: Option<u8>,
     inpath: &'a Path,
-    thead: (Token, TokVal2),
+    thead: (Token, TokVal),
     lnum: i32,
     tmph: [TmpIdx; (TMASK + 1) as usize],
     plink: PhiIdx,  // BlkIdx::INVALID before first phi of curb
@@ -391,7 +391,7 @@ impl Parser<'_> {
             inf: BufReader::new(f).bytes(), // TODO use .peekable() instead of ungetc()
             ungetc: None,
             inpath: path,
-            thead: (Token::Txxx, TokVal2::None),
+            thead: (Token::Txxx, TokVal::None),
             lnum: 1,
             tmph: [TmpIdx::INVALID; (TMASK + 1) as usize],
             plink: PhiIdx::INVALID,
@@ -544,14 +544,14 @@ impl Parser<'_> {
         self.ungetc = c;
     }
 
-    fn lex(&mut self) -> RubeResult<(Token, TokVal2)> {
+    fn lex(&mut self) -> RubeResult<(Token, TokVal)> {
         let mut c: Option<u8> = Some(b' ');
 
         let mut craw: u8;
         // Skip blanks
         loop {
             match c {
-                None => return Ok((Token::Teof, TokVal2::Eof)),
+                None => return Ok((Token::Teof, TokVal::Eof)),
                 Some(craw0) => {
                     craw = craw0;
                     if craw != b' ' && craw != b'\t' {
@@ -566,7 +566,7 @@ impl Parser<'_> {
         let mut take_alpha = false;
         let mut take_quote = false;
 
-        let tvc = TokVal2::B(craw);
+        let tvc = TokVal::B(craw);
 
         match craw {
             b',' => return Ok((Token::Tcomma, tvc)),
@@ -579,7 +579,7 @@ impl Parser<'_> {
             b's' => {
                 let c2 = self.getc()?;
                 if c2 == Some(b'_') {
-                    return Ok((Token::Tflts, TokVal2::S(self.get_float()?)));
+                    return Ok((Token::Tflts, TokVal::S(self.get_float()?)));
                 } else {
                     self.ungetc(c2);
                     take_alpha = true;
@@ -588,7 +588,7 @@ impl Parser<'_> {
             b'd' => {
                 let c2 = self.getc()?;
                 if c2 == Some(b'_') {
-                    return Ok((Token::Tfltd, TokVal2::D(self.get_double()?)));
+                    return Ok((Token::Tfltd, TokVal::D(self.get_double()?)));
                 } else {
                     self.ungetc(c2);
                     take_alpha = true;
@@ -683,14 +683,14 @@ impl Parser<'_> {
             }
             self.ungetc(c); // Hope EOF is idempotent
             if t != Token::Txxx {
-                return Ok((t, TokVal2::Str(tok)));
+                return Ok((t, TokVal::Str(tok)));
             }
             let h: u32 = hash(&tok).wrapping_mul(K) >> M;
             t = LEXH[h as usize];
             if t == Token::Txxx || KWMAP[t as usize] != tok {
                 return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
             }
-            return Ok((t, TokVal2::Str(tok)));
+            return Ok((t, TokVal::Str(tok)));
         } else if take_quote {
             assert!(t != Token::Txxx);
             let mut tok: Vec<u8> = vec![];
@@ -704,7 +704,7 @@ impl Parser<'_> {
                 craw = c.unwrap();
                 tok.push(craw);
                 if craw == b'"' && !esc {
-                    return Ok((t, TokVal2::Str(tok)));
+                    return Ok((t, TokVal::Str(tok)));
                 }
                 esc = craw == b'\\' && !esc;
             }
@@ -712,7 +712,7 @@ impl Parser<'_> {
 
         if is_digit(craw) || craw == b'-' {
             self.ungetc(c);
-            return Ok((Token::Tint, TokVal2::I(self.getint()?)));
+            return Ok((Token::Tint, TokVal::I(self.getint()?)));
         }
 
         Err(self.err(&format!(
@@ -722,7 +722,7 @@ impl Parser<'_> {
         )))
     }
 
-    fn peek_with_val(&mut self) -> RubeResult<(Token, TokVal2)> {
+    fn peek_with_val(&mut self) -> RubeResult<(Token, TokVal)> {
         if self.thead.0 == Token::Txxx {
             self.thead = self.lex()?;
         }
@@ -734,13 +734,13 @@ impl Parser<'_> {
         Ok(self.peek_with_val()?.0)
     }
 
-    fn next(&mut self) -> RubeResult<(Token, TokVal2)> {
+    fn next(&mut self) -> RubeResult<(Token, TokVal)> {
         let ttv = self.peek_with_val()?;
-        self.thead = (Token::Txxx, TokVal2::None);
+        self.thead = (Token::Txxx, TokVal::None);
         Ok(ttv)
     }
 
-    fn nextnl(&mut self) -> RubeResult<(Token, TokVal2)> {
+    fn nextnl(&mut self) -> RubeResult<(Token, TokVal)> {
         loop {
             let t = self.next()?;
             // println!("                                                        nextnl() - next() returned token {:?}", t);
@@ -751,7 +751,7 @@ impl Parser<'_> {
         }
     }
 
-    fn expect(&mut self, t: Token) -> RubeResult<TokVal2> {
+    fn expect(&mut self, t: Token) -> RubeResult<TokVal> {
         static TTOA: [&'static str; Token::Ntok as usize] = {
             let mut ttoa0: [&'static str; Token::Ntok as usize] =
                 ["<unknown>"; Token::Ntok as usize];
@@ -993,10 +993,10 @@ impl Parser<'_> {
         let mut ty: TypIdx = TypIdx::INVALID;
 
         let mut op_tok: Token = Token::Txxx;
-        let mut op_tv: TokVal2 = TokVal2::None;
+        let mut op_tv: TokVal = TokVal::None;
 
         let mut t: Token;
-        let mut tv: TokVal2;
+        let mut tv: TokVal;
 
         (t, tv) = self.nextnl()?;
 
@@ -1562,9 +1562,9 @@ impl Parser<'_> {
     }
 
     // TODO - this should just return a Vec<TypField>
-    fn parsefields(&mut self, ty: &mut Typ, tparam: Token, tvparam: TokVal2) -> RubeResult<()> {
+    fn parsefields(&mut self, ty: &mut Typ, tparam: Token, tvparam: TokVal) -> RubeResult<()> {
         let mut t: Token = tparam;
-        let mut tv: TokVal2 = tvparam;
+        let mut tv: TokVal = tvparam;
         let mut sz: u64 = 0;
         let mut al = ty.align;
         while t != Token::Trbrace {
@@ -1813,7 +1813,7 @@ impl Parser<'_> {
         Ok(())
     }
 
-    fn parselnk(&mut self, lnk: &mut Lnk) -> RubeResult<(Token, TokVal2)> {
+    fn parselnk(&mut self, lnk: &mut Lnk) -> RubeResult<(Token, TokVal)> {
         let mut haslnk: bool = false;
 
         loop {
