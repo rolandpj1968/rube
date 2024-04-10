@@ -359,6 +359,7 @@ impl TokVal2 {
         }
     }
 
+    // TODO - return &[u8]
     fn as_str(&self) -> Vec<u8> {
         match self {
             TokVal2::Str(s) => s.clone(), // mmm, can we just return &[u8]?
@@ -850,6 +851,7 @@ impl Parser<'_> {
         Ok(newcon(c, curf))
     }
 
+    // TODO: pass tv.as_str()
     fn findtyp(&self /*, int i*/) -> RubeResult<TypIdx> {
         for i in (0..self.typ.len()).rev() {
             //while (--i >= 0)
@@ -994,6 +996,7 @@ impl Parser<'_> {
     }
 
     // Blk name is always in self.tokval.str
+    // TODO - pass tv.as_str()
     fn findblk(&mut self, curf: &mut Fn) -> BlkIdx {
         let name: &[u8] = &self.tokval.str;
         let h: u32 = hash(name) & BMASK;
@@ -1051,8 +1054,8 @@ impl Parser<'_> {
         match t {
             // Instruction returning a value
             Token::Ttmp => {
-                assert!(tv.as_str() == self.tokval.str);
-                r = self.tmpref(&self.tokval.str.clone(), curf);
+                //assert!(tv.as_str() == self.tokval.str);
+                r = self.tmpref(&tv.as_str(), curf);
                 self.expect(Token::Teq)?;
                 (k, ty) = self.parsecls()?;
                 (op_tok, op_tv) = self.next()?;
@@ -1149,7 +1152,8 @@ impl Parser<'_> {
                 op_tok = t;
                 k = KW;
                 r = Ref::R;
-                self.expect(Token::Tint)?;
+                let ln_i = self.expect(Token::Tint)?.as_i();
+                assert!(ln_i == self.tokval.num);
                 let ln: i32 = self.tokval.num as i32;
                 if ln < 0 || (ln as i64) != self.tokval.num {
                     return Err(self.err(&format!(
@@ -1158,10 +1162,12 @@ impl Parser<'_> {
                     )));
                 }
                 arg.push(Ref::RInt(ln));
+                // TODO - didn't clean this up
                 let cn: i32 = {
                     if self.peek()? == Token::Tcomma {
                         self.next()?;
-                        self.expect(Token::Tint)?;
+                        let cn_i = self.expect(Token::Tint)?.as_i();
+                        assert!(cn_i == self.tokval.num);
                         let cn0: i32 = self.tokval.num as i32;
                         if cn0 < 0 || (cn0 as i64) != self.tokval.num {
                             return Err(self.err(&format!(
@@ -1569,8 +1575,8 @@ impl Parser<'_> {
         }
         //println!("Parsing fn {}", String::from_utf8_lossy(&self.tokval.str));
         assert!(self.tokval.str == tv.as_str());
-        curf.name = self.tokval.str.clone();
-        //println!(" ... parserefl...");
+        curf.name = tv.as_str(); //.tokval.str.clone();
+                                 //println!(" ... parserefl...");
         curf.vararg = self.parserefl(false, &mut curf)?;
         //println!(" ... done parserefl...");
         if self.nextnl()?.0 != Token::Tlbrace {
@@ -1647,7 +1653,7 @@ impl Parser<'_> {
             let mut c: i32 = 1;
             if t == Token::Tint {
                 assert!(tv.as_i() == self.tokval.num);
-                c = self.tokval.num as i32; // TODO - check cast range?
+                c = tv.as_i()/*self.tokval.num*/ as i32; // TODO - check cast range?
                 (t, tv) = self.nextnl()?;
             }
             sz += (a as u64) + (c as u64) * s;
@@ -1698,15 +1704,20 @@ impl Parser<'_> {
                 return Err(self.err("alignment expected"));
             }
             assert!(tv.as_i() == self.tokval.num);
+            let mut al_exp = tv.as_i();
             let mut al: i32 = 0;
+            // TODO - there must be a better way of doing this - hi bit and check 2^N
             loop {
                 // println!(
                 //     "                  tv.as_i() is {} self.tokval.num is {}",
                 //     tv.as_i(),
                 //     self.tokval.num
                 // );
-                self.tokval.num /= 2;
-                if self.tokval.num == 0 {
+                /*self.tokval.num*/
+                al_exp /= 2;
+                if
+                /*self.tokval.num*/
+                al_exp == 0 {
                     break;
                 }
                 al += 1;
@@ -1720,6 +1731,7 @@ impl Parser<'_> {
         (t, tv) = self.nextnl()?;
         if t == Token::Tint {
             ty.isdark = true;
+            assert!(tv.as_i() == self.tokval.num);
             ty.size = self.tokval.num as u64; // TODO: QBE notify? Mmm check negative value?
             if ty.align == -1 {
                 return Err(self.err("dark types need alignment"));
