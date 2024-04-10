@@ -1130,6 +1130,11 @@ impl Fn {
         &self.blks[bi.0]
     }
 
+    pub fn blk_mut(&mut self, bi: BlkIdx) -> &mut Blk {
+        assert!(bi != BlkIdx::INVALID);
+        &mut self.blks[bi.0]
+    }
+
     pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
         let bi: BlkIdx = BlkIdx(self.blks.len());
         self.blks.push(b);
