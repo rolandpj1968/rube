@@ -1561,12 +1561,8 @@ impl Parser<'_> {
         if t != Token::Tglo {
             return Err(self.err("function name expected"));
         }
-        //println!("Parsing fn {}", String::from_utf8_lossy(&self.tokval.str));
-        //assert!(self.tokval.str == tv.as_str());
-        curf.name = tv.as_str(); //.tokval.str.clone();
-                                 //println!(" ... parserefl...");
+        curf.name = tv.as_str();
         curf.vararg = self.parserefl(false, &mut curf)?;
-        //println!(" ... done parserefl...");
         if self.nextnl()?.0 != Token::Tlbrace {
             return Err(self.err("function body must start with {"));
         }
@@ -1640,8 +1636,7 @@ impl Parser<'_> {
             (t, tv) = self.nextnl()?;
             let mut c: i32 = 1;
             if t == Token::Tint {
-                //assert!(tv.as_i() == self.tokval.num);
-                c = tv.as_i()/*self.tokval.num*/ as i32; // TODO - check cast range?
+                c = tv.as_i() as i32; // TODO - check cast range?
                 (t, tv) = self.nextnl()?;
             }
             sz += (a as u64) + (c as u64) * s;
@@ -1692,7 +1687,6 @@ impl Parser<'_> {
             if t != Token::Tint {
                 return Err(self.err("alignment expected"));
             }
-            //assert!(tv.as_i() == self.tokval.num);
             let mut al_exp = tv.as_i();
             let mut al: i32 = 0;
             // TODO - there must be a better way of doing this - hi bit and check 2^N
@@ -1712,8 +1706,7 @@ impl Parser<'_> {
         (t, tv) = self.nextnl()?;
         if t == Token::Tint {
             ty.isdark = true;
-            //assert!(tv.as_i() == self.tokval.num);
-            ty.size = tv.as_i()/*self.tokval.num*/ as u64; // TODO: QBE notify? Mmm check negative value?
+            ty.size = tv.as_i() as u64; // TODO: QBE notify? Mmm check negative value?
             if ty.align == -1 {
                 return Err(self.err("dark types need alignment"));
             }
@@ -1759,8 +1752,7 @@ impl Parser<'_> {
             if t != Token::Tint {
                 return Err(self.err("invalid token after offset in ref"));
             }
-            //assert!(tv.as_i() == self.tokval.num);
-            off = /*self.tokval.num*/tv.as_i();
+            off = tv.as_i();
         }
         d.u = DatU::Ref { name, off };
 
@@ -1809,7 +1801,6 @@ impl Parser<'_> {
                 Token::Td => DatT::DL,
                 Token::Tz => DatT::DZ,
                 _ => {
-                    //assert!(tv.as_b() == self.tokval.chr.unwrap());
                     let b = tv.as_b();
                     return Err(self.err(&format!(
                         "invalid size specifier '{}' ({:#02x?}) in data",
