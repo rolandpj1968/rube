@@ -298,26 +298,6 @@ const BMASK: u32 = 8191; /* for blocks hash */
 const K: u32 = 9583425; /* found using tools/lexh.c */
 const M: u32 = 23;
 
-struct TokVal {
-    chr: Option<u8>, // None on EOF (or uninit)
-    fltd: f64,
-    flts: f32,
-    num: i64,
-    str: Vec<u8>,
-}
-
-impl TokVal {
-    fn new() -> TokVal {
-        TokVal {
-            chr: None,
-            fltd: 0.0,
-            flts: 0.0,
-            num: 0,
-            str: vec![],
-        }
-    }
-}
-
 // Hrmmm, struggling with copyable vector
 #[derive(Clone /*, Copy*/)]
 enum TokVal2 {
@@ -392,7 +372,6 @@ pub struct Parser<'a> {
     ungetc: Option<u8>,
     inpath: &'a Path,
     thead: (Token, TokVal2),
-    tokval: TokVal,
     lnum: i32,
     tmph: [TmpIdx; (TMASK + 1) as usize],
     plink: PhiIdx,  // BlkIdx::INVALID before first phi of curb
@@ -413,7 +392,6 @@ impl Parser<'_> {
             ungetc: None,
             inpath: path,
             thead: (Token::Txxx, TokVal2::None),
-            tokval: TokVal::new(),
             lnum: 1,
             tmph: [TmpIdx::INVALID; (TMASK + 1) as usize],
             plink: PhiIdx::INVALID,
@@ -705,19 +683,18 @@ impl Parser<'_> {
             }
             self.ungetc(c); // Hope EOF is idempotent
             if t != Token::Txxx {
-                return Ok((t, TokVal2::Str(tok /*.clone()*/)));
+                return Ok((t, TokVal2::Str(tok)));
             }
             let h: u32 = hash(&tok).wrapping_mul(K) >> M;
             t = LEXH[h as usize];
             if t == Token::Txxx || KWMAP[t as usize] != tok {
                 return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
             }
-            return Ok((t, TokVal2::Str(tok /*.clone()*/)));
+            return Ok((t, TokVal2::Str(tok)));
         } else if take_quote {
             assert!(t != Token::Txxx);
             let mut tok: Vec<u8> = vec![];
-            //self.tokval.str = vec![];
-            tok./*self.tokval.str.*/push(craw);
+            tok.push(craw);
             let mut esc = false;
             loop {
                 c = self.getc()?;
@@ -725,9 +702,9 @@ impl Parser<'_> {
                     return Err(self.err("unterminated string"));
                 }
                 craw = c.unwrap();
-                tok./*self.tokval.str.*/push(craw);
+                tok.push(craw);
                 if craw == b'"' && !esc {
-                    return Ok((t, TokVal2::Str(tok /*self.tokval.str.clone()*/)));
+                    return Ok((t, TokVal2::Str(tok)));
                 }
                 esc = craw == b'\\' && !esc;
             }
