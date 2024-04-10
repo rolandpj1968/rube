@@ -1051,6 +1051,7 @@ impl Parser<'_> {
         match t {
             // Instruction returning a value
             Token::Ttmp => {
+                assert!(tv.as_str() == self.tokval.str);
                 r = self.tmpref(&self.tokval.str.clone(), curf);
                 self.expect(Token::Teq)?;
                 (k, ty) = self.parsecls()?;
