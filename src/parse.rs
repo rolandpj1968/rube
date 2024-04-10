@@ -43,6 +43,10 @@ impl Error for ParseError {
     }
 }
 
+fn to_s(raw: &[u8]) -> String {
+    String::from_utf8_lossy(raw).to_string()
+}
+
 #[derive(PartialEq)]
 enum PState {
     PLbl,
@@ -314,6 +318,15 @@ impl TokVal {
     }
 }
 
+// enum TokVal2 {
+//     Eof,
+//     C(u8),
+//     S(f32),
+//     D(f64),
+//     I(i64),
+//     Str(Vec<u8>),
+// }
+
 lazy_static! {
     static ref LEXH: [Token; (1 << (32 - M)) as usize] = {
         let mut lexh0: [Token; (1 << (32 - M)) as usize] = [Token::Txxx; (1 << (32 - M)) as usize];
@@ -451,7 +464,7 @@ impl Parser<'_> {
             Ok(s) => Ok(s),
             Err(_) => Err(self.err(&format!(
                 "invalid characters in floating point literal {:?}",
-                String::from_utf8_lossy(&bytes)
+                to_s(&bytes)
             ))),
         }
     }
@@ -516,6 +529,7 @@ impl Parser<'_> {
         let mut c: Option<u8> = Some(b' ');
 
         let mut craw: u8;
+        // Skip blanks
         loop {
             self.tokval.chr = c;
             match c {
@@ -794,10 +808,7 @@ impl Parser<'_> {
                 return Ok(TypIdx(i));
             }
         }
-        Err(self.err(&format!(
-            "undefined type :{}",
-            String::from_utf8_lossy(&self.tokval.str)
-        )))
+        Err(self.err(&format!("undefined type :{}", to_s(&self.tokval.str))))
     }
 
     fn parsecls(&mut self) -> RubeResult<(KExt, TypIdx)> {
@@ -1011,7 +1022,7 @@ impl Parser<'_> {
                 if new_b.jmp.type_ != J::Jxxx {
                     return Err(self.err(&format!(
                         "multiple definitions of block @{}",
-                        String::from_utf8_lossy(&new_b.name),
+                        to_s(&new_b.name),
                     )));
                 }
                 if self.blink == BlkIdx::INVALID {
@@ -1382,7 +1393,7 @@ impl Parser<'_> {
                 } else {
                     return Err(self.err(&format!(
                         "phi to val is not a tmp in block {}",
-                        String::from_utf8_lossy(&fn_.blk(bi).name)
+                        to_s(&fn_.blk(bi).name)
                     )));
                 }
                 pi = fn_.phi(pi).link;
@@ -1394,7 +1405,7 @@ impl Parser<'_> {
                     if clsmerge(&mut t.cls, ins_cls) {
                         return Err(self.err(&format!(
                             "temporary %{} is assigned with multiple types",
-                            String::from_utf8_lossy(&t.name)
+                            to_s(&t.name)
                         )));
                     }
                 }
@@ -1423,8 +1434,8 @@ impl Parser<'_> {
                         if bshas(&ppb, pbi.0) {
                             return Err(self.err(&format!(
                                 "multiple entries for @{} in phi %{}",
-                                String::from_utf8_lossy(&fn_.blk(pbi).name),
-                                String::from_utf8_lossy(&t.name)
+                                to_s(&fn_.blk(pbi).name),
+                                to_s(&t.name)
                             )));
                         }
                         if !usecheck(fn_, &p.arg[n], k) {
@@ -1433,14 +1444,14 @@ impl Parser<'_> {
                             if let Ref::RTmp(ti) = argr {
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
-                                    String::from_utf8_lossy(&fn_.tmp(*ti).name),
-                                    String::from_utf8_lossy(&t.name)
+                                    to_s(&fn_.tmp(*ti).name),
+                                    to_s(&t.name)
                                 )));
                             } else {
                                 return Err(self.err(&format!(
                                     "invalid type for operand {} in phi %{}",
                                     n,
-                                    String::from_utf8_lossy(&t.name)
+                                    to_s(&t.name)
                                 )));
                             }
                         }
@@ -1450,7 +1461,7 @@ impl Parser<'_> {
                     if !bsequal(&pb, &ppb) {
                         return Err(self.err(&format!(
                             "predecessors not matched in phi %{}",
-                            String::from_utf8_lossy(&t.name)
+                            to_s(&t.name)
                         )));
                     }
 
@@ -1909,7 +1920,7 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
             if c.sym.type_ == SymT::SThr {
                 let _ = write!(f, "thread ");
             }
-            let _ = write!(f, "${}", String::from_utf8_lossy(str_(&c.sym.id, itbl)));
+            let _ = write!(f, "${}", to_s(str_(&c.sym.id, itbl)));
             if let ConBits::I(i) = c.bits {
                 let _ = write!(f, "{}", i);
             }
@@ -1939,7 +1950,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             if ti.0 < TMP0 {
                 let _ = write!(f, "R{}", ti.0);
             } else {
-                let _ = write!(f, "%{}", String::from_utf8_lossy(&fn_.tmps[ti.0].name));
+                let _ = write!(f, "%{}", to_s(&fn_.tmps[ti.0].name));
             }
         }
         Ref::RCon(ci) => {
@@ -1957,7 +1968,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             let _ = write!(f, "{:04x}", n);
         }
         Ref::RTyp(ti) => {
-            let _ = write!(f, ":{}", String::from_utf8_lossy(&typ[ti.0].name));
+            let _ = write!(f, ":{}", to_s(&typ[ti.0].name));
         }
         Ref::RMem(mi) => {
             let mut i: bool = false;
@@ -2030,11 +2041,11 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
 
         jtoa0
     };
-    let _ = writeln!(f, "function ${}() {{", String::from_utf8_lossy(&fn_.name));
+    let _ = writeln!(f, "function ${}() {{", to_s(&fn_.name));
     let mut bi: BlkIdx = fn_.start;
     while bi != BlkIdx::INVALID {
         let b: &Blk = fn_.blk(bi);
-        let _ = writeln!(f, "@{}", String::from_utf8_lossy(&b.name));
+        let _ = writeln!(f, "@{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::INVALID {
             let p: &Phi = &fn_.phis[pi.0];
@@ -2046,7 +2057,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             for n in 0..p.arg.len() {
                 let bi: BlkIdx = p.blk[n];
                 let pb = fn_.blk(bi);
-                let _ = write!(f, "@{} ", String::from_utf8_lossy(&pb.name));
+                let _ = write!(f, "@{} ", to_s(&pb.name));
                 printref(f, fn_, typ, itbl, &p.arg[n]);
                 if n != p.arg.len() - 1 {
                     let _ = write!(f, ", ");
@@ -2062,7 +2073,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 let _ = write!(f, " ={} ", KTOC[i.cls as usize]);
             }
             assert!(OPTAB[i.op as usize].name.len() != 0);
-            let _ = write!(f, "{}", String::from_utf8_lossy(&OPTAB[i.op as usize].name));
+            let _ = write!(f, "{}", to_s(&OPTAB[i.op as usize].name));
             if i.to == Ref::R {
                 match i.op {
                     O::Oarg
@@ -2106,7 +2117,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     printref(f, fn_, typ, itbl, &b.jmp.arg);
                 }
                 if b.jmp.type_ == J::Jretc {
-                    let _ = write!(f, ", :{}", String::from_utf8_lossy(&typ[fn_.retty.0].name));
+                    let _ = write!(f, ", :{}", to_s(&typ[fn_.retty.0].name));
                 }
             }
             J::Jhlt => {
@@ -2114,7 +2125,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             J::Jjmp => {
                 if b.s1 != b.link {
-                    let _ = write!(f, "\tjmp @{}", String::from_utf8_lossy(&fn_.blk(b.s1).name));
+                    let _ = write!(f, "\tjmp @{}", to_s(&fn_.blk(b.s1).name));
                 }
             }
             _ => {
@@ -2127,8 +2138,8 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 let _ = writeln!(
                     f,
                     "@%{}, @%{}",
-                    String::from_utf8_lossy(&fn_.blk(b.s1).name),
-                    String::from_utf8_lossy(&fn_.blk(b.s2).name)
+                    to_s(&fn_.blk(b.s1).name),
+                    to_s(&fn_.blk(b.s2).name)
                 );
             }
         }
