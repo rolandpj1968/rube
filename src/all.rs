@@ -1093,10 +1093,6 @@ pub struct Fn {
     pub tmp: Vec<Tmp>,
     pub con: Vec<Con>,
     pub mem: Vec<Mem>,
-    //pub int ntmp,
-    //pub int ncon,
-    //pub int nmem,
-    //pub uint nblk,
     pub retty: TypIdx, // index in Parser::typ, TypIdx::INVALID if no aggregate return
     pub retr: Ref,
     pub rpo: Vec<BlkIdx>,
@@ -1117,10 +1113,6 @@ impl Fn {
             tmp: vec![],
             con: vec![],
             mem: vec![],
-            //int ntmp,
-            //int ncon,
-            //int nmem,
-            //uint nblk,
             retty: TypIdx::INVALID,
             retr: Ref::R,
             rpo: vec![],
@@ -1131,6 +1123,17 @@ impl Fn {
             name: vec![],
             lnk,
         }
+    }
+
+    pub fn blk(&self, bi: BlkIdx) -> &Blk {
+        assert!(bi != BlkIdx::INVALID);
+        &self.blks[bi.0]
+    }
+
+    pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
+        let bi: BlkIdx = BlkIdx(self.blks.len());
+        self.blks.push(b);
+        bi
     }
 }
 

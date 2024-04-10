@@ -338,9 +338,9 @@ pub struct Parser<'a> {
     tokval: TokVal,
     lnum: i32,
     tmph: [TmpIdx; (TMASK + 1) as usize],
-    plink: PhiIdx, // BlkIdx::INVALID before first phi of curb
-    curb: BlkIdx,  // BlkIdx::INVALID before start parsing first blk
-    blink: BlkIdx, // BlkIdx::INVALID before finished parsing first blk, else prev blk
+    plink: PhiIdx,  // BlkIdx::INVALID before first phi of curb
+    cur_bi: BlkIdx, // BlkIdx::INVALID before start parsing first blk
+    blink: BlkIdx,  // BlkIdx::INVALID before finished parsing first blk, else prev blk
     blkh: [BlkIdx; (BMASK + 1) as usize],
     rcls: KExt,
     typ: Vec<Typ>,                            // from util.c
@@ -360,7 +360,7 @@ impl Parser<'_> {
             lnum: 1,
             tmph: [TmpIdx::INVALID; (TMASK + 1) as usize],
             plink: PhiIdx::INVALID,
-            curb: BlkIdx::INVALID,
+            cur_bi: BlkIdx::INVALID,
             blink: BlkIdx::INVALID,
             blkh: [BlkIdx::INVALID; (BMASK + 1) as usize],
             rcls: K0,
@@ -930,9 +930,8 @@ impl Parser<'_> {
     fn findblk(&mut self, name: &[u8], curf: &mut Fn) -> BlkIdx {
         let h: u32 = hash(name) & BMASK;
         let mut bi: BlkIdx = self.blkh[h as usize];
-
         while bi != BlkIdx::INVALID {
-            let b: &Blk = &curf.blks[bi.0];
+            let b: &Blk = curf.blk(bi);
             if b.name == name {
                 return bi;
             }
@@ -941,19 +940,18 @@ impl Parser<'_> {
         }
 
         let id: usize = curf.blks.len();
-        bi = BlkIdx(id);
-        curf.blks.push(Blk::new(name, id, self.blkh[h as usize]));
+        bi = curf.add_blk(Blk::new(name, id, self.blkh[h as usize]));
         self.blkh[h as usize] = bi;
 
-        return bi;
+        bi
     }
 
     fn closeblk(&mut self, curf: &mut Fn) {
         // TODO - should really check if self.curb is valid
-        let curb: &mut Blk = &mut curf.blks[self.curb.0];
+        let curb: &mut Blk = &mut curf.blks[self.cur_bi.0];
         // TODO - this is silly, just use Blk::ins directly
         curb.ins = self.insb.clone();
-        self.blink = self.curb;
+        self.blink = self.cur_bi;
         self.insb.clear();
     }
 
@@ -998,14 +996,14 @@ impl Parser<'_> {
             Token::Trbrace => return Ok(PState::PEnd),
             // New block
             Token::Tlbl => {
-                let new_blki: BlkIdx = self.findblk(&self.tokval.str.clone(), curf);
+                let new_bi: BlkIdx = self.findblk(&self.tokval.str.clone(), curf);
                 // TODO: When is curb not valid? Maybe start block with explicit label?
-                if self.curb != BlkIdx::INVALID && curf.blks[self.curb.0].jmp.type_ == J::Jxxx {
+                if self.cur_bi != BlkIdx::INVALID && curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
                     self.closeblk(curf);
-                    curf.blks[self.curb.0].jmp.type_ = J::Jjmp;
-                    curf.blks[self.curb.0].s1 = new_blki;
+                    curf.blks[self.cur_bi.0].jmp.type_ = J::Jjmp;
+                    curf.blks[self.cur_bi.0].s1 = new_bi;
                 }
-                let new_b: &mut Blk = &mut curf.blks[new_blki.0];
+                let new_b: &Blk = curf.blk(new_bi);
                 if new_b.jmp.type_ != J::Jxxx {
                     return Err(self.err(&format!(
                         "multiple definitions of block @{}",
@@ -1014,57 +1012,57 @@ impl Parser<'_> {
                 }
                 if self.blink == BlkIdx::INVALID {
                     // First block
-                    curf.start = new_blki;
+                    curf.start = new_bi;
                 } else {
-                    curf.blks[self.curb.0].link = new_blki;
+                    curf.blks[self.cur_bi.0].link = new_bi;
                 }
-                self.curb = new_blki;
+                self.cur_bi = new_bi;
                 self.plink = PhiIdx::INVALID;
                 self.expect(Token::Tnl)?;
                 return Ok(PState::PPhi);
             }
             // Return instruction - ends block
             Token::Tret => {
-                curf.blks[self.curb.0].jmp.type_ = match jmp_for_cls(self.rcls) {
+                curf.blks[self.cur_bi.0].jmp.type_ = match jmp_for_cls(self.rcls) {
                     None => {
                         return Err(self.err(&format!("BUG: invalid type {:?} for ret", self.rcls)))
                     }
                     Some(j) => j,
                 };
                 if self.peek()? == Token::Tnl {
-                    curf.blks[self.curb.0].jmp.type_ = J::Jret0;
+                    curf.blks[self.cur_bi.0].jmp.type_ = J::Jret0;
                 } else if self.rcls != K0 {
                     let r: Ref = self.parseref(curf)?;
-                    if let Ref::R = r {
+                    if r == Ref::R {
                         return Err(self.err("invalid return value"));
                     }
-                    curf.blks[self.curb.0].jmp.arg = r;
+                    curf.blks[self.cur_bi.0].jmp.arg = r;
                 }
                 goto_close = true;
             }
             // Jump instruction - ends block
             Token::Tjmp | Token::Tjnz => {
                 if t == Token::Tjmp {
-                    curf.blks[self.curb.0].jmp.type_ = J::Jjmp;
+                    curf.blks[self.cur_bi.0].jmp.type_ = J::Jjmp;
                 } else {
-                    curf.blks[self.curb.0].jmp.type_ = J::Jjnz;
+                    curf.blks[self.cur_bi.0].jmp.type_ = J::Jjnz;
                     let r: Ref = self.parseref(curf)?;
                     if let Ref::R = r {
                         return Err(self.err("invalid argument for jnz jump"));
                     }
-                    curf.blks[self.curb.0].jmp.arg = r;
+                    curf.blks[self.cur_bi.0].jmp.arg = r;
                     self.expect(Token::Tcomma)?;
                 }
                 // Jump:
                 self.expect(Token::Tlbl)?;
-                curf.blks[self.curb.0].s1 = self.findblk(&self.tokval.str.clone(), curf);
-                if curf.blks[self.curb.0].jmp.type_ != J::Jjmp {
+                curf.blks[self.cur_bi.0].s1 = self.findblk(&self.tokval.str.clone(), curf);
+                if curf.blks[self.cur_bi.0].jmp.type_ != J::Jjmp {
                     self.expect(Token::Tcomma)?;
                     self.expect(Token::Tlbl)?;
-                    curf.blks[self.curb.0].s2 = self.findblk(&self.tokval.str.clone(), curf);
+                    curf.blks[self.cur_bi.0].s2 = self.findblk(&self.tokval.str.clone(), curf);
                 }
-                if curf.blks[self.curb.0].s1 == curf.start
-                    || curf.blks[self.curb.0].s2 == curf.start
+                if curf.blks[self.cur_bi.0].s1 == curf.start
+                    || curf.blks[self.cur_bi.0].s2 == curf.start
                 {
                     return Err(self.err("invalid jump to the start block"));
                 }
@@ -1072,7 +1070,7 @@ impl Parser<'_> {
             }
             // Halt instruction - ends block
             Token::Thlt => {
-                curf.blks[self.curb.0].jmp.type_ = J::Jhlt;
+                curf.blks[self.cur_bi.0].jmp.type_ = J::Jhlt;
                 goto_close = true;
             }
             // Debug line/column location tag
@@ -1191,15 +1189,14 @@ impl Parser<'_> {
                 self.next()?;
                 match op_tok {
                     Token::Tphi => {
-                        if ps != PState::PPhi || self.curb == curf.start {
+                        if ps != PState::PPhi || self.cur_bi == curf.start {
                             return Err(self.err("unexpected phi instruction"));
                         }
                         let phii = PhiIdx(curf.phis.len());
                         curf.phis
                             .push(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
                         if self.plink == PhiIdx::INVALID {
-                            curf.blks[self.curb.0] /*curb*/
-                                .phi = phii;
+                            curf.blks[self.cur_bi.0].phi = phii;
                         } else {
                             let prev_phi = &mut curf.phis[self.plink.0];
                             prev_phi.link = phii;
@@ -1360,7 +1357,7 @@ typecheck(Fn *fn)
  */
 impl Parser<'_> {
     fn parsefn(&mut self, lnk: &Lnk) -> RubeResult<Fn> {
-        self.curb = BlkIdx::INVALID;
+        self.cur_bi = BlkIdx::INVALID;
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
         let mut curf = Fn::new(lnk.clone());
         for i in 0..(TMP0 as i32) {
@@ -1404,13 +1401,10 @@ impl Parser<'_> {
                 break;
             }
         }
-        if self.curb == BlkIdx::INVALID {
+        if self.cur_bi == BlkIdx::INVALID {
             return Err(self.err("empty function"));
-        } else {
-            let b: &Blk = &curf.blks[self.curb.0]; // TODO accessor fn rather?
-            if b.jmp.type_ == J::Jxxx {
-                return Err(self.err("last block misses jump"));
-            }
+        } else if curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
+            return Err(self.err("last block misses jump"));
         }
 
         let mut bi = curf.start;
@@ -1930,7 +1924,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
     let _ = writeln!(f, "function ${}() {{", String::from_utf8_lossy(&fn_.name));
     let mut bi: BlkIdx = fn_.start;
     while bi != BlkIdx::INVALID {
-        let b: &Blk = &fn_.blks[bi.0];
+        let b: &Blk = fn_.blk(bi);
         let _ = writeln!(f, "@{}", String::from_utf8_lossy(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::INVALID {
@@ -1938,11 +1932,11 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             let _ = write!(f, "\t");
             printref(f, fn_, typ, itbl, &p.to);
             let _ = write!(f, " ={} phi ", KTOC[p.cls as usize]);
-            assert!(p.arg.len() != 0);
+            assert!(!p.arg.is_empty());
             assert!(p.arg.len() == p.blk.len());
             for n in 0..p.arg.len() {
                 let bi: BlkIdx = p.blk[n];
-                let pb = &fn_.blks[bi.0];
+                let pb = fn_.blk(bi);
                 let _ = write!(f, "@{} ", String::from_utf8_lossy(&pb.name));
                 printref(f, fn_, typ, itbl, &p.arg[n]);
                 if n != p.arg.len() - 1 {
@@ -2011,11 +2005,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             J::Jjmp => {
                 if b.s1 != b.link {
-                    let _ = write!(
-                        f,
-                        "\tjmp @{}",
-                        String::from_utf8_lossy(&fn_.blks[b.s1.0].name)
-                    );
+                    let _ = write!(f, "\tjmp @{}", String::from_utf8_lossy(&fn_.blk(b.s1).name));
                 }
             }
             _ => {
@@ -2025,11 +2015,11 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     let _ = write!(f, ", ");
                 }
                 assert!(b.s1 != BlkIdx::INVALID && b.s2 != BlkIdx::INVALID);
-                let _ = write!(
+                let _ = writeln!(
                     f,
-                    "@%{}, @%{}\n",
-                    String::from_utf8_lossy(&fn_.blks[b.s1.0].name),
-                    String::from_utf8_lossy(&fn_.blks[b.s2.0].name)
+                    "@%{}, @%{}",
+                    String::from_utf8_lossy(&fn_.blk(b.s1).name),
+                    String::from_utf8_lossy(&fn_.blk(b.s2).name)
                 );
             }
         }
