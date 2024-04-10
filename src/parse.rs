@@ -704,20 +704,20 @@ impl Parser<'_> {
                 }
             }
             self.ungetc(c); // Hope EOF is idempotent
-            self.tokval.str = tok.clone();
             if t != Token::Txxx {
-                return Ok((t, TokVal2::Str(tok.clone())));
+                return Ok((t, TokVal2::Str(tok /*.clone()*/)));
             }
             let h: u32 = hash(&tok).wrapping_mul(K) >> M;
             t = LEXH[h as usize];
             if t == Token::Txxx || KWMAP[t as usize] != tok {
                 return Err(self.err(&format!("unknown keyword \"{:?}\"", tok)));
             }
-            return Ok((t, TokVal2::Str(tok.clone())));
+            return Ok((t, TokVal2::Str(tok /*.clone()*/)));
         } else if take_quote {
             assert!(t != Token::Txxx);
-            self.tokval.str = vec![];
-            self.tokval.str.push(craw);
+            let mut tok: Vec<u8> = vec![];
+            //self.tokval.str = vec![];
+            tok./*self.tokval.str.*/push(craw);
             let mut esc = false;
             loop {
                 c = self.getc()?;
@@ -725,9 +725,9 @@ impl Parser<'_> {
                     return Err(self.err("unterminated string"));
                 }
                 craw = c.unwrap();
-                self.tokval.str.push(craw);
+                tok./*self.tokval.str.*/push(craw);
                 if craw == b'"' && !esc {
-                    return Ok((t, TokVal2::Str(self.tokval.str.clone())));
+                    return Ok((t, TokVal2::Str(tok /*self.tokval.str.clone()*/)));
                 }
                 esc = craw == b'\\' && !esc;
             }
