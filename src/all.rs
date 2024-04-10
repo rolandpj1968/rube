@@ -1317,10 +1317,10 @@ pub struct Dat {
 }
 
 impl Dat {
-    pub fn new(type_: DatT, name: &Vec<u8>, lnk: Lnk) -> Dat {
+    pub fn new(type_: DatT, name: &[u8], lnk: Lnk) -> Dat {
         Dat {
             type_,
-            name: name.clone(),
+            name: name.to_vec(),
             lnk: lnk,
             u: DatU::None,
             isref: false,
