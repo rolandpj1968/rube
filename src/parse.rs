@@ -1747,9 +1747,9 @@ impl Parser<'_> {
     }
 
     // TODO - need to pass tv.as_str()
-    fn parsedatstr(&self, d: &mut Dat) {
+    fn parsedatstr(&self, d: &mut Dat, str: &[u8]) {
         d.isstr = true;
-        d.u = DatU::Str(self.tokval.str.clone());
+        d.u = DatU::Str(str.to_vec() /*self.tokval.str.clone()*/);
     }
 
     // TODO - need to pass tv.as_str()
@@ -1809,7 +1809,7 @@ impl Parser<'_> {
                     Token::Tfltd => d.u = DatU::Fltd(tv.as_d()),
                     Token::Tint => d.u = DatU::Num(tv.as_i()),
                     Token::Tglo => self.parsedatref(&mut d, &tv.as_str())?,
-                    Token::Tstr => self.parsedatstr(&mut d),
+                    Token::Tstr => self.parsedatstr(&mut d, &tv.as_str()),
                     _ => {
                         return Err(self.err("constant literal or global ref expected in data"));
                     }
