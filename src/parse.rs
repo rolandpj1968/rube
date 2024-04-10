@@ -735,8 +735,7 @@ impl Parser<'_> {
 
         if is_digit(craw) || craw == b'-' {
             self.ungetc(c);
-            self.tokval.num = self.getint()?;
-            return Ok((Token::Tint, TokVal2::I(self.tokval.num)));
+            return Ok((Token::Tint, TokVal2::I(self.getint()?)));
         }
 
         Err(self.err(&format!(
