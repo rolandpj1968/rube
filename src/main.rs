@@ -8,6 +8,7 @@ extern crate lazy_static;
 extern crate static_assertions;
 
 mod all;
+mod cfg;
 mod optab;
 mod parse;
 mod util;

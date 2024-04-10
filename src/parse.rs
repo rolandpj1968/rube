@@ -10,12 +10,15 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
-    jmp_for_cls, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn, Ins, KExt, Lnk, Mem,
-    ORanges, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, TmpIdx, Typ, TypFld, TypFldT, TypIdx,
-    J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O, TMP0,
+    bshas, jmp_for_cls, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn, Ins,
+    KExt, Lnk, Mem, ORanges, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp, TmpIdx, Typ,
+    TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O, TMP0,
 };
+use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
-use crate::util::{hash, intern, newcon, newtmp, str_, Bucket, InternId, IMASK};
+use crate::util::{
+    bsinit, bsset, clsmerge, hash, intern, newcon, newtmp, str_, Bucket, InternId, IMASK,
+};
 
 #[derive(Debug)]
 struct ParseError {
@@ -744,18 +747,18 @@ impl Parser<'_> {
     fn tmpref(&mut self, v: &[u8], curf: &mut Fn) -> Ref {
         let tmp_idx: TmpIdx = self.tmph[(hash(v) & TMASK) as usize];
         if tmp_idx != TmpIdx::INVALID {
-            if curf.tmp[tmp_idx.0].name == v {
+            if curf.tmps[tmp_idx.0].name == v {
                 return Ref::RTmp(tmp_idx);
             }
-            for t in (TMP0..curf.tmp.len()).rev() {
-                if curf.tmp[t].name == v {
+            for t in (TMP0..curf.tmps.len()).rev() {
+                if curf.tmps[t].name == v {
                     return Ref::RTmp(TmpIdx(t));
                 }
             }
         }
-        let t = curf.tmp.len();
+        let t = curf.tmps.len();
         let r = newtmp(None, KX, curf);
-        curf.tmp[t].name = v.to_vec(); // Ugh
+        curf.tmps[t].name = v.to_vec(); // Ugh
 
         r
     }
@@ -998,7 +1001,6 @@ impl Parser<'_> {
             // New block
             Token::Tlbl => {
                 let new_bi: BlkIdx = self.findblk(curf);
-                // TODO: When is curb not valid? Maybe start block with explicit label?
                 if self.cur_bi != BlkIdx::INVALID && curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
                     self.closeblk(curf);
                     let curb: &mut Blk = curf.blk_mut(self.cur_bi);
@@ -1263,7 +1265,19 @@ usecheck(Ref r, int k, Fn *fn)
     return rtype(r) != RTmp || fn->tmp[r.val].cls == k
         || (fn->tmp[r.val].cls == Kl && k == Kw);
 }
+ */
 
+fn usecheck(fn_: &Fn, r: &Ref, k: KExt) -> bool {
+    match r {
+        Ref::RTmp(ti) => {
+            let cls: KExt = fn_.tmps[ti.0].cls;
+            cls == k || (cls == KL && k == KW)
+        }
+        _ => false,
+    }
+}
+
+/*
 static void
 typecheck(Fn *fn)
 {
@@ -1357,6 +1371,78 @@ typecheck(Fn *fn)
 
  */
 impl Parser<'_> {
+    fn typecheck(&self, fn_: &mut Fn) -> RubeResult<()> {
+        fillpreds(fn_);
+        let mut bi: BlkIdx = fn_.start;
+        while bi != BlkIdx::INVALID {
+            let mut pi: PhiIdx = fn_.blk(bi).phi;
+            while pi != PhiIdx::INVALID {
+                if let Ref::RTmp(ti) = fn_.phi(pi).to {
+                    fn_.tmp_mut(ti).cls = fn_.phi(pi).cls;
+                } else {
+                    return Err(self.err(&format!(
+                        "phi to val is not a tmp in block {}",
+                        String::from_utf8_lossy(&fn_.blk(bi).name)
+                    )));
+                }
+                pi = fn_.phi(pi).link;
+            }
+            for ii in 0..fn_.blk(bi).ins.len() {
+                if let Ref::RTmp(ti) = fn_.blk(bi).ins[ii].to {
+                    let ins_cls: KExt = fn_.blk(bi).ins[ii].cls;
+                    let t: &mut Tmp = fn_.tmp_mut(ti);
+                    if clsmerge(&mut t.cls, ins_cls) {
+                        return Err(self.err(&format!(
+                            "temporary %{} is assigned with multiple types",
+                            String::from_utf8_lossy(&t.name)
+                        )));
+                    }
+                }
+            }
+            bi = fn_.blk(bi).link;
+        }
+
+        bi = fn_.start;
+        while bi != BlkIdx::INVALID {
+            let b: &Blk = fn_.blk(bi);
+
+            let mut pb: BSet = bsinit(fn_.blks.len());
+
+            for pred_bi in &b.pred {
+                bsset(&mut pb, pred_bi.0);
+            }
+            let mut pi = b.phi;
+            while pi != PhiIdx::INVALID {
+                let p: &Phi = fn_.phi(pi);
+                if let Ref::RTmp(ti) = p.to {
+                    let t: &Tmp = fn_.tmp(ti);
+                    let k: KExt = t.cls;
+                    let mut ppb: BSet = bsinit(fn_.blks.len());
+                    for n in 0..fn_.phi(pi).arg.len() {
+                        let pbi: BlkIdx = p.blk[n];
+                        if bshas(&ppb, pbi.0) {
+                            return Err(self.err(&format!(
+                                "multiple entries for @{} in phi %{}",
+                                String::from_utf8_lossy(&fn_.blk(pbi).name),
+                                String::from_utf8_lossy(&t.name)
+                            )));
+                        }
+                        // if (!usecheck(p->arg[n], k, fn))
+                        //     err("invalid type for operand %%%s in phi %%%s",
+                        // 	fn->tmp[p->arg[n].val].name, t->name);
+                        bsset(&mut ppb, pbi.0);
+                    }
+                    pi = fn_.phi(pi).link;
+                } else {
+                    assert!(false); // Already checked above
+                }
+            }
+            bi = fn_.blk(bi).link;
+        }
+
+        Ok(())
+    }
+
     fn parsefn(&mut self, lnk: &Lnk) -> RubeResult<Fn> {
         self.cur_bi = BlkIdx::INVALID;
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
@@ -1831,7 +1917,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             if ti.0 < TMP0 {
                 let _ = write!(f, "R{}", ti.0);
             } else {
-                let _ = write!(f, "%{}", String::from_utf8_lossy(&fn_.tmp[ti.0].name));
+                let _ = write!(f, "%{}", String::from_utf8_lossy(&fn_.tmps[ti.0].name));
             }
         }
         Ref::RCon(ci) => {

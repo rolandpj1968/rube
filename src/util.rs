@@ -1,4 +1,4 @@
-use crate::all::{Con, ConIdx, Fn, KExt, Ref, Tmp, TmpIdx};
+use crate::all::{bit, BSet, Con, ConIdx, Fn, KExt, Ref, Tmp, TmpIdx, KL, KW, KX, NBIT};
 use crate::parse::Parser; // ugh for intern()
 
 /*
@@ -401,7 +401,22 @@ clsmerge(short *pk, short k)
     }
     return k1 != k;
 }
+ */
 
+pub fn clsmerge(pk: &mut KExt, k: KExt) -> bool {
+    let k1: KExt = *pk;
+    if k1 == KX {
+        *pk = k;
+        return false;
+    }
+    if (k1 == KW && k == KL) || (k1 == KL && k == KW) {
+        *pk = KW;
+        return false;
+    }
+    return k1 != k;
+}
+
+/*
 int
 phicls(int t, Tmp *tmp)
 {
@@ -440,7 +455,7 @@ pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
     // int t;
 
     // t = fn_->ntmp++;
-    let t = fn_.tmp.len();
+    let t = fn_.tmps.len();
     // vgrow(&fn_->tmp, fn_->ntmp);
     // memset(&fn_->tmp[t], 0, sizeof(Tmp));
     let mut name: Vec<u8> = vec![];
@@ -456,7 +471,7 @@ pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
         }
     }
 
-    fn_.tmp.push(Tmp::new(
+    fn_.tmps.push(Tmp::new(
         name, /*ndef*/ 1, /*nuse*/ 1, /*slot*/ -1, /*cls*/ k,
     ));
 
@@ -594,6 +609,14 @@ bsinit(BSet *bs, uint n)
 }
 
 MAKESURE(NBit_is_64, NBit == 64);
+ */
+
+pub fn bsinit(n: usize) -> BSet {
+    vec![0; (n + NBIT - 1) / NBIT]
+}
+
+const_assert_eq!(NBIT, 64);
+/*
 inline static uint
 popcnt(bits b)
 {
@@ -648,14 +671,25 @@ bsmax(BSet *bs)
 {
     return bs->nt * NBit;
 }
+ */
+fn bsmax(bs: &BSet) -> usize {
+    bs.len() * NBIT
+}
 
+/*
 void
 bsset(BSet *bs, uint elt)
 {
     assert(elt < bsmax(bs));
     bs->t[elt/NBit] |= BIT(elt%NBit);
 }
+ */
 
+pub fn bsset(bs: &mut BSet, elt: usize) {
+    assert!(elt < bsmax(bs));
+    bs[elt / NBIT] |= bit(elt % NBIT);
+}
+/*
 void
 bsclr(BSet *bs, uint elt)
 {

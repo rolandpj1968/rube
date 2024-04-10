@@ -112,7 +112,13 @@ pub struct Target {
 
 /*
 #define BIT(n) ((bits)1 << (n))
+ */
 
+pub fn bit(n: usize) -> Bits {
+    (1 as Bits) << n
+}
+
+/*
 enum {
     RXX = 0,
     Tmp0 = NBit, /* first non-reg temporary */
@@ -128,6 +134,8 @@ struct BSet {
     bits *t;
 };
  */
+
+pub type BSet = Vec<Bits>;
 
 /*
 struct Ref {
@@ -748,8 +756,7 @@ impl BlkJmp {
 
 pub struct Blk {
     pub phi: PhiIdx,
-    pub ins: Vec<Ins>, // not gonna work! Maybe InsIdx?
-    //pub uint nins;
+    pub ins: Vec<Ins>,
     pub jmp: BlkJmp,
     pub s1: BlkIdx,
     pub s2: BlkIdx,
@@ -762,9 +769,7 @@ pub struct Blk {
     pub dom: BlkIdx,  // maybe Vec<BlkIdx>?
     pub dlink: BlkIdx,
     pub fron: Vec<BlkIdx>,
-    //pub uint nfron;
     pub pred: Vec<BlkIdx>,
-    //pub uint npred;
     //pub BSet in[1], out[1], gen[1]; // TODO
     pub nlive: [u32; 2],
     pub loop_: bool, // i32?
@@ -775,8 +780,7 @@ impl Blk {
     pub fn new(name: &[u8], id: usize, dlink: BlkIdx) -> Blk {
         Blk {
             phi: PhiIdx::INVALID,
-            ins: vec![], // not gonna work! Maybe InsIdx?
-            //pub uint nins;
+            ins: vec![],
             jmp: BlkJmp::new(),
             s1: BlkIdx::INVALID,
             s2: BlkIdx::INVALID,
@@ -789,14 +793,16 @@ impl Blk {
             dom: BlkIdx::INVALID,  // maybe Vec<BlkIdx>?
             dlink,
             fron: vec![],
-            //pub uint nfron;
             pred: vec![],
-            //pub uint npred;
             //pub BSet in[1], out[1], gen[1]; // TODO
             nlive: [0u32; 2],
             loop_: false, // i32?
             name: name.to_vec(),
         }
+    }
+
+    pub fn s1_s2(&self) -> (BlkIdx, BlkIdx) {
+        (self.s1, self.s2)
     }
 }
 
@@ -1090,7 +1096,7 @@ pub struct Fn {
     pub blks: Vec<Blk>,
     pub phis: Vec<Phi>,
     pub start: BlkIdx,
-    pub tmp: Vec<Tmp>,
+    pub tmps: Vec<Tmp>,
     pub con: Vec<Con>,
     pub mem: Vec<Mem>,
     pub retty: TypIdx, // index in Parser::typ, TypIdx::INVALID if no aggregate return
@@ -1110,7 +1116,7 @@ impl Fn {
             blks: vec![],
             phis: vec![],
             start: BlkIdx::INVALID,
-            tmp: vec![],
+            tmps: vec![],
             con: vec![],
             mem: vec![],
             retty: TypIdx::INVALID,
@@ -1139,6 +1145,38 @@ impl Fn {
         let bi: BlkIdx = BlkIdx(self.blks.len());
         self.blks.push(b);
         bi
+    }
+
+    pub fn phi(&self, pi: PhiIdx) -> &Phi {
+        assert!(pi != PhiIdx::INVALID);
+        &self.phis[pi.0]
+    }
+
+    pub fn phi_mut(&mut self, pi: PhiIdx) -> &mut Phi {
+        assert!(pi != PhiIdx::INVALID);
+        &mut self.phis[pi.0]
+    }
+
+    pub fn add_phi(&mut self, p: Phi) -> PhiIdx {
+        let pi: PhiIdx = PhiIdx(self.phis.len());
+        self.phis.push(p);
+        pi
+    }
+
+    pub fn tmp(&self, ti: TmpIdx) -> &Tmp {
+        assert!(ti != TmpIdx::INVALID);
+        &self.tmps[ti.0]
+    }
+
+    pub fn tmp_mut(&mut self, ti: TmpIdx) -> &mut Tmp {
+        assert!(ti != TmpIdx::INVALID);
+        &mut self.tmps[ti.0]
+    }
+
+    pub fn add_tmp(&mut self, t: Tmp) -> TmpIdx {
+        let ti: TmpIdx = TmpIdx(self.tmps.len());
+        self.tmps.push(t);
+        ti
     }
 }
 
@@ -1353,6 +1391,14 @@ bshas(BSet *bs, uint elt)
     assert(elt < bs->nt * NBit);
     return (bs->t[elt/NBit] & BIT(elt%NBit)) != 0;
 }
+ */
+
+pub fn bshas(bs: &BSet, elt: usize) -> bool {
+    assert!(elt < bs.len() * NBIT);
+    (bs[elt / NBIT] & bit(elt % NBIT)) != 0
+}
+
+/*
 
 /* parse.c */
 extern Op optab[NOp];
