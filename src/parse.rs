@@ -889,7 +889,7 @@ impl Parser<'_> {
 
         self.expect(Token::Tlparen)?;
 
-        while self.peek()? == Token::Trparen {
+        while self.peek()? != Token::Trparen {
             if !arg && vararg {
                 return Err(self.err("no parameters allowed after '...'"));
             }
@@ -1546,9 +1546,12 @@ impl Parser<'_> {
         if t != Token::Tglo {
             return Err(self.err("function name expected"));
         }
+        //println!("Parsing fn {}", String::from_utf8_lossy(&self.tokval.str));
         assert!(self.tokval.str == tv.as_str());
         curf.name = self.tokval.str.clone();
+        //println!(" ... parserefl...");
         curf.vararg = self.parserefl(false, &mut curf)?;
+        //println!(" ... done parserefl...");
         if self.nextnl()?.0 != Token::Tlbrace {
             return Err(self.err("function body must start with {"));
         }
