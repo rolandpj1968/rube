@@ -1728,7 +1728,7 @@ impl Parser<'_> {
 
     // TODO - should just return Dat???
     // TODO - need to pass tv
-    fn parsedatref(&mut self, d: &mut Dat) -> RubeResult<()> {
+    fn parsedatref(&mut self, d: &mut Dat, name: &[u8]) -> RubeResult<()> {
         d.isref = true;
         let name: Vec<u8> = self.tokval.str.clone();
         let mut off: i64 = 0;
@@ -1807,7 +1807,7 @@ impl Parser<'_> {
                     Token::Tflts => d.u = DatU::Flts(tv.as_s()),
                     Token::Tfltd => d.u = DatU::Fltd(tv.as_d()),
                     Token::Tint => d.u = DatU::Num(tv.as_i()),
-                    Token::Tglo => self.parsedatref(&mut d)?,
+                    Token::Tglo => self.parsedatref(&mut d, &tv.as_str())?,
                     Token::Tstr => self.parsedatstr(&mut d),
                     _ => {
                         return Err(self.err("constant literal or global ref expected in data"));
