@@ -460,7 +460,7 @@ pub struct Ins {
     pub op: O,
     pub cls: KExt, // Must be one of Kw, Kl, Ks, Kd
     pub to: Ref,
-    pub arg: [Ref; 2],
+    pub args: [Ref; 2],
 }
 
 impl Ins {
@@ -480,8 +480,8 @@ impl Ins {
 #[derive(new)]
 pub struct Phi {
     pub to: Ref,
-    pub arg: Vec<Ref>,
-    pub blk: Vec<BlkIdx>,
+    pub args: Vec<Ref>, // TODO would be cool to just have one Vec<(Ref, BlkIdx)>
+    pub blks: Vec<BlkIdx>,
     pub cls: KExt,
     pub link: PhiIdx,
 }
@@ -522,8 +522,8 @@ pub struct Blk {
     pub idom: BlkIdx, // maybe Vec<BlkIdx>?
     pub dom: BlkIdx,  // maybe Vec<BlkIdx>?
     pub dlink: BlkIdx,
-    pub fron: Vec<BlkIdx>,
-    pub pred: Vec<BlkIdx>,
+    pub frons: Vec<BlkIdx>,
+    pub preds: Vec<BlkIdx>,
     //pub BSet in[1], out[1], gen[1]; // TODO
     pub nlive: [u32; 2],
     pub loop_: u32, // was i32 in QBE
@@ -546,8 +546,8 @@ impl Blk {
             idom: BlkIdx::INVALID, // maybe Vec<BlkIdx>?
             dom: BlkIdx::INVALID,  // maybe Vec<BlkIdx>?
             dlink,
-            fron: vec![],
-            pred: vec![],
+            frons: vec![],
+            preds: vec![],
             //pub BSet in[1], out[1], gen[1]; // TODO
             nlive: [0u32; 2],
             loop_: 0,

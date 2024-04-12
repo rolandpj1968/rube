@@ -1089,7 +1089,6 @@ impl Parser<'_> {
                     curf.blk_mut(self.cur_bi).jmp.arg = r;
                     self.expect(Token::Tcomma)?;
                 }
-                // Jump:
                 let name = self.expect(Token::Tlbl)?.as_str();
                 curf.blk_mut(self.cur_bi).s1 = self.findblk(curf, &name);
                 if curf.blk(self.cur_bi).jmp.type_ != J::Jjmp {
@@ -1335,7 +1334,7 @@ impl Parser<'_> {
 
             let mut pb: BSet = bsinit(fn_.blks.len());
 
-            for pred_bi in &b.pred {
+            for pred_bi in &b.preds {
                 bsset(&mut pb, pred_bi.0);
             }
             let mut pi = b.phi;
@@ -1345,8 +1344,8 @@ impl Parser<'_> {
                     let t: &Tmp = fn_.tmp(ti);
                     let k: KExt = t.cls;
                     let mut ppb: BSet = bsinit(fn_.blks.len());
-                    for n in 0..fn_.phi(pi).arg.len() {
-                        let pbi: BlkIdx = p.blk[n];
+                    for n in 0..fn_.phi(pi).args.len() {
+                        let pbi: BlkIdx = p.blks[n];
                         if bshas(&ppb, pbi.0) {
                             return Err(self.err(&format!(
                                 "multiple entries for @{} in phi %{}",
@@ -1354,8 +1353,8 @@ impl Parser<'_> {
                                 to_s(&t.name)
                             )));
                         }
-                        if !usecheck(fn_, &p.arg[n], k) {
-                            let argr: &Ref = &p.arg[n];
+                        if !usecheck(fn_, &p.args[n], k) {
+                            let argr: &Ref = &p.args[n];
                             // Must be a RTmp after usecheck() failure
                             if let Ref::RTmp(ti) = argr {
                                 return Err(self.err(&format!(
@@ -1387,7 +1386,7 @@ impl Parser<'_> {
                 for n in 0..2 {
                     let op: &Op = &OPTAB[i.op as usize];
                     let k: KExt = op.argcls[n][i.cls as usize];
-                    let r: &Ref = &i.arg[n];
+                    let r: &Ref = &i.args[n];
                     if k == KE {
                         return Err(
                             self.err(&format!("invalid instruction type in {}", to_s(op.name)))
@@ -2043,14 +2042,14 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             let _ = write!(f, "\t");
             printref(f, fn_, typ, itbl, &p.to);
             let _ = write!(f, " ={} phi ", KTOC[p.cls as usize]);
-            assert!(!p.arg.is_empty());
-            assert!(p.arg.len() == p.blk.len());
-            for n in 0..p.arg.len() {
-                let bi: BlkIdx = p.blk[n];
+            assert!(!p.args.is_empty());
+            assert!(p.args.len() == p.blks.len());
+            for n in 0..p.args.len() {
+                let bi: BlkIdx = p.blks[n];
                 let pb = fn_.blk(bi);
                 let _ = write!(f, "@{} ", to_s(&pb.name));
-                printref(f, fn_, typ, itbl, &p.arg[n]);
-                if n != p.arg.len() - 1 {
+                printref(f, fn_, typ, itbl, &p.args[n]);
+                if n != p.args.len() - 1 {
                     let _ = write!(f, ", ");
                 }
             }
@@ -2081,13 +2080,13 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     _ => {} // nada
                 }
             }
-            if i.arg[0] != Ref::R {
+            if i.args[0] != Ref::R {
                 let _ = write!(f, " ");
-                printref(f, fn_, typ, itbl, &i.arg[0]);
+                printref(f, fn_, typ, itbl, &i.args[0]);
             }
-            if i.arg[1] != Ref::R {
+            if i.args[1] != Ref::R {
                 let _ = write!(f, ", ");
-                printref(f, fn_, typ, itbl, &i.arg[1]);
+                printref(f, fn_, typ, itbl, &i.args[1]);
             }
             let _ = writeln!(f);
         }
