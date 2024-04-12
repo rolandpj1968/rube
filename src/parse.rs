@@ -790,16 +790,16 @@ impl Parser<'_> {
             if curf.tmp(ti).name == v {
                 return Ref::RTmp(ti);
             }
-            for t in (TMP0..curf.tmps.len()).rev() {
-                if curf.tmps[t].name == v {
-                    return Ref::RTmp(TmpIdx(t));
+            for ti in (TMP0..(curf.tmps.len() as u32)).rev() {
+                if curf.tmps[ti as usize].name == v {
+                    return Ref::RTmp(TmpIdx(ti));
                 }
             }
         }
-        let ti = curf.tmps.len();
+        let ti = curf.tmps.len() as u32;
         self.tmph[tmph_i] = TmpIdx(ti);
         let r = newtmp(None, KX, curf);
-        curf.tmps[ti].name = v.to_vec(); // Ugh - rather do in newtmp?
+        curf.tmps[ti as usize].name = v.to_vec(); // Ugh - rather do in newtmp?
 
         r
     }
@@ -825,7 +825,7 @@ impl Parser<'_> {
     fn findtyp(&self, name: &[u8]) -> RubeResult<TypIdx> {
         for i in (0..self.typ.len()).rev() {
             if name == self.typ[i].name {
-                return Ok(TypIdx(i));
+                return Ok(TypIdx(i as u32));
             }
         }
         Err(self.err(&format!("undefined type :{}", to_s(name))))
@@ -1226,9 +1226,8 @@ impl Parser<'_> {
                         if ps != PState::PPhi || self.cur_bi == curf.start {
                             return Err(self.err("unexpected phi instruction"));
                         }
-                        let pi = PhiIdx(curf.phis.len());
-                        curf.phis
-                            .push(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
+                        let pi =
+                            curf.add_phi(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
                         if self.plink == PhiIdx::INVALID {
                             curf.blk_mut(self.cur_bi).phi = pi;
                         } else {
@@ -1659,9 +1658,8 @@ impl Parser<'_> {
             // let type_: TypFldT;
             // let mut s: u64;
             // let mut a: i32;
-            let mut ftyp_idx: usize = 0;
+            let mut ftyp_idx: u32 = 0;
 
-            // TODO: Hrmmm, these are all unused, something missing
             let (type_, mut s, mut a) = match t {
                 Token::Td => (TypFldT::Fd, 8u64, 3i32),
                 Token::Tl => (TypFldT::Fl, 8u64, 3i32),
@@ -1671,8 +1669,13 @@ impl Parser<'_> {
                 Token::Tb => (TypFldT::Fb, 1u64, 0i32),
                 Token::Ttyp => {
                     let TypIdx(idx) = self.findtyp(&tv.as_str())?;
+                    // TODO - neaten up...
                     ftyp_idx = idx;
-                    (TypFldT::FTyp, self.typ[idx].size, self.typ[idx].align)
+                    (
+                        TypFldT::FTyp,
+                        self.typ[idx as usize].size,
+                        self.typ[idx as usize].align,
+                    )
                 }
                 _ => return Err(self.err("invalid type member specifier")),
             };
@@ -2066,7 +2069,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             let _ = write!(f, "{:04x}", n);
         }
         Ref::RTyp(ti) => {
-            let _ = write!(f, ":{}", to_s(&typ[ti.0].name));
+            let _ = write!(f, ":{}", to_s(&typ[ti.0 as usize].name));
         }
         Ref::RMem(mi) => {
             let mut i: bool = false;
@@ -2215,7 +2218,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     printref(f, fn_, typ, itbl, &b.jmp.arg);
                 }
                 if b.jmp.type_ == J::Jretc {
-                    let _ = write!(f, ", :{}", to_s(&typ[fn_.retty.0].name));
+                    let _ = write!(f, ", :{}", to_s(&typ[fn_.retty.0 as usize].name));
                 }
             }
             J::Jhlt => {

@@ -452,16 +452,9 @@ newtmp(char *prfx, int k,  Fn *fn)
 pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
     // TODO why a globally unique name?
     static mut N: i32 = 0;
-    // int t;
-
-    // t = fn_->ntmp++;
-    let t = fn_.tmps.len();
-    // vgrow(&fn_->tmp, fn_->ntmp);
-    // memset(&fn_->tmp[t], 0, sizeof(Tmp));
     let mut name: Vec<u8> = vec![];
     // Mmm, empty name if there's no prefix?
     if let Some(bytes) = prfx {
-        // strf(fn->tmp[t].name, "%s.%d", prfx, ++n);
         name.extend_from_slice(bytes);
         name.push(b'.');
         unsafe {
@@ -471,17 +464,11 @@ pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
         }
     }
 
-    fn_.tmps.push(Tmp::new(
+    let ti: TmpIdx = fn_.add_tmp(Tmp::new(
         name, /*ndef*/ 1, /*nuse*/ 1, /*slot*/ -1, /*cls*/ k,
     ));
 
-    // fn->tmp[t].cls = k;
-    // fn->tmp[t].slot = -1;
-    // fn->tmp[t].nuse = +1;
-    // fn->tmp[t].ndef = +1;
-
-    // return TMP(t);
-    Ref::RTmp(TmpIdx(t))
+    Ref::RTmp(ti)
 }
 
 /*
@@ -518,24 +505,14 @@ newcon(Con *c0, Fn *fn)
  */
 
 pub fn newcon(c0: Con, fn_: &mut Fn) -> Ref {
-    // Con *c1;
-    // int i;
-
-    let next_i = fn_.cons.len();
-    for i in 1..next_i {
-        // c1 = &fn_->con[i];
-        // if (c0->type == c1->type
-        // && symeq(c0->sym, c1->sym)
-        // && c0->bits.i == c1->bits.i)
+    for i in 1..fn_.cons.len() {
         if c0 == fn_.cons[i] {
-            return Ref::RCon(ConIdx(i));
+            return Ref::RCon(ConIdx(i as u32));
         }
     }
-    // vgrow(&fn_->con, ++fn_->ncon);
-    // fn_->con[i] = *c0;
-    fn_.cons.push(c0);
+    let ci = fn_.add_con(c0);
 
-    Ref::RCon(ConIdx(next_i))
+    Ref::RCon(ci)
 }
 
 /*
@@ -612,7 +589,7 @@ MAKESURE(NBit_is_64, NBit == 64);
  */
 
 pub fn bsinit(n: usize) -> BSet {
-    vec![0; (n + NBIT - 1) / NBIT]
+    vec![0; (n + (NBIT as usize) - 1) / (NBIT as usize)]
 }
 
 const_assert_eq!(NBIT, 64);
@@ -672,8 +649,8 @@ bsmax(BSet *bs)
     return bs->nt * NBit;
 }
  */
-fn bsmax(bs: &BSet) -> usize {
-    bs.len() * NBIT
+fn bsmax(bs: &BSet) -> u32 {
+    (bs.len() as u32) * NBIT
 }
 
 /*
@@ -685,9 +662,9 @@ bsset(BSet *bs, uint elt)
 }
  */
 
-pub fn bsset(bs: &mut BSet, elt: usize) {
+pub fn bsset(bs: &mut BSet, elt: u32) {
     assert!(elt < bsmax(bs));
-    bs[elt / NBIT] |= bit(elt % NBIT);
+    bs[(elt / NBIT) as usize] |= bit(elt % NBIT);
 }
 /*
 void

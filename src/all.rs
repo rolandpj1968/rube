@@ -60,7 +60,7 @@ enum {
 };
  */
 
-pub const NBIT: usize = 8 * std::mem::size_of::<Bits>();
+pub const NBIT: u32 = 8 * std::mem::size_of::<Bits>() as u32;
 
 /*
 struct Target {
@@ -114,7 +114,7 @@ pub struct Target {
 #define BIT(n) ((bits)1 << (n))
  */
 
-pub fn bit(n: usize) -> Bits {
+pub fn bit(n: u32) -> Bits {
     (1 as Bits) << n
 }
 
@@ -126,7 +126,7 @@ enum {
  */
 
 pub const RXX: usize = 0;
-pub const TMP0: usize = NBIT;
+pub const TMP0: u32 = NBIT;
 
 /*
 struct BSet {
@@ -713,10 +713,10 @@ pub struct Phi {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PhiIdx(pub usize); // Index into Fn::phi
+pub struct PhiIdx(pub u32); // Index into Fn::phi
 
 impl PhiIdx {
-    pub const INVALID: PhiIdx = PhiIdx(usize::MAX);
+    pub const INVALID: PhiIdx = PhiIdx(u32::MAX);
 }
 
 /*
@@ -818,10 +818,10 @@ impl Blk {
 
 // Index into Fn::blks
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct BlkIdx(pub usize);
+pub struct BlkIdx(pub u32);
 
 impl BlkIdx {
-    pub const INVALID: BlkIdx = BlkIdx(usize::MAX);
+    pub const INVALID: BlkIdx = BlkIdx(u32::MAX);
 }
 
 /*
@@ -979,10 +979,10 @@ impl Tmp {
 
 // Index in Fn::tmp
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TmpIdx(pub usize);
+pub struct TmpIdx(pub u32);
 
 impl TmpIdx {
-    pub const INVALID: TmpIdx = TmpIdx(usize::MAX);
+    pub const INVALID: TmpIdx = TmpIdx(u32::MAX);
 }
 
 /*
@@ -1038,10 +1038,10 @@ impl Con {
 
 // Index in Fn::cons
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ConIdx(pub usize);
+pub struct ConIdx(pub u32);
 
 impl ConIdx {
-    pub const INVALID: ConIdx = ConIdx(usize::MAX);
+    pub const INVALID: ConIdx = ConIdx(u32::MAX);
 }
 
 /*
@@ -1066,10 +1066,10 @@ pub struct Addr {
 
 pub type Mem = Addr;
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MemIdx(pub usize); // Index into Fn::mem
+pub struct MemIdx(pub u32); // Index into Fn::mem
 
 impl MemIdx {
-    pub const INVALID: MemIdx = MemIdx(usize::MAX);
+    pub const INVALID: MemIdx = MemIdx(u32::MAX);
 }
 
 /*
@@ -1154,71 +1154,71 @@ impl Fn {
 
     pub fn blk(&self, bi: BlkIdx) -> &Blk {
         assert!(bi != BlkIdx::INVALID);
-        &self.blks[bi.0]
+        &self.blks[bi.0 as usize]
     }
 
     pub fn blk_mut(&mut self, bi: BlkIdx) -> &mut Blk {
         assert!(bi != BlkIdx::INVALID);
-        &mut self.blks[bi.0]
+        &mut self.blks[bi.0 as usize]
     }
 
     pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
-        let bi: BlkIdx = BlkIdx(self.blks.len());
+        let bi: BlkIdx = BlkIdx(self.blks.len() as u32);
         self.blks.push(b);
         bi
     }
 
     pub fn phi(&self, pi: PhiIdx) -> &Phi {
         assert!(pi != PhiIdx::INVALID);
-        &self.phis[pi.0]
+        &self.phis[pi.0 as usize]
     }
 
     pub fn phi_mut(&mut self, pi: PhiIdx) -> &mut Phi {
         assert!(pi != PhiIdx::INVALID);
-        &mut self.phis[pi.0]
+        &mut self.phis[pi.0 as usize]
     }
 
     pub fn add_phi(&mut self, p: Phi) -> PhiIdx {
-        let pi: PhiIdx = PhiIdx(self.phis.len());
+        let pi: PhiIdx = PhiIdx(self.phis.len() as u32);
         self.phis.push(p);
         pi
     }
 
     pub fn tmp(&self, ti: TmpIdx) -> &Tmp {
         assert!(ti != TmpIdx::INVALID);
-        &self.tmps[ti.0]
+        &self.tmps[ti.0 as usize]
     }
 
     pub fn tmp_mut(&mut self, ti: TmpIdx) -> &mut Tmp {
         assert!(ti != TmpIdx::INVALID);
-        &mut self.tmps[ti.0]
+        &mut self.tmps[ti.0 as usize]
     }
 
     pub fn add_tmp(&mut self, t: Tmp) -> TmpIdx {
-        let ti: TmpIdx = TmpIdx(self.tmps.len());
+        let ti: TmpIdx = TmpIdx(self.tmps.len() as u32);
         self.tmps.push(t);
         ti
     }
 
     pub fn con(&self, ci: ConIdx) -> &Con {
         assert!(ci != ConIdx::INVALID);
-        &self.cons[ci.0]
+        &self.cons[ci.0 as usize]
     }
 
     pub fn con_mut(&mut self, ci: ConIdx) -> &mut Con {
         assert!(ci != ConIdx::INVALID);
-        &mut self.cons[ci.0]
+        &mut self.cons[ci.0 as usize]
     }
 
     pub fn add_con(&mut self, c: Con) -> ConIdx {
-        let ci: ConIdx = ConIdx(self.cons.len());
+        let ci: ConIdx = ConIdx(self.cons.len() as u32);
         self.cons.push(c);
         ci
     }
 
     pub fn mem(&self, mi: MemIdx) -> &Mem {
         assert!(mi != MemIdx::INVALID);
-        &self.mems[mi.0]
+        &self.mems[mi.0 as usize]
     }
 }
 
@@ -1281,10 +1281,10 @@ pub struct Typ {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TypIdx(pub usize);
+pub struct TypIdx(pub u32);
 
 impl TypIdx {
-    pub const INVALID: TypIdx = TypIdx(usize::MAX);
+    pub const INVALID: TypIdx = TypIdx(u32::MAX);
 }
 
 impl Typ {
@@ -1435,9 +1435,9 @@ bshas(BSet *bs, uint elt)
 }
  */
 
-pub fn bshas(bs: &BSet, elt: usize) -> bool {
-    assert!(elt < bs.len() * NBIT);
-    (bs[elt / NBIT] & bit(elt % NBIT)) != 0
+pub fn bshas(bs: &BSet, elt: u32) -> bool {
+    assert!(elt < (bs.len() as u32) * NBIT);
+    (bs[(elt / NBIT) as usize] & bit(elt % NBIT)) != 0
 }
 
 /*
