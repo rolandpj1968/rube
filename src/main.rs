@@ -7,6 +7,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate static_assertions;
 
+mod abi;
 mod all;
 mod cfg;
 mod optab;
@@ -19,6 +20,7 @@ use std::fs::File;
 use std::io::stdout;
 use std::path::Path;
 
+use abi::elimsb;
 use all::{Bits, Dat, Fn, Ref, Target, Typ};
 use parse::{parse, printfn};
 use util::Bucket;
@@ -103,9 +105,10 @@ fn dump_data(dat: &Dat, _typ: &[Typ]) {
     );
 }
 
-fn dump_func(fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
+fn dump_func(fn_: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     println!("Got fn {:?}:", String::from_utf8_lossy(&fn_.name));
     println!();
+    elimsb(fn_);
     printfn(&mut stdout(), fn_, typ, itbl);
 }
 

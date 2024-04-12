@@ -1849,7 +1849,7 @@ impl Parser<'_> {
         &mut self,
         dbgfile: fn(&[u8]) -> (),
         data: fn(&Dat, &[Typ]) -> (),
-        func: fn(&Fn, &[Typ], &[Bucket]) -> (),
+        func: fn(&mut Fn, &[Typ], &[Bucket]) -> (),
     ) -> RubeResult<()> {
         loop {
             let mut lnk = Lnk {
@@ -1867,7 +1867,7 @@ impl Parser<'_> {
                 }
 
                 Token::Tfunc => {
-                    func(&self.parsefn(&lnk)?, &self.typ, &self.itbl);
+                    func(&mut self.parsefn(&lnk)?, &self.typ, &self.itbl);
                 }
 
                 Token::Tdata => {
@@ -1898,7 +1898,7 @@ pub fn parse(
     path: &Path,
     dbgfile: fn(&[u8]) -> (),
     data: fn(&Dat, &[Typ]) -> (),
-    func: fn(&Fn, &[Typ], &[Bucket]) -> (),
+    func: fn(&mut Fn, &[Typ], &[Bucket]) -> (),
 ) -> RubeResult<()> {
     // Allocate on the heap cos it's laaarge; TODO do we need tmph? Revert to stack
     let mut parser = Box::new(Parser::new(target, f, path));
