@@ -11,9 +11,9 @@ use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
     bshas, cls_for_ret, isret, ret_for_cls, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat,
-    DatT, DatU, Fn, Ins, KExt, Lnk, Mem, ORanges, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT,
-    Target, Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB,
-    KUH, KW, KX, O, TMP0,
+    DatT, DatU, Fn, Ins, KExt, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp,
+    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX,
+    NPUBOP, O, TMP0,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -165,7 +165,7 @@ enum Token {
     // End op public ops
 
     /* aliases */
-    Tloadw = ORanges::NPubOp as u8,
+    Tloadw = NPUBOP as u8,
     Tloadl,
     Tloads,
     Tloadd,
@@ -284,7 +284,7 @@ lazy_static! {
     kwmap0[Token::Tdots as usize] = b"...";
 
     // formerly in lexinit()
-    for i in 0..(ORanges::NPubOp as usize) {
+    for i in 0..(NPUBOP as usize) {
             if !OPTAB[i].name.is_empty() {
         kwmap0[i] = OPTAB[i].name;
             }
@@ -1992,7 +1992,6 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
 
 pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
     static KTOC: [&str; 4] = ["w", "l", "s", "d"];
-    // static char ktoc[] = "wlsd";
     // Generated from gcc -E and hand-munged
     static JTOA: [&str; J::NJmp as usize] = {
         let mut jtoa0: [&str; J::NJmp as usize] = [""; J::NJmp as usize];
