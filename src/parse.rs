@@ -786,12 +786,6 @@ impl Parser<'_> {
     fn tmpref(&mut self, v: &[u8], curf: &mut Fn) -> Ref {
         let tmph_i = (hash(v) & TMASK) as usize;
         let ti: TmpIdx = self.tmph[tmph_i];
-        // println!(
-        //     "tmpref(v is {}, hash index is {}, ti is {:?} )",
-        //     to_s(v),
-        //     (hash(v) & TMASK),
-        //     ti
-        // );
         if ti != TmpIdx::INVALID {
             if curf.tmp(ti).name == v {
                 return Ref::RTmp(ti);
@@ -952,10 +946,6 @@ impl Parser<'_> {
                         if arg {
                             Ins::new1(O::Oarg, k, Ref::R, [r])
                         } else {
-                            // println!("             parsed param {:?} type {:?}", r, k);
-                            // if let Ref::RTmp(ti) = r {
-                            //     println!("                 {:?} is {:?}", r, curf.tmp(ti));
-                            // }
                             Ins::new1(O::Opar, k, r, [Ref::R])
                         }
                     }
@@ -1470,15 +1460,9 @@ impl Parser<'_> {
                             )));
                         }
                         if !usecheck(fn_, &p.arg[n], k) {
-                            //println!("p.to is {:?} {:?} arg {} is {:?}", p.to, t, n, p.arg[n]);
                             let argr: &Ref = &p.arg[n];
                             // Must be a RTmp after usecheck() failure
                             if let Ref::RTmp(ti) = argr {
-                                // println!(
-                                //     "                     arg {} tmp is {:?}",
-                                //     n,
-                                //     fn_.tmp(*ti)
-                                // );
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
                                     to_s(&fn_.tmp(*ti).name),
@@ -1507,16 +1491,8 @@ impl Parser<'_> {
             for i in &b.ins {
                 for n in 0..2 {
                     let op: &Op = &OPTAB[i.op as usize];
-                    //println!("   ins {} arg {} op type is {:?}", to_s(op.name), n, i.cls);
                     let k: KExt = op.argcls[n][i.cls as usize];
                     let r: &Ref = &i.arg[n];
-                    // println!(
-                    //     "   ins {} arg {} expecting {:?} ref is {:?}",
-                    //     to_s(op.name),
-                    //     n,
-                    //     k,
-                    //     r
-                    // );
                     if k == KE {
                         return Err(
                             self.err(&format!("invalid instruction type in {}", to_s(op.name)))
@@ -1559,9 +1535,6 @@ impl Parser<'_> {
             let mut goto_jerr: bool = false;
             let r: &Ref = &b.jmp.arg;
             if isret(b.jmp.type_) {
-                // if cls_for_ret(b.jmp.type_).is_none() {
-                //     println!("Failed to get cls for {:?}", b.jmp.type_);
-                // }
                 // This must succeed after isret()
                 // TODO - QBE handling of jret0 seems odd
                 if b.jmp.type_ != J::Jret0 {
@@ -1671,7 +1644,6 @@ impl Parser<'_> {
             self.tmph[i as usize] = TmpIdx::INVALID;
         }
 
-        //println!("TODO - missing typecheck()");
         self.typecheck(&mut curf)?;
 
         Ok(curf)
