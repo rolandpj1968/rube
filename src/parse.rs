@@ -1587,6 +1587,19 @@ impl Parser<'_> {
                 }
             }
 
+            if b.s1 != BlkIdx::INVALID && fn_.blk(b.s1).jmp.type_ == J::Jxxx {
+                return Err(self.err(&format!(
+                    "block @{} is used undefined",
+                    to_s(&fn_.blk(b.s1).name)
+                )));
+            }
+            if b.s2 != BlkIdx::INVALID && fn_.blk(b.s2).jmp.type_ == J::Jxxx {
+                return Err(self.err(&format!(
+                    "block @{} is used undefined",
+                    to_s(&fn_.blk(b.s2).name)
+                )));
+            }
+
             bi = fn_.blk(bi).link;
         }
 
