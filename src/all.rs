@@ -920,6 +920,7 @@ struct Tmp {
 };
  */
 
+#[derive(Debug)]
 pub enum TmpWdth {
     WFull,
     Wsb, /* must match Oload/Oext order */
@@ -930,6 +931,8 @@ pub enum TmpWdth {
     Wuw,
 }
 
+// TODO derive new?
+#[derive(Debug)]
 pub struct Tmp {
     pub name: Vec<u8>,
     // Ins *def;

@@ -783,7 +783,14 @@ impl Parser<'_> {
     }
 
     fn tmpref(&mut self, v: &[u8], curf: &mut Fn) -> Ref {
-        let ti: TmpIdx = self.tmph[(hash(v) & TMASK) as usize];
+        let tmph_i = (hash(v) & TMASK) as usize;
+        let ti: TmpIdx = self.tmph[tmph_i];
+        // println!(
+        //     "tmpref(v is {}, hash index is {}, ti is {:?} )",
+        //     to_s(v),
+        //     (hash(v) & TMASK),
+        //     ti
+        // );
         if ti != TmpIdx::INVALID {
             if curf.tmp(ti).name == v {
                 return Ref::RTmp(ti);
@@ -794,9 +801,10 @@ impl Parser<'_> {
                 }
             }
         }
-        let t = curf.tmps.len();
+        let ti = curf.tmps.len();
+        self.tmph[tmph_i] = TmpIdx(ti);
         let r = newtmp(None, KX, curf);
-        curf.tmps[t].name = v.to_vec(); // Ugh - rather do in newtmp?
+        curf.tmps[ti].name = v.to_vec(); // Ugh - rather do in newtmp?
 
         r
     }
@@ -943,6 +951,10 @@ impl Parser<'_> {
                         if arg {
                             Ins::new1(O::Oarg, k, Ref::R, [r])
                         } else {
+                            // println!("             parsed param {:?} type {:?}", r, k);
+                            // if let Ref::RTmp(ti) = r {
+                            //     println!("                 {:?} is {:?}", r, curf.tmp(ti));
+                            // }
                             Ins::new1(O::Opar, k, r, [Ref::R])
                         }
                     }
@@ -1302,7 +1314,7 @@ fn usecheck(fn_: &Fn, r: &Ref, k: KExt) -> bool {
             let cls: KExt = fn_.tmp(*ti).cls;
             cls == k || (cls == KL && k == KW)
         }
-        _ => false,
+        _ => true,
     }
 }
 
@@ -1457,20 +1469,22 @@ impl Parser<'_> {
                             )));
                         }
                         if !usecheck(fn_, &p.arg[n], k) {
-                            // TODO - notify QBE - this might not be a tmp - could be a constant
+                            println!("p.to is {:?} {:?} arg {} is {:?}", p.to, t, n, p.arg[n]);
                             let argr: &Ref = &p.arg[n];
+                            // Must be a RTmp after usecheck() failure
                             if let Ref::RTmp(ti) = argr {
+                                println!(
+                                    "                     arg {} tmp is {:?}",
+                                    n,
+                                    fn_.tmp(*ti)
+                                );
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
                                     to_s(&fn_.tmp(*ti).name),
                                     to_s(&t.name)
                                 )));
                             } else {
-                                return Err(self.err(&format!(
-                                    "invalid type for operand {} in phi %{}",
-                                    n,
-                                    to_s(&t.name)
-                                )));
+                                assert!(false);
                             }
                         }
                         bsset(&mut ppb, pbi.0);
@@ -1559,8 +1573,8 @@ impl Parser<'_> {
             self.tmph[i as usize] = TmpIdx::INVALID;
         }
 
-        println!("TODO - missing typecheck()");
-        //self.typecheck(&mut curf)?;
+        //println!("TODO - missing typecheck()");
+        self.typecheck(&mut curf)?;
 
         Ok(curf)
     }
