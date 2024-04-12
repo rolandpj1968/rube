@@ -766,6 +766,7 @@ pub struct Fn {
     pub tmps: Vec<Tmp>,
     pub cons: Vec<Con>,
     pub mems: Vec<Mem>,
+    pub nblk: u32,     // Becomes number of reachable Blk's
     pub retty: TypIdx, // index in Parser::typ, TypIdx::INVALID if no aggregate return
     pub retr: Ref,
     pub rpo: Vec<BlkIdx>,
@@ -786,6 +787,7 @@ impl Fn {
             tmps: vec![],
             cons: vec![],
             mems: vec![],
+            nblk: 0,
             retty: TypIdx::INVALID,
             retr: Ref::R,
             rpo: vec![],

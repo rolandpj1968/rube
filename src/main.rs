@@ -22,6 +22,7 @@ use std::path::Path;
 
 use abi::elimsb;
 use all::{Bits, Dat, Fn, Ref, Target, Typ};
+use cfg::fillrpo;
 use parse::{parse, printfn};
 use util::Bucket;
 
@@ -109,6 +110,7 @@ fn dump_func(fn_: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     println!("Got fn {:?}:", String::from_utf8_lossy(&fn_.name));
     println!();
     elimsb(fn_);
+    fillrpo(fn_);
     printfn(&mut stdout(), fn_, typ, itbl);
 }
 

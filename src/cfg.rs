@@ -1,4 +1,4 @@
-use crate::all::{Blk, BlkIdx, Fn};
+use crate::all::{Blk, BlkIdx, Fn, Phi, PhiIdx};
 
 /*
 #include "all.h"
@@ -44,7 +44,46 @@ edgedel(Blk *bs, Blk **pbd)
             sizeof bd->pred[0] * (bd->npred-a));
     }
 }
+ */
 
+fn edgedel(f: &mut Fn, bsi: BlkIdx, bdi: BlkIdx) {
+    if bdi == BlkIdx::INVALID {
+	return;
+    }
+    {
+	let b: &mut Blk = f.blk_mut(bsi);
+	if b.s1 == bdi {
+	    b.s1 = BlkIdx::INVALID;
+	}
+	if b.s2 == bdi {
+	    b.s2 = BlkIdx::INVALID;
+	}
+    }
+    let mut pi: PhiIdx = f.blk(bdi).phi;
+    while pi != PhiIdx::INVALID {
+	let p: &mut Phi = f.phi_mut(pi);
+	let mut a: usize = 0;
+	while p.blk[a] != bsi {
+            assert!( a+1 < p.blk.len());
+	    a += 1;
+	}
+	p.blk.remove(a);
+	p.arg.remove(a);
+
+	pi = p.link;
+    }
+    let bd: &mut Blk = f.blk_mut(bdi);
+    if !bd.pred.is_empty() {
+	let mut a: usize = 0;
+	while bd.pred[a] != bsi {
+	    assert!(a+1 < bd.pred.len());
+	    a += 1;
+	}
+	bd.pred.remove(a);
+    }
+}
+
+/*
 static void
 addpred(Blk *bp, Blk *bc)
 {
@@ -141,23 +180,17 @@ rporec(Blk *b, uint x)
 }
  */
 
-pub fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
+fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
     if bi == BlkIdx::INVALID || f.blk(bi).id != u32::MAX {
         return x;
     }
 
     f.blk_mut(bi).id = 1;
 
-    let (s1, s2) = {
-        let b: &Blk = f.blk(bi);
-        let s1: BlkIdx = b.s1;
-        let s2: BlkIdx = b.s2;
-        if s1 != BlkIdx::INVALID && s2 != BlkIdx::INVALID && f.blk(s1).loop_ > f.blk(s2).loop_ {
-            (s2, s1)
-        } else {
-            (s1, s2)
-        }
-    };
+    let (mut s1, mut s2) = f.blk(bi).s1_s2();
+    if s1 != BlkIdx::INVALID && s2 != BlkIdx::INVALID && f.blk(s1).loop_ > f.blk(s2).loop_ {
+            (s1, s2) = (s2, s1);
+    }
 
     x = rporec(f, s1, x);
     x = rporec(f, s2, x);
@@ -165,9 +198,11 @@ pub fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
 
     f.blk_mut(bi).id = x;
 
-    // Mmm, underflow??
-    assert!(x != 0);
-    x - 1
+    if x ==0 {
+	u32::MAX
+    } else {
+	x - 1
+    }
 }
 
 /*
@@ -195,7 +230,51 @@ fillrpo(Fn *f)
         }
     }
 }
+ */
 
+/* fill the reverse post-order (rpo) information */
+pub fn fillrpo(f: &mut Fn) {
+    let mut bi: BlkIdx = f.start;
+    while bi != BlkIdx::INVALID {
+        let b: &mut Blk = f.blk_mut(bi);
+        b.id = u32::MAX;
+        bi = b.link;
+    }
+
+    let n: u32 = rporec(f, f.start, (f.nblk - 1) as u32).wrapping_add(1);
+    f.nblk -= n;
+    f.rpo = vec![BlkIdx::INVALID; f.nblk as usize];
+    let mut prev_bi = BlkIdx::INVALID;
+    let mut bi = f.start;
+    while bi != BlkIdx::INVALID {
+        let (id, s1, s2, next_bi) = {
+	    let b: &Blk = f.blk(bi);
+	    (b.id, b.s1, b.s2, b.link)
+	};
+	if id == u32::MAX {
+            // Unreachable Blk
+            edgedel(f, bi, s1);
+            edgedel(f, bi, s2);
+            if prev_bi == BlkIdx::INVALID {
+                f.start = next_bi;
+            } else {
+                f.blk_mut(prev_bi).link = next_bi;
+            }
+            bi = next_bi;
+        } else {
+            let (rpo_idx, next_bi) = {
+                let b: &mut Blk = f.blk_mut(bi);
+                b.id -= n;
+                (b.id, b.link)
+            };
+            f.rpo[rpo_idx as usize] = bi;
+            prev_bi = bi;
+            bi = next_bi;
+        }
+    }
+}
+
+/*
 /* for dominators computation, read
  * "A Simple, Fast Dominance Algorithm"
  * by K. Cooper, T. Harvey, and K. Kennedy.

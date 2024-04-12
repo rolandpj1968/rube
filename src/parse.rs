@@ -1528,6 +1528,8 @@ impl Parser<'_> {
             return Err(self.err("last block misses jump"));
         }
 
+        curf.nblk = curf.blks.len() as u32;
+
         let mut bi = curf.start;
         while bi != BlkIdx::INVALID {
             let b: &mut Blk = curf.blk_mut(bi);
