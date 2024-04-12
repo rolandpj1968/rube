@@ -2032,10 +2032,10 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
                 let _ = write!(f, "");
             }
             ConBits::F(s) => {
-                let _ = write!(f, "s_{}", s);
+                let _ = write!(f, "s_{:.6}", s);
             }
             ConBits::D(d) => {
-                let _ = write!(f, "d_{}", d);
+                let _ = write!(f, "d_{:.6}", d);
             }
             ConBits::I(i) => {
                 let _ = write!(f, "{}", i);
@@ -2201,6 +2201,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             let _ = writeln!(f);
         }
+        let mut skip_writeln: bool = false;
         match b.jmp.type_ {
             J::Jret0
             | J::Jretsb
@@ -2225,7 +2226,9 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 let _ = write!(f, "\thlt");
             }
             J::Jjmp => {
-                if b.s1 != b.link {
+                if b.s1 == b.link {
+                    skip_writeln = true;
+                } else {
                     let _ = write!(f, "\tjmp @{}", to_s(&fn_.blk(b.s1).name));
                 }
             }
@@ -2236,15 +2239,17 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     let _ = write!(f, ", ");
                 }
                 assert!(b.s1 != BlkIdx::INVALID && b.s2 != BlkIdx::INVALID);
-                let _ = writeln!(
+                let _ = write!(
                     f,
-                    "@%{}, @%{}",
+                    "@{}, @{}",
                     to_s(&fn_.blk(b.s1).name),
                     to_s(&fn_.blk(b.s2).name)
                 );
             }
         }
-        let _ = writeln!(f);
+        if !skip_writeln {
+            let _ = writeln!(f);
+        }
         bi = b.link;
     }
     let _ = writeln!(f, "}}");
