@@ -10,9 +10,10 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
-    bshas, jmp_for_cls, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn, Ins,
-    KExt, Lnk, Mem, ORanges, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp, TmpIdx, Typ,
-    TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O, TMP0,
+    bshas, cls_for_ret, isret, ret_for_cls, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat,
+    DatT, DatU, Fn, Ins, KExt, Lnk, Mem, ORanges, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT,
+    Target, Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB,
+    KUH, KW, KX, O, TMP0,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -1070,7 +1071,7 @@ impl Parser<'_> {
             }
             // Return instruction - ends block
             Token::Tret => {
-                curf.blk_mut(self.cur_bi).jmp.type_ = match jmp_for_cls(self.rcls) {
+                curf.blk_mut(self.cur_bi).jmp.type_ = match ret_for_cls(self.rcls) {
                     None => {
                         return Err(self.err(&format!("BUG: invalid type {:?} for ret", self.rcls)))
                     }
@@ -1552,6 +1553,37 @@ impl Parser<'_> {
                             assert!(false);
                         }
                     }
+                }
+            }
+
+            let mut goto_jerr: bool = false;
+            let r: &Ref = &b.jmp.arg;
+            if isret(b.jmp.type_) {
+                // if cls_for_ret(b.jmp.type_).is_none() {
+                //     println!("Failed to get cls for {:?}", b.jmp.type_);
+                // }
+                // This must succeed after isret()
+                // TODO - QBE handling of jret0 seems odd
+                if b.jmp.type_ != J::Jret0 {
+                    let k: KExt = cls_for_ret(b.jmp.type_).unwrap();
+                    if !usecheck(fn_, r, k) {
+                        goto_jerr = true;
+                    }
+                }
+            }
+            if b.jmp.type_ == J::Jjnz && !usecheck(fn_, r, KW) {
+                goto_jerr = true;
+            }
+            if goto_jerr {
+                // Must be RTmp after usecheck() failure
+                if let Ref::RTmp(ti) = r {
+                    return Err(self.err(&format!(
+                        "invalid type for jump argument %{} in block @{}",
+                        to_s(&fn_.tmp(*ti).name),
+                        to_s(&b.name)
+                    )));
+                } else {
+                    assert!(false);
                 }
             }
 
