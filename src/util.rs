@@ -449,26 +449,25 @@ newtmp(char *prfx, int k,  Fn *fn)
 }
  */
 
-pub fn newtmp(prfx: Option<&[u8]>, k: KExt, fn_: &mut Fn) -> Ref {
+pub fn newtmp(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> TmpIdx {
     // TODO why a globally unique name?
     static mut N: i32 = 0;
-    let mut name: Vec<u8> = vec![];
-    // Mmm, empty name if there's no prefix?
-    if let Some(bytes) = prfx {
-        name.extend_from_slice(bytes);
+    let mut name: Vec<u8> = prfx.to_vec();
+    if sufx {
         name.push(b'.');
         unsafe {
-            // TODO
             N += 1;
             name.extend_from_slice(&format!("{}", N).as_bytes());
         }
     }
 
-    let ti: TmpIdx = fn_.add_tmp(Tmp::new(
+    fn_.add_tmp(Tmp::new(
         name, /*ndef*/ 1, /*nuse*/ 1, /*slot*/ -1, /*cls*/ k,
-    ));
+    ))
+}
 
-    Ref::RTmp(ti)
+pub fn newtmpref(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> Ref {
+    Ref::RTmp(newtmp(prfx, sufx, k, fn_))
 }
 
 /*

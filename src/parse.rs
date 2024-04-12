@@ -18,7 +18,8 @@ use crate::all::{
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
 use crate::util::{
-    bsequal, bsinit, bsset, clsmerge, hash, intern, newcon, newtmp, str_, Bucket, InternId, IMASK,
+    bsequal, bsinit, bsset, clsmerge, hash, intern, newcon, newtmp, newtmpref, str_, Bucket,
+    InternId, IMASK,
 };
 
 #[derive(Debug)]
@@ -783,25 +784,22 @@ impl Parser<'_> {
         )))
     }
 
-    fn tmpref(&mut self, v: &[u8], curf: &mut Fn) -> Ref {
-        let tmph_i = (hash(v) & TMASK) as usize;
+    fn tmpref(&mut self, name: &[u8], curf: &mut Fn) -> Ref {
+        let tmph_i = (hash(name) & TMASK) as usize;
         let ti: TmpIdx = self.tmph[tmph_i];
         if ti != TmpIdx::INVALID {
-            if curf.tmp(ti).name == v {
+            if curf.tmp(ti).name == name {
                 return Ref::RTmp(ti);
             }
             for ti in (TMP0..(curf.tmps.len() as u32)).rev() {
-                if curf.tmps[ti as usize].name == v {
+                if curf.tmps[ti as usize].name == name {
                     return Ref::RTmp(TmpIdx(ti));
                 }
             }
         }
-        let ti = curf.tmps.len() as u32;
-        self.tmph[tmph_i] = TmpIdx(ti);
-        let r = newtmp(None, KX, curf);
-        curf.tmps[ti as usize].name = v.to_vec(); // Ugh - rather do in newtmp?
-
-        r
+        let ti: TmpIdx = newtmp(name, false, KX, curf);
+        self.tmph[tmph_i] = ti;
+        Ref::RTmp(ti)
     }
 
     fn parseref(&mut self, curf: &mut Fn) -> RubeResult<Ref> {
@@ -1482,9 +1480,11 @@ impl Parser<'_> {
         let mut curf = Fn::new(lnk.clone());
         for i in 0..(TMP0 as i32) {
             if self.target.fpr0 <= i && i < self.target.fpr0 + self.target.nfpr {
-                let _ = newtmp(None, KD, &mut curf);
+                // Ugh, returns Ref
+                let _ = newtmpref(b"", false, KD, &mut curf);
             } else {
-                let _ = newtmp(None, KL, &mut curf);
+                // Ugh, returns Ref
+                let _ = newtmpref(b"", false, KL, &mut curf);
             }
         }
 
