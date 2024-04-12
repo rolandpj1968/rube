@@ -726,11 +726,11 @@ impl Parser<'_> {
         if self.thead.0 == Token::Txxx {
             self.thead = self.lex()?;
         }
-        // Ugh, help - no clone()!
+        // Ugh, help - need clone() for Str(vec)!
         Ok((self.thead.0, self.thead.1.clone()))
     }
 
-    fn peek(&mut self) -> RubeResult<Token> {
+    fn peek_tok(&mut self) -> RubeResult<Token> {
         Ok(self.peek_with_val()?.0)
     }
 
@@ -742,13 +742,16 @@ impl Parser<'_> {
 
     fn nextnl(&mut self) -> RubeResult<(Token, TokVal)> {
         loop {
-            let t = self.next()?;
-            // println!("                                                        nextnl() - next() returned token {:?}", t);
+            let ttv = self.next()?;
 
-            if t.0 != Token::Tnl {
-                return Ok(t);
+            if ttv.0 != Token::Tnl {
+                return Ok(ttv);
             }
         }
+    }
+
+    fn nextnl_tok(&mut self) -> RubeResult<Token> {
+        Ok(self.nextnl()?.0)
     }
 
     fn expect(&mut self, t: Token) -> RubeResult<TokVal> {
@@ -780,10 +783,10 @@ impl Parser<'_> {
     }
 
     fn tmpref(&mut self, v: &[u8], curf: &mut Fn) -> Ref {
-        let tmp_idx: TmpIdx = self.tmph[(hash(v) & TMASK) as usize];
-        if tmp_idx != TmpIdx::INVALID {
-            if curf.tmps[tmp_idx.0].name == v {
-                return Ref::RTmp(tmp_idx);
+        let ti: TmpIdx = self.tmph[(hash(v) & TMASK) as usize];
+        if ti != TmpIdx::INVALID {
+            if curf.tmp(ti).name == v {
+                return Ref::RTmp(ti);
             }
             for t in (TMP0..curf.tmps.len()).rev() {
                 if curf.tmps[t].name == v {
@@ -793,7 +796,7 @@ impl Parser<'_> {
         }
         let t = curf.tmps.len();
         let r = newtmp(None, KX, curf);
-        curf.tmps[t].name = v.to_vec(); // Ugh
+        curf.tmps[t].name = v.to_vec(); // Ugh - rather do in newtmp?
 
         r
     }
@@ -872,13 +875,13 @@ impl Parser<'_> {
 
         self.expect(Token::Tlparen)?;
 
-        while self.peek()? != Token::Trparen {
+        while self.peek_tok()? != Token::Trparen {
             if !arg && vararg {
                 return Err(self.err("no parameters allowed after '...'"));
             }
 
             let mut goto_next: bool = false;
-            match self.peek()? {
+            match self.peek_tok()? {
                 Token::Tdots => {
                     if vararg {
                         return Err(self.err("only one '...' allowed"));
@@ -946,7 +949,7 @@ impl Parser<'_> {
                 };
                 self.insb.push(ins);
             }
-            if self.peek()? == Token::Trparen {
+            if self.peek_tok()? == Token::Trparen {
                 break;
             }
             self.expect(Token::Tcomma)?;
@@ -993,10 +996,10 @@ impl Parser<'_> {
         let mut ty: TypIdx = TypIdx::INVALID;
 
         let mut op_tok: Token = Token::Txxx;
-        let mut op_tv: TokVal = TokVal::None;
+        //let mut op_tv: TokVal = TokVal::None;
 
         let mut t: Token;
-        let mut tv: TokVal;
+        let tv: TokVal;
 
         (t, tv) = self.nextnl()?;
 
@@ -1015,7 +1018,7 @@ impl Parser<'_> {
                 r = self.tmpref(&tv.as_str(), curf);
                 self.expect(Token::Teq)?;
                 (k, ty) = self.parsecls()?;
-                (op_tok, op_tv) = self.next()?;
+                (op_tok, _ /*op_tv*/) = self.next()?;
             }
             // Void instructions
             Token::Tblit | Token::Tcall | Token::TOvastart => {
@@ -1061,7 +1064,7 @@ impl Parser<'_> {
                     }
                     Some(j) => j,
                 };
-                if self.peek()? == Token::Tnl {
+                if self.peek_tok()? == Token::Tnl {
                     curf.blk_mut(self.cur_bi).jmp.type_ = J::Jret0; // is this necessary?
                 } else if self.rcls != K0 {
                     let r: Ref = self.parseref(curf)?;
@@ -1117,7 +1120,7 @@ impl Parser<'_> {
                 arg.push(Ref::RInt(ln));
                 // TODO - didn't clean this up
                 let cn: i32 = {
-                    if self.peek()? == Token::Tcomma {
+                    if self.peek_tok()? == Token::Tcomma {
                         self.next()?;
                         let cn_i = self.expect(Token::Tint)?.as_i();
                         let cn0: i32 = cn_i as i32;
@@ -1193,7 +1196,7 @@ impl Parser<'_> {
                     return Err(self.err("size class must be w, l, s, or d"));
                 }
                 // Instruction args
-                if self.peek()? != Token::Tnl {
+                if self.peek_tok()? != Token::Tnl {
                     loop {
                         if op_tok == Token::Tphi {
                             let name = self.expect(Token::Tlbl)?.as_str();
@@ -1204,7 +1207,7 @@ impl Parser<'_> {
                             return Err(self.err("invalid instruction argument"));
                         }
                         arg.push(argi);
-                        t = self.peek()?;
+                        t = self.peek_tok()?;
                         if t == Token::Tnl {
                             break;
                         }
@@ -1220,16 +1223,16 @@ impl Parser<'_> {
                         if ps != PState::PPhi || self.cur_bi == curf.start {
                             return Err(self.err("unexpected phi instruction"));
                         }
-                        let phii = PhiIdx(curf.phis.len());
+                        let pi = PhiIdx(curf.phis.len());
                         curf.phis
                             .push(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
                         if self.plink == PhiIdx::INVALID {
-                            curf.blk_mut(self.cur_bi).phi = phii;
+                            curf.blk_mut(self.cur_bi).phi = pi;
                         } else {
-                            let prev_phi = &mut curf.phis[self.plink.0];
-                            prev_phi.link = phii;
+                            let prev_phi = &mut curf.phi_mut(self.plink);
+                            prev_phi.link = pi;
                         }
-                        self.plink = phii;
+                        self.plink = pi;
                         return Ok(PState::PPhi);
                     }
                     Token::Tblit => {
@@ -1238,13 +1241,14 @@ impl Parser<'_> {
                         }
                         self.insb
                             .push(Ins::new2(O::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
-                        let coni: ConIdx;
-                        if let Ref::RCon(coni0) = arg[2] {
-                            coni = coni0;
+                        let ci: ConIdx;
+                        if let Ref::RCon(ci0) = arg[2] {
+                            ci = ci0;
                         } else {
                             return Err(self.err("blit size must be constant"));
                         }
-                        let c: &Con = &curf.con[coni.0];
+                        let c: &Con = curf.con(ci);
+                        // TODO - clean up
                         let sz: u32 = {
                             let mut sz_u32: u32 = 0;
                             let mut is_valid_size: bool = c.type_ == ConT::CBits;
@@ -1295,7 +1299,7 @@ usecheck(Ref r, int k, Fn *fn)
 fn usecheck(fn_: &Fn, r: &Ref, k: KExt) -> bool {
     match r {
         Ref::RTmp(ti) => {
-            let cls: KExt = fn_.tmps[ti.0].cls;
+            let cls: KExt = fn_.tmp(*ti).cls;
             cls == k || (cls == KL && k == KW)
         }
         _ => false,
@@ -1502,13 +1506,13 @@ impl Parser<'_> {
             }
         }
 
-        curf.con.push(Con::new(
+        curf.cons.push(Con::new(
             ConT::CBits,
             Sym::new(SymT::SGlo, InternId::INVALID),
             ConBits::I(0xdeaddead),
         )); /* UNDEF */
         // ??? what's this for?
-        curf.con.push(Con::new(
+        curf.cons.push(Con::new(
             ConT::CBits,
             Sym::new(SymT::SGlo, InternId::INVALID),
             ConBits::I(0),
@@ -1517,7 +1521,7 @@ impl Parser<'_> {
 
         self.blink = BlkIdx::INVALID;
 
-        if self.peek()? != Token::Tglo {
+        if self.peek_tok()? != Token::Tglo {
             (self.rcls, curf.retty) = self.parsecls()?;
         }
         let (t, tv) = self.next()?;
@@ -1526,7 +1530,7 @@ impl Parser<'_> {
         }
         curf.name = tv.as_str();
         curf.vararg = self.parserefl(false, &mut curf)?;
-        if self.nextnl()?.0 != Token::Tlbrace {
+        if self.nextnl_tok()? != Token::Tlbrace {
             return Err(self.err("function body must start with {"));
         }
         let mut ps: PState = PState::PLbl;
@@ -1600,7 +1604,7 @@ impl Parser<'_> {
             let mut c: i32 = 1;
             if t == Token::Tint {
                 c = tv.as_i() as i32; // TODO - check cast range?
-                (t, tv) = self.nextnl()?;
+                t = self.nextnl_tok()?;
             }
             sz += (a as u64) + (c as u64) * s;
             if type_ == TypFldT::FTyp {
@@ -1638,12 +1642,12 @@ impl Parser<'_> {
         let mut ty = Typ::new(); // Ugh construct upwards
 
         let (mut t, mut tv) = self.nextnl()?;
-        if t != Token::Ttyp || self.nextnl()?.0 != Token::Teq {
+        if t != Token::Ttyp || self.nextnl_tok()? != Token::Teq {
             return Err(self.err("type name and then = expected"));
         }
 
         ty.name = tv.as_str();
-        (t, tv) = self.nextnl()?;
+        t = self.nextnl_tok()?;
         if t == Token::Talign {
             (t, tv) = self.nextnl()?;
             if t != Token::Tint {
@@ -1660,7 +1664,7 @@ impl Parser<'_> {
                 al += 1;
             }
             ty.align = al;
-            (t, tv) = self.nextnl()?;
+            t = self.nextnl_tok()?;
         }
         if t != Token::Tlbrace {
             return Err(self.err("type body must start with {"));
@@ -1672,7 +1676,7 @@ impl Parser<'_> {
             if ty.align == -1 {
                 return Err(self.err("dark types need alignment"));
             }
-            if self.nextnl()?.0 != Token::Trbrace {
+            if self.nextnl_tok()? != Token::Trbrace {
                 return Err(self.err("} expected"));
             }
             self.typ.push(ty);
@@ -1688,7 +1692,7 @@ impl Parser<'_> {
                 (t, tv) = self.nextnl()?;
                 self.parsefields(&mut ty, t, tv)?;
                 n += 1;
-                (t, tv) = self.nextnl()?;
+                t = self.nextnl_tok()?;
                 if t == Token::Trbrace {
                     break;
                 }
@@ -1706,7 +1710,7 @@ impl Parser<'_> {
     fn parsedatref(&mut self, d: &mut Dat, name: &[u8]) -> RubeResult<()> {
         d.isref = true;
         let mut off: i64 = 0;
-        if self.peek()? == Token::Tplus {
+        if self.peek_tok()? == Token::Tplus {
             let _ = self.next()?;
             let (t, tv) = self.next()?;
             if t != Token::Tint {
@@ -1731,12 +1735,12 @@ impl Parser<'_> {
     fn parsedat(&mut self, cb: fn(&Dat, &[Typ]) -> (), lnk: &mut Lnk) -> RubeResult<()> {
         let (mut t, mut tv) = self.nextnl()?;
 
-        if t != Token::Tglo || self.nextnl()?.0 != Token::Teq {
+        if t != Token::Tglo || self.nextnl_tok()? != Token::Teq {
             return Err(self.err("data name, then = expected"));
         }
         let name = tv.as_str();
 
-        (t, tv) = self.nextnl()?;
+        t = self.nextnl_tok()?;
         lnk.align = 8;
         if t == Token::Talign {
             (t, tv) = self.nextnl()?;
@@ -1744,7 +1748,7 @@ impl Parser<'_> {
                 return Err(self.err("alignment expected"));
             }
             lnk.align = tv.as_i() as i8; // TODO - check casting range?
-            (t, tv) = self.nextnl()?;
+            t = self.nextnl_tok()?;
         }
 
         let mut d: Dat = Dat::new(DatT::DStart, &name, lnk.clone());
@@ -1813,11 +1817,12 @@ impl Parser<'_> {
         Ok(())
     }
 
-    fn parselnk(&mut self, lnk: &mut Lnk) -> RubeResult<(Token, TokVal)> {
+    fn parselnk(&mut self, lnk: &mut Lnk) -> RubeResult<Token> {
         let mut haslnk: bool = false;
 
         loop {
-            let (mut t, mut tv) = self.nextnl()?;
+            let mut t = self.nextnl_tok()?;
+            let mut tv: TokVal;
 
             match t {
                 Token::Texport => {
@@ -1837,11 +1842,9 @@ impl Parser<'_> {
                         return Err(self.err("section \"name\" expected"));
                     }
                     lnk.sec = tv.as_str();
-                    if self.peek()? == Token::Tstr {
-                        (t, tv) = self.next()?;
+                    if self.peek_tok()? == Token::Tstr {
+                        (_, tv) = self.next()?;
                         lnk.secf = tv.as_str();
-                    } else {
-                        panic!("unhandled");
                     }
                 }
 
@@ -1852,7 +1855,7 @@ impl Parser<'_> {
                     if haslnk && t != Token::Tdata && t != Token::Tfunc {
                         return Err(self.err("only data and function have linkage"));
                     }
-                    return Ok((t, tv));
+                    return Ok(t);
                 }
             }
 
@@ -1875,8 +1878,7 @@ impl Parser<'_> {
                 secf: vec![],
             };
 
-            let (mut t, mut tv) = self.parselnk(&mut lnk)?;
-            match t {
+            match self.parselnk(&mut lnk)? {
                 Token::Tdbgfile => {
                     let s = self.expect(Token::Tstr)?;
                     dbgfile(&s.as_str());
@@ -1962,7 +1964,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             if ti.0 < TMP0 {
                 let _ = write!(f, "R{}", ti.0);
             } else {
-                let _ = write!(f, "%{}", to_s(&fn_.tmps[ti.0].name));
+                let _ = write!(f, "%{}", to_s(&fn_.tmp(*ti).name));
             }
         }
         Ref::RCon(ci) => {
@@ -1970,11 +1972,11 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
                 //(req(r, UNDEF)) { TODO - this seems missing
                 let _ = write!(f, "UNDEF");
             } else {
-                printcon(f, itbl, &fn_.con[ci.0]);
+                printcon(f, itbl, fn_.con(*ci));
             }
         }
         Ref::RSlot(i) => {
-            let _ = write!(f, "S{}", *i as i32);
+            let _ = write!(f, "S{}", *i);
         }
         Ref::RCall(n) => {
             let _ = write!(f, "{:04x}", n);
@@ -1984,7 +1986,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
         }
         Ref::RMem(mi) => {
             let mut i: bool = false;
-            let m: &Mem = &fn_.mem[mi.0];
+            let m: &Mem = fn_.mem(*mi);
             let _ = write!(f, "[");
             if m.offset.type_ != ConT::CUndef {
                 printcon(f, itbl, &m.offset);
@@ -2060,7 +2062,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
         let _ = writeln!(f, "@{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::INVALID {
-            let p: &Phi = &fn_.phis[pi.0];
+            let p: &Phi = &fn_.phi(pi);
             let _ = write!(f, "\t");
             printref(f, fn_, typ, itbl, &p.to);
             let _ = write!(f, " ={} phi ", KTOC[p.cls as usize]);

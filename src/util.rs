@@ -521,19 +521,19 @@ pub fn newcon(c0: Con, fn_: &mut Fn) -> Ref {
     // Con *c1;
     // int i;
 
-    let next_i = fn_.con.len();
+    let next_i = fn_.cons.len();
     for i in 1..next_i {
         // c1 = &fn_->con[i];
         // if (c0->type == c1->type
         // && symeq(c0->sym, c1->sym)
         // && c0->bits.i == c1->bits.i)
-        if c0 == fn_.con[i] {
+        if c0 == fn_.cons[i] {
             return Ref::RCon(ConIdx(i));
         }
     }
     // vgrow(&fn_->con, ++fn_->ncon);
     // fn_->con[i] = *c0;
-    fn_.con.push(c0);
+    fn_.cons.push(c0);
 
     Ref::RCon(ConIdx(next_i))
 }

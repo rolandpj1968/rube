@@ -1023,9 +1023,13 @@ impl Con {
     }
 }
 
-// Index in Fn::con
+// Index in Fn::cons
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ConIdx(pub usize);
+
+impl ConIdx {
+    pub const INVALID: ConIdx = ConIdx(usize::MAX);
+}
 
 /*
 typedef struct Addr Addr;
@@ -1050,6 +1054,10 @@ pub struct Addr {
 pub type Mem = Addr;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MemIdx(pub usize); // Index into Fn::mem
+
+impl MemIdx {
+    pub const INVALID: MemIdx = MemIdx(usize::MAX);
+}
 
 /*
 struct Lnk {
@@ -1097,8 +1105,8 @@ pub struct Fn {
     pub phis: Vec<Phi>,
     pub start: BlkIdx,
     pub tmps: Vec<Tmp>,
-    pub con: Vec<Con>,
-    pub mem: Vec<Mem>,
+    pub cons: Vec<Con>,
+    pub mems: Vec<Mem>,
     pub retty: TypIdx, // index in Parser::typ, TypIdx::INVALID if no aggregate return
     pub retr: Ref,
     pub rpo: Vec<BlkIdx>,
@@ -1117,8 +1125,8 @@ impl Fn {
             phis: vec![],
             start: BlkIdx::INVALID,
             tmps: vec![],
-            con: vec![],
-            mem: vec![],
+            cons: vec![],
+            mems: vec![],
             retty: TypIdx::INVALID,
             retr: Ref::R,
             rpo: vec![],
@@ -1177,6 +1185,27 @@ impl Fn {
         let ti: TmpIdx = TmpIdx(self.tmps.len());
         self.tmps.push(t);
         ti
+    }
+
+    pub fn con(&self, ci: ConIdx) -> &Con {
+        assert!(ci != ConIdx::INVALID);
+        &self.cons[ci.0]
+    }
+
+    pub fn con_mut(&mut self, ci: ConIdx) -> &mut Con {
+        assert!(ci != ConIdx::INVALID);
+        &mut self.cons[ci.0]
+    }
+
+    pub fn add_con(&mut self, c: Con) -> ConIdx {
+        let ci: ConIdx = ConIdx(self.cons.len());
+        self.cons.push(c);
+        ci
+    }
+
+    pub fn mem(&self, mi: MemIdx) -> &Mem {
+        assert!(mi != MemIdx::INVALID);
+        &self.mems[mi.0]
     }
 }
 
