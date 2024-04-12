@@ -972,7 +972,7 @@ impl Parser<'_> {
             bi = b.dlink;
         }
 
-        let id: usize = curf.blks.len();
+        let id: u32 = curf.blks.len() as u32; // TODO - is this value used???
         bi = curf.add_blk(Blk::new(name, id, self.blkh[h as usize]));
         self.blkh[h as usize] = bi;
 

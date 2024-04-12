@@ -139,8 +139,39 @@ rporec(Blk *b, uint x)
     assert(x != -1u);
     return x - 1;
 }
+ */
 
-/* fill the rpo information */
+pub fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
+    if bi == BlkIdx::INVALID || f.blk(bi).id != u32::MAX {
+        return x;
+    }
+
+    f.blk_mut(bi).id = 1;
+
+    let (s1, s2) = {
+        let b: &Blk = f.blk(bi);
+        let s1: BlkIdx = b.s1;
+        let s2: BlkIdx = b.s2;
+        if s1 != BlkIdx::INVALID && s2 != BlkIdx::INVALID && f.blk(s1).loop_ > f.blk(s2).loop_ {
+            (s2, s1)
+        } else {
+            (s1, s2)
+        }
+    };
+
+    x = rporec(f, s1, x);
+    x = rporec(f, s2, x);
+    assert!(x != u32::MAX);
+
+    f.blk_mut(bi).id = x;
+
+    // Mmm, underflow??
+    assert!(x != 0);
+    x - 1
+}
+
+/*
+/* fill the reverse post-order (rpo) information */
 void
 fillrpo(Fn *f)
 {

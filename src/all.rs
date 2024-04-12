@@ -516,7 +516,7 @@ pub struct Blk {
     pub s2: BlkIdx,
     pub link: BlkIdx,
 
-    pub id: usize, // Same as BlkIdx for this block
+    pub id: u32,
     pub visit: u32,
 
     pub idom: BlkIdx, // maybe Vec<BlkIdx>?
@@ -526,12 +526,12 @@ pub struct Blk {
     pub pred: Vec<BlkIdx>,
     //pub BSet in[1], out[1], gen[1]; // TODO
     pub nlive: [u32; 2],
-    pub loop_: bool, // i32?
+    pub loop_: u32, // was i32 in QBE
     pub name: Vec<u8>,
 }
 
 impl Blk {
-    pub fn new(name: &[u8], id: usize, dlink: BlkIdx) -> Blk {
+    pub fn new(name: &[u8], id: u32, dlink: BlkIdx) -> Blk {
         Blk {
             phi: PhiIdx::INVALID,
             ins: vec![],
@@ -550,7 +550,7 @@ impl Blk {
             pred: vec![],
             //pub BSet in[1], out[1], gen[1]; // TODO
             nlive: [0u32; 2],
-            loop_: false, // i32?
+            loop_: 0,
             name: name.to_vec(),
         }
     }
