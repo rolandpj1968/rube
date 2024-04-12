@@ -11,7 +11,7 @@ use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
     bshas, jmp_for_cls, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat, DatT, DatU, Fn, Ins,
-    KExt, Lnk, Mem, ORanges, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp, TmpIdx, Typ,
+    KExt, Lnk, Mem, ORanges, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp, TmpIdx, Typ,
     TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX, O, TMP0,
 };
 use crate::cfg::fillpreds;
@@ -1036,7 +1036,7 @@ impl Parser<'_> {
             Token::Tblit | Token::Tcall | Token::TOvastart => {
                 /* operations without result */
                 r = Ref::R;
-                k = KW; // why not T0?
+                k = KW; // Why not T0? Note typecheck() assumes KW.
                 op_tok = t;
             }
             // End of function
@@ -1252,7 +1252,7 @@ impl Parser<'_> {
                             return Err(self.err("insufficient args for blit"));
                         }
                         self.insb
-                            .push(Ins::new2(O::Oblit0, K0, Ref::R, [arg[0], arg[1]]));
+                            .push(Ins::new2(O::Oblit0, KW, Ref::R, [arg[0], arg[1]]));
                         let ci: ConIdx;
                         if let Ref::RCon(ci0) = arg[2] {
                             ci = ci0;
@@ -1278,7 +1278,7 @@ impl Parser<'_> {
                             sz_u32
                         };
                         let r: Ref = Ref::RInt(sz as i32); /* Mmm */
-                        self.insb.push(Ins::new1(O::Oblit1, K0, Ref::R, [r]));
+                        self.insb.push(Ins::new1(O::Oblit1, KW, Ref::R, [r]));
                         return Ok(PState::PIns);
                     }
                     _ => {
@@ -1469,15 +1469,15 @@ impl Parser<'_> {
                             )));
                         }
                         if !usecheck(fn_, &p.arg[n], k) {
-                            println!("p.to is {:?} {:?} arg {} is {:?}", p.to, t, n, p.arg[n]);
+                            //println!("p.to is {:?} {:?} arg {} is {:?}", p.to, t, n, p.arg[n]);
                             let argr: &Ref = &p.arg[n];
                             // Must be a RTmp after usecheck() failure
                             if let Ref::RTmp(ti) = argr {
-                                println!(
-                                    "                     arg {} tmp is {:?}",
-                                    n,
-                                    fn_.tmp(*ti)
-                                );
+                                // println!(
+                                //     "                     arg {} tmp is {:?}",
+                                //     n,
+                                //     fn_.tmp(*ti)
+                                // );
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
                                     to_s(&fn_.tmp(*ti).name),
@@ -1499,9 +1499,62 @@ impl Parser<'_> {
 
                     pi = fn_.phi(pi).link;
                 } else {
-                    assert!(false); // Already checked above
+                    // Already checked above that p.to is an RTmp
+                    assert!(false);
                 }
             }
+            for i in &b.ins {
+                for n in 0..2 {
+                    let op: &Op = &OPTAB[i.op as usize];
+                    //println!("   ins {} arg {} op type is {:?}", to_s(op.name), n, i.cls);
+                    let k: KExt = op.argcls[n][i.cls as usize];
+                    let r: &Ref = &i.arg[n];
+                    // println!(
+                    //     "   ins {} arg {} expecting {:?} ref is {:?}",
+                    //     to_s(op.name),
+                    //     n,
+                    //     k,
+                    //     r
+                    // );
+                    if k == KE {
+                        return Err(
+                            self.err(&format!("invalid instruction type in {}", to_s(op.name)))
+                        );
+                    }
+                    if let Ref::RTyp(_) = r {
+                        continue;
+                    }
+                    static FS: [&str; 2] = ["first", "second"];
+                    if *r != Ref::R && k == KX {
+                        return Err(self.err(&format!(
+                            "no {} operand expected in {}",
+                            FS[n],
+                            to_s(op.name)
+                        )));
+                    }
+                    if *r == Ref::R && k != KX {
+                        return Err(self.err(&format!(
+                            "missing {} operand in {}",
+                            FS[n],
+                            to_s(op.name)
+                        )));
+                    }
+                    if !usecheck(fn_, r, k) {
+                        // Must be a RTmp if usecheck() fails
+                        if let Ref::RTmp(ti) = r {
+                            return Err(self.err(&format!(
+                                "invalid type for {} operand %{} in {}",
+                                FS[n],
+                                to_s(&fn_.tmp(*ti).name),
+                                to_s(op.name)
+                            )));
+                        } else {
+                            assert!(false);
+                        }
+                    }
+                }
+            }
+
             bi = fn_.blk(bi).link;
         }
 
