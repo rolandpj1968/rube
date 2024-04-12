@@ -756,7 +756,7 @@ impl Parser<'_> {
     }
 
     fn expect(&mut self, t: Token) -> RubeResult<TokVal> {
-        static TTOA: [&'static str; Token::Ntok as usize] = {
+        static TTOA: [&str; Token::Ntok as usize] = {
             let mut ttoa0: [&'static str; Token::Ntok as usize] =
                 ["<unknown>"; Token::Ntok as usize];
 
@@ -1285,18 +1285,9 @@ impl Parser<'_> {
         }
         self.insb.push(Ins::new2(op, k, r, [arg[0], arg[1]]));
 
-        return Ok(PState::PIns);
+        Ok(PState::PIns)
     }
 }
-
-/*
-static int
-usecheck(Ref r, int k, Fn *fn)
-{
-    return rtype(r) != RTmp || fn->tmp[r.val].cls == k
-        || (fn->tmp[r.val].cls == Kl && k == Kw);
-}
- */
 
 fn usecheck(fn_: &Fn, r: &Ref, k: KExt) -> bool {
     match r {
@@ -1308,99 +1299,6 @@ fn usecheck(fn_: &Fn, r: &Ref, k: KExt) -> bool {
     }
 }
 
-/*
-static void
-typecheck(Fn *fn)
-{
-    Blk *b;
-    Phi *p;
-    Ins *i;
-    uint n;
-    int k;
-    Tmp *t;
-    Ref r;
-    BSet pb[1], ppb[1];
-
-    fillpreds(fn);
-    bsinit(pb, fn->nblk);
-    bsinit(ppb, fn->nblk);
-    for (b=fn->start; b; b=b->link) {
-        for (p=b->phi; p; p=p->link)
-            fn->tmp[p->to.val].cls = p->cls;
-        for (i=b->ins; i<&b->ins[b->nins]; i++)
-            if (rtype(i->to) == RTmp) {
-                t = &fn->tmp[i->to.val];
-                if (clsmerge(&t->cls, i->cls))
-                    err("temporary %%%s is assigned with"
-                        " multiple types", t->name);
-            }
-    }
-    for (b=fn->start; b; b=b->link) {
-        bszero(pb);
-        for (n=0; n<b->npred; n++)
-            bsset(pb, b->pred[n]->id);
-        for (p=b->phi; p; p=p->link) {
-            bszero(ppb);
-            t = &fn->tmp[p->to.val];
-            for (n=0; n<p->narg; n++) {
-                k = t->cls;
-                if (bshas(ppb, p->blk[n]->id))
-                    err("multiple entries for @%s in phi %%%s",
-                        p->blk[n]->name, t->name);
-                if (!usecheck(p->arg[n], k, fn))
-                    err("invalid type for operand %%%s in phi %%%s",
-                        fn->tmp[p->arg[n].val].name, t->name);
-                bsset(ppb, p->blk[n]->id);
-            }
-            if (!bsequal(pb, ppb))
-                err("predecessors not matched in phi %%%s", t->name);
-        }
-        for (i=b->ins; i<&b->ins[b->nins]; i++)
-            for (n=0; n<2; n++) {
-                k = optab[i->op].argcls[n][i->cls];
-                r = i->arg[n];
-                t = &fn->tmp[r.val];
-                if (k == Ke)
-                    err("invalid instruction type in %s",
-                        optab[i->op].name);
-                if (rtype(r) == RType)
-                    continue;
-                if (rtype(r) != -1 && k == Kx)
-                    err("no %s operand expected in %s",
-                        n == 1 ? "second" : "first",
-                        optab[i->op].name);
-                if (rtype(r) == -1 && k != Kx)
-                    err("missing %s operand in %s",
-                        n == 1 ? "second" : "first",
-                        optab[i->op].name);
-                if (!usecheck(r, k, fn))
-                    err("invalid type for %s operand %%%s in %s",
-                        n == 1 ? "second" : "first",
-                        t->name, optab[i->op].name);
-            }
-        r = b->jmp.arg;
-        if (isret(b->jmp.type)) {
-            if (b->jmp.type == Jretc)
-                k = Kl;
-            else if (b->jmp.type >= Jretsb)
-                k = Kw;
-            else
-                k = b->jmp.type - Jretw;
-            if (!usecheck(r, k, fn))
-                goto JErr;
-        }
-        if (b->jmp.type == Jjnz && !usecheck(r, Kw, fn))
-        JErr:
-            err("invalid type for jump argument %%%s in block @%s",
-                fn->tmp[r.val].name, b->name);
-        if (b->s1 && b->s1->jmp.type == Jxxx)
-            err("block @%s is used undefined", b->s1->name);
-        if (b->s2 && b->s2->jmp.type == Jxxx)
-            err("block @%s is used undefined", b->s2->name);
-    }
-}
-
- */
 impl Parser<'_> {
     fn typecheck(&self, fn_: &mut Fn) -> RubeResult<()> {
         fillpreds(fn_);
@@ -1655,9 +1553,6 @@ impl Parser<'_> {
         let mut sz: u64 = 0;
         let mut al = ty.align;
         while t != Token::Trbrace {
-            // let type_: TypFldT;
-            // let mut s: u64;
-            // let mut a: i32;
             let mut ftyp_idx: u32 = 0;
 
             let (type_, mut s, mut a) = match t {
@@ -2013,10 +1908,7 @@ pub fn parse(
 
 pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
     match c.type_ {
-        ConT::CUndef => {
-            assert!(false); // nada
-            let _ = write!(f, "");
-        }
+        ConT::CUndef => assert!(false), // nada
         ConT::CAddr => {
             if c.sym.type_ == SymT::SThr {
                 let _ = write!(f, "thread ");
@@ -2027,10 +1919,7 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
             }
         }
         ConT::CBits => match c.bits {
-            ConBits::None => {
-                assert!(false);
-                let _ = write!(f, "");
-            }
+            ConBits::None => assert!(false),
             ConBits::F(s) => {
                 let _ = write!(f, "s_{:.6}", s);
             }
@@ -2096,7 +1985,7 @@ fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) 
             let _ = write!(f, "]");
         }
         Ref::RInt(i) => {
-            let _ = write!(f, "{}", *i as i32);
+            let _ = write!(f, "{}", *i);
         }
     }
 }
@@ -2149,7 +2038,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
         let _ = writeln!(f, "@{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::INVALID {
-            let p: &Phi = &fn_.phi(pi);
+            let p: &Phi = fn_.phi(pi);
             let _ = write!(f, "\t");
             printref(f, fn_, typ, itbl, &p.to);
             let _ = write!(f, " ={} phi ", KTOC[p.cls as usize]);
@@ -2173,8 +2062,8 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 printref(f, fn_, typ, itbl, &i.to);
                 let _ = write!(f, " ={} ", KTOC[i.cls as usize]);
             }
-            assert!(OPTAB[i.op as usize].name.len() != 0);
-            let _ = write!(f, "{}", to_s(&OPTAB[i.op as usize].name));
+            assert!(!OPTAB[i.op as usize].name.is_empty());
+            let _ = write!(f, "{}", to_s(OPTAB[i.op as usize].name));
             if i.to == Ref::R {
                 match i.op {
                     O::Oarg
