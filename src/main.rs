@@ -118,6 +118,7 @@ fn dump_func(fn_: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     fillrpo(fn_);
     filluse(fn_);
     promote(fn_).unwrap();
+    filluse(fn_);
     printfn(&mut stdout(), fn_, typ, itbl);
 }
 

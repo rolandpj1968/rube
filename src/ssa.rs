@@ -95,7 +95,6 @@ pub fn filluse(f: &mut Fn) {
             }
         }
 
-        // if (rtype(b->jmp.arg) == RTmp) {
         if let Ref::RTmp(ti) = f.blk(bi).jmp.arg {
             adduse(f.tmp_mut(ti), UseT::UJmp, bi, bid);
         }

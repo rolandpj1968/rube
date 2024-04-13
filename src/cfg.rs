@@ -13,37 +13,6 @@ newblk()
     *b = z;
     return b;
 }
-
-void
-edgedel(Blk *bs, Blk **pbd)
-{
-    Blk *bd;
-    Phi *p;
-    uint a;
-    int mult;
-
-    bd = *pbd;
-    mult = 1 + (bs->s1 == bs->s2);
-    *pbd = 0;
-    if (!bd || mult > 1)
-        return;
-    for (p=bd->phi; p; p=p->link) {
-        for (a=0; p->blk[a]!=bs; a++)
-            assert(a+1<p->narg);
-        p->narg--;
-        memmove(&p->blk[a], &p->blk[a+1],
-            sizeof p->blk[0] * (p->narg-a));
-        memmove(&p->arg[a], &p->arg[a+1],
-            sizeof p->arg[0] * (p->narg-a));
-    }
-    if (bd->npred != 0) {
-        for (a=0; bd->pred[a]!=bs; a++)
-            assert(a+1<bd->npred);
-        bd->npred--;
-        memmove(&bd->pred[a], &bd->pred[a+1],
-            sizeof bd->pred[0] * (bd->npred-a));
-    }
-}
  */
 
 fn edgedel(f: &mut Fn, bsi: BlkIdx, bdi: BlkIdx) {
@@ -83,67 +52,13 @@ fn edgedel(f: &mut Fn, bsi: BlkIdx, bdi: BlkIdx) {
     }
 }
 
-/*
-static void
-addpred(Blk *bp, Blk *bc)
-{
-    if (!bc->pred) {
-        bc->pred = alloc(bc->npred * sizeof bc->pred[0]);
-        bc->visit = 0;
-    }
-    bc->pred[bc->visit++] = bp;
-}
-
-/* fill predecessors information in blocks */
-void
-fillpreds(Fn *f)
-{
-    Blk *b;
-
-    for (b=f->start; b; b=b->link) {
-        b->npred = 0;
-        b->pred = 0;
-    }
-    for (b=f->start; b; b=b->link) {
-        if (b->s1)
-            b->s1->npred++;
-        if (b->s2 && b->s2 != b->s1)
-            b->s2->npred++;
-    }
-    for (b=f->start; b; b=b->link) {
-        if (b->s1)
-            addpred(b, b->s1);
-        if (b->s2 && b->s2 != b->s1)
-            addpred(b, b->s2);
-    }
-}
- */
-
 pub fn fillpreds(f: &mut Fn) {
-    // Blk * b;
-
-    // for (b=f->start; b; b=b->link) {
-    //     b->npred = 0;
-    //     b->pred = 0;
-    // }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::INVALID {
         let b: &mut Blk = f.blk_mut(bi);
         b.preds.clear();
         bi = b.link;
     }
-    // for (b=f->start; b; b=b->link) {
-    //     if (b->s1)
-    //         b->s1->npred++;
-    //     if (b->s2 && b->s2 != b->s1)
-    //         b->s2->npred++;
-    // }
-    // for (b=f->start; b; b=b->link) {
-    //     if (b->s1)
-    //         addpred(b, b->s1);
-    //     if (b->s2 && b->s2 != b->s1)
-    //         addpred(b, b->s2);
-    // }
     bi = f.start;
     while bi != BlkIdx::INVALID {
         let (s1, s2) = f.blk(bi).s1_s2();
@@ -156,29 +71,6 @@ pub fn fillpreds(f: &mut Fn) {
         bi = f.blk(bi).link;
     }
 }
-
-/*
-static int
-rporec(Blk *b, uint x)
-{
-    Blk *s1, *s2;
-
-    if (!b || b->id != -1u)
-        return x;
-    b->id = 1;
-    s1 = b->s1;
-    s2 = b->s2;
-    if (s1 && s2 && s1->loop > s2->loop) {
-        s1 = b->s2;
-        s2 = b->s1;
-    }
-    x = rporec(s1, x);
-    x = rporec(s2, x);
-    b->id = x;
-    assert(x != -1u);
-    return x - 1;
-}
- */
 
 fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
     if bi == BlkIdx::INVALID || f.blk(bi).id != u32::MAX {
@@ -201,33 +93,6 @@ fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
     // Deliberately wraps to u32:MAX
     x.wrapping_sub(1)
 }
-
-/*
-/* fill the reverse post-order (rpo) information */
-void
-fillrpo(Fn *f)
-{
-    uint n;
-    Blk *b, **p;
-
-    for (b=f->start; b; b=b->link)
-        b->id = -1u;
-    n = 1 + rporec(f->start, f->nblk-1);
-    f->nblk -= n;
-    f->rpo = alloc(f->nblk * sizeof f->rpo[0]);
-    for (p=&f->start; (b=*p);) {
-        if (b->id == -1u) {
-            edgedel(b, &b->s1);
-            edgedel(b, &b->s2);
-            *p = b->link;
-        } else {
-            b->id -= n;
-            f->rpo[b->id] = b;
-            p = &b->link;
-        }
-    }
-}
- */
 
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
@@ -268,67 +133,74 @@ pub fn fillrpo(f: &mut Fn) {
     }
 }
 
-/*
 /* for dominators computation, read
  * "A Simple, Fast Dominance Algorithm"
  * by K. Cooper, T. Harvey, and K. Kennedy.
  */
 
-static Blk *
-inter(Blk *b1, Blk *b2)
-{
-    Blk *bt;
+fn inter(f: &Fn, mut bi1: BlkIdx, mut bi2: BlkIdx) -> BlkIdx {
+    if bi1 == BlkIdx::INVALID {
+        return bi2;
+    }
 
-    if (b1 == 0)
-        return b2;
-    while (b1 != b2) {
-        if (b1->id < b2->id) {
-            bt = b1;
-            b1 = b2;
-            b2 = bt;
+    while bi1 != bi2 {
+        if f.blk(bi1).id < f.blk(bi2).id {
+            (bi1, bi2) = (bi2, bi1);
         }
-        while (b1->id > b2->id) {
-            b1 = b1->idom;
-            assert(b1);
+        while f.blk(bi1).id > f.blk(bi2).id {
+            bi1 = f.blk(bi1).idom;
+            assert!(bi1 != BlkIdx::INVALID);
         }
     }
-    return b1;
+    return bi1;
 }
 
-void
-filldom(Fn *fn)
-{
-    Blk *b, *d;
-    int ch;
-    uint n, p;
+pub fn filldom(f: &mut Fn) {
+    let mut bi: BlkIdx = f.start;
+    while bi != BlkIdx::INVALID {
+        let b: &mut Blk = f.blk_mut(bi);
+        b.idom = BlkIdx::INVALID;
+        b.dom = BlkIdx::INVALID;
+        b.dlink = BlkIdx::INVALID;
 
-    for (b=fn->start; b; b=b->link) {
-        b->idom = 0;
-        b->dom = 0;
-        b->dlink = 0;
+        bi = b.link;
     }
-    do {
-        ch = 0;
-        for (n=1; n<fn->nblk; n++) {
-            b = fn->rpo[n];
-            d = 0;
-            for (p=0; p<b->npred; p++)
-                if (b->pred[p]->idom
-                ||  b->pred[p] == fn->start)
-                    d = inter(d, b->pred[p]);
-            if (d != b->idom) {
-                ch++;
-                b->idom = d;
+    loop {
+        let mut ch: u32 = 0;
+        for n in 1..f.rpo.len() {
+            bi = f.rpo[n];
+            let mut di: BlkIdx = BlkIdx::INVALID;
+            for p in 0..f.blk(bi).preds.len() {
+                let b: &Blk = f.blk(bi);
+                if f.blk(b.preds[p]).idom != BlkIdx::INVALID || b.preds[p] == f.start {
+                    di = inter(f, di, b.preds[p]);
+                }
+            }
+            if di != f.blk(bi).idom {
+                ch += 1;
+                f.blk_mut(bi).idom = di;
             }
         }
-    } while (ch);
-    for (b=fn->start; b; b=b->link)
-        if ((d=b->idom)) {
-            assert(d != b);
-            b->dlink = d->dom;
-            d->dom = b;
+
+        if ch == 0 {
+            break;
         }
+    }
+    let mut bi: BlkIdx = f.start;
+    while bi != BlkIdx::INVALID {
+        let di: BlkIdx = f.blk(bi).idom;
+        if di != BlkIdx::INVALID {
+            assert!(di != bi);
+            let ddomi = f.blk(di).dom;
+            f.blk_mut(bi).dlink = ddomi;
+            f.blk_mut(di).dom = bi;
+        }
+
+        bi = f.blk(bi).link;
+    }
 }
+
+/*
 
 int
 sdom(Blk *b1, Blk *b2)
