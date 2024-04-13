@@ -11,6 +11,11 @@ use crate::util::InternId;
 pub type RubeError = Box<dyn std::error::Error>;
 pub type RubeResult<T> = Result<T, RubeError>;
 
+// Helper for displaying byte slice
+pub fn to_s(raw: &[u8]) -> String {
+    String::from_utf8_lossy(raw).to_string()
+}
+
 pub type Bits = u64;
 
 /*
@@ -814,6 +819,14 @@ impl Fn {
         let bi: BlkIdx = BlkIdx(self.blks.len() as u32);
         self.blks.push(b);
         bi
+    }
+
+    pub fn set_blk_link(&mut self, from_bi: BlkIdx, to_bi: BlkIdx) {
+        if from_bi == BlkIdx::INVALID {
+            self.start = to_bi;
+        } else {
+            self.blk_mut(from_bi).link = to_bi;
+        }
     }
 
     pub fn phi(&self, pi: PhiIdx) -> &Phi {

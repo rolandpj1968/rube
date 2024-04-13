@@ -10,10 +10,10 @@ use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
-    bshas, cls_for_ret, isret, ret_for_cls, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT, Dat,
-    DatT, DatU, Fn, Ins, KExt, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp,
-    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX,
-    NPUBOP, O, TMP0,
+    bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT,
+    Dat, DatT, DatU, Fn, Ins, KExt, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target,
+    Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW,
+    KX, NPUBOP, O, TMP0,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -43,10 +43,6 @@ impl Error for ParseError {
     fn description(&self) -> &str {
         &self.msg
     }
-}
-
-fn to_s(raw: &[u8]) -> String {
-    String::from_utf8_lossy(raw).to_string()
 }
 
 #[derive(PartialEq)]

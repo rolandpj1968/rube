@@ -1,4 +1,4 @@
-use crate::all::{Blk, BlkIdx, Fn, Phi, PhiIdx};
+use crate::all::{to_s, Blk, BlkIdx, Fn, Phi, PhiIdx};
 
 /*
 #include "all.h"
@@ -198,11 +198,8 @@ fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
 
     f.blk_mut(bi).id = x;
 
-    if x == 0 {
-        u32::MAX
-    } else {
-        x - 1
-    }
+    // Deliberately wraps to u32:MAX
+    x.wrapping_sub(1)
 }
 
 /*
@@ -241,7 +238,8 @@ pub fn fillrpo(f: &mut Fn) {
         bi = b.link;
     }
 
-    let n: u32 = rporec(f, f.start, (f.nblk - 1) as u32).wrapping_add(1);
+    // Deliberately wraps from u32::MAX
+    let n: u32 = rporec(f, f.start, f.nblk - 1).wrapping_add(1);
     f.nblk -= n;
     f.rpo = vec![BlkIdx::INVALID; f.nblk as usize];
     let mut prev_bi = BlkIdx::INVALID;
@@ -255,11 +253,7 @@ pub fn fillrpo(f: &mut Fn) {
             // Unreachable Blk
             edgedel(f, bi, s1);
             edgedel(f, bi, s2);
-            if prev_bi == BlkIdx::INVALID {
-                f.start = next_bi;
-            } else {
-                f.blk_mut(prev_bi).link = next_bi;
-            }
+            f.set_blk_link(prev_bi, next_bi);
             bi = next_bi;
         } else {
             let (rpo_idx, next_bi) = {
