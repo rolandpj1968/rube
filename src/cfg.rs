@@ -200,58 +200,61 @@ pub fn filldom(f: &mut Fn) {
     }
 }
 
-/*
-
-int
-sdom(Blk *b1, Blk *b2)
-{
-    assert(b1 && b2);
-    if (b1 == b2)
-        return 0;
-    while (b2->id > b1->id)
-        b2 = b2->idom;
-    return b1 == b2;
+fn sdom(f: &Fn, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
+    assert!(b1i != BlkIdx::INVALID && b2i != BlkIdx::INVALID);
+    if b1i == b2i {
+        return false;
+    }
+    while f.blk(b2i).id > f.blk(b1i).id {
+        b2i = f.blk(b2i).idom;
+    }
+    b1i == b2i
 }
 
-int
-dom(Blk *b1, Blk *b2)
-{
-    return b1 == b2 || sdom(b1, b2);
+fn dom(f: &Fn, b1i: BlkIdx, b2i: BlkIdx) -> bool {
+    b1i == b2i || sdom(f, b1i, b2i)
 }
 
-static void
-addfron(Blk *a, Blk *b)
-{
-    uint n;
-
-    for (n=0; n<a->nfron; n++)
-        if (a->fron[n] == b)
+pub fn addfron(f: &mut Fn, ai: BlkIdx, bi: BlkIdx) {
+    for froni in &f.blk(ai).frons {
+        if *froni == bi {
             return;
-    if (!a->nfron)
-        a->fron = vnew(++a->nfron, sizeof a->fron[0], PFn);
-    else
-        vgrow(&a->fron, ++a->nfron);
-    a->fron[a->nfron-1] = b;
+        }
+    }
+
+    f.blk_mut(ai).frons.push(bi);
 }
 
 /* fill the dominance frontier */
-void
-fillfron(Fn *fn)
-{
-    Blk *a, *b;
-
-    for (b=fn->start; b; b=b->link)
-        b->nfron = 0;
-    for (b=fn->start; b; b=b->link) {
-        if (b->s1)
-            for (a=b; !sdom(a, b->s1); a=a->idom)
-                addfron(a, b->s1);
-        if (b->s2)
-            for (a=b; !sdom(a, b->s2); a=a->idom)
-                addfron(a, b->s2);
+pub fn fillfron(f: &mut Fn) {
+    let mut bi = f.start;
+    while bi != BlkIdx::INVALID {
+        let b: &mut Blk = f.blk_mut(bi);
+        b.frons.clear();
+        bi = b.link;
+    }
+    bi = f.start;
+    while bi != BlkIdx::INVALID {
+        let (s1, s2) = f.blk(bi).s1_s2();
+        if s1 != BlkIdx::INVALID {
+            let mut ai = bi;
+            while !sdom(f, ai, s1) {
+                addfron(f, ai, s1);
+                ai = f.blk(ai).idom;
+            }
+        }
+        if s2 != BlkIdx::INVALID {
+            let mut ai = bi;
+            while !sdom(f, ai, s2) {
+                addfron(f, ai, s2);
+                ai = f.blk(ai).idom;
+            }
+        }
+        bi = f.blk(bi).link;
     }
 }
 
+/*
 static void
 loopmark(Blk *hd, Blk *b, void f(Blk *, Blk *))
 {
