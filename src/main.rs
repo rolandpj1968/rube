@@ -26,6 +26,7 @@ use std::path::Path;
 use abi::elimsb;
 use all::{Bits, Dat, Fn, Ref, Target, Typ};
 use cfg::fillrpo;
+use mem::promote;
 use parse::{parse, printfn};
 use ssa::filluse;
 use util::Bucket;
@@ -116,6 +117,7 @@ fn dump_func(fn_: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     elimsb(fn_);
     fillrpo(fn_);
     filluse(fn_);
+    promote(fn_).unwrap();
     printfn(&mut stdout(), fn_, typ, itbl);
 }
 
