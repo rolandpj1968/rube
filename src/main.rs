@@ -31,6 +31,8 @@ use parse::{parse, printfn};
 use ssa::filluse;
 use util::Bucket;
 
+use crate::ssa::ssa;
+
 // Target T_amd64_sysv = {
 // 	.name = "amd64_sysv",
 // 	.emitfin = elf_emitfin,
@@ -111,15 +113,16 @@ fn dump_data(dat: &Dat, _typ: &[Typ]) {
     );
 }
 
-fn dump_func(fn_: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
-    println!("Got fn {:?}:", String::from_utf8_lossy(&fn_.name));
+fn dump_func(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
+    println!("Got fn {:?}:", String::from_utf8_lossy(&f.name));
     println!();
-    elimsb(fn_);
-    fillrpo(fn_);
-    filluse(fn_);
-    promote(fn_).unwrap();
-    filluse(fn_);
-    printfn(&mut stdout(), fn_, typ, itbl);
+    elimsb(f);
+    fillrpo(f);
+    filluse(f);
+    promote(f).unwrap();
+    filluse(f);
+    ssa(f);
+    printfn(&mut stdout(), f, typ, itbl);
 }
 
 fn main() {

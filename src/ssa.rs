@@ -1,7 +1,8 @@
 use crate::all::{
-    isext, isload, isparbh, Blk, BlkIdx, Fn, Ins, InsIdx, PhiIdx, Ref, Tmp, TmpIdx, TmpWdth, Use,
-    UseT, KW, O, TMP0,
+    isext, isload, isparbh, to_s, Blk, BlkIdx, Fn, Ins, InsIdx, PhiIdx, Ref, Tmp, TmpIdx, TmpWdth,
+    Use, UseT, KW, O, TMP0,
 };
+use crate::cfg::filldom;
 use crate::util::phicls;
 
 fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: u32) {
@@ -198,14 +199,16 @@ phiins(Fn *fn)
     }
     free(blist);
 }
-
-typedef struct Name Name;
+ */
 struct Name {
-    Ref r;
-    Blk *b;
-    Name *up;
-};
+    r: Ref,
+    bi: BlkIdx,
+    up: NameIdx,
+}
 
+struct NameIdx(u32);
+
+/*
 static Name *namel;
 
 static Name *
@@ -308,48 +311,62 @@ renblk(Blk *b, Name **stk, Fn *fn)
     for (s=b->dom; s; s=s->dlink)
         renblk(s, stk, fn);
 }
+ */
 
 /* require rpo and use */
-void
-ssa(Fn *fn)
-{
-    Name **stk, *n;
-    int d, nt;
-    Blk *b, *b1;
+pub fn ssa(f: &mut Fn) {
+    // Name **stk, *n;
+    // int d, nt;
+    // Blk *b, *b1;
 
-    nt = fn->ntmp;
-    stk = emalloc(nt * sizeof stk[0]);
-    d = debug['L'];
-    debug['L'] = 0;
-    filldom(fn);
-    if (debug['N']) {
-        fprintf(stderr, "\n> Dominators:\n");
-        for (b1=fn->start; b1; b1=b1->link) {
-            if (!b1->dom)
-                continue;
-            fprintf(stderr, "%10s:", b1->name);
-            for (b=b1->dom; b; b=b->dlink)
-                fprintf(stderr, " %s", b->name);
-            fprintf(stderr, "\n");
+    // nt = fn->ntmp;
+    // stk = emalloc(nt * sizeof stk[0]);
+    // d = debug['L'];
+    // debug['L'] = 0;
+    filldom(f);
+    if true
+    /*debug['N']*/
+    {
+        // TODO obviously
+        eprintln!("\n> Dominators:");
+        let mut b1i: BlkIdx = f.start;
+        while b1i != BlkIdx::INVALID {
+            let b1: &Blk = f.blk(b1i);
+            if b1.dom != BlkIdx::INVALID {
+                /*e*/
+                print!("{:>10}:", to_s(&b1.name));
+                let mut bi: BlkIdx = b1.dom;
+                while bi != BlkIdx::INVALID {
+                    let b: &Blk = f.blk(bi);
+                    /*e*/
+                    print!(" {}", to_s(&b.name));
+                    bi = b.dlink;
+                }
+                /*e*/
+                println!();
+            }
+
+            b1i = f.blk(b1i).link;
         }
     }
-    fillfron(fn);
-    filllive(fn);
-    phiins(fn);
-    renblk(fn->start, stk, fn);
-    while (nt--)
-        while ((n=stk[nt])) {
-            stk[nt] = n->up;
-            nfree(n);
-        }
-    debug['L'] = d;
-    free(stk);
-    if (debug['N']) {
-        fprintf(stderr, "\n> After SSA construction:\n");
-        printfn(fn, stderr);
-    }
+    // fillfron(fn);
+    // filllive(fn);
+    // phiins(fn);
+    // renblk(fn->start, stk, fn);
+    // while (nt--)
+    //     while ((n=stk[nt])) {
+    //         stk[nt] = n->up;
+    //         nfree(n);
+    //     }
+    // debug['L'] = d;
+    // free(stk);
+    // if (debug['N']) {
+    //     fprintf(stderr, "\n> After SSA construction:\n");
+    //     printfn(fn, stderr);
+    // }
 }
 
+/*
 static int
 phicheck(Phi *p, Blk *b, Ref t)
 {
