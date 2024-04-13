@@ -1,4 +1,4 @@
-use crate::all::{to_s, Blk, BlkIdx, Fn, Phi, PhiIdx};
+use crate::all::{Blk, BlkIdx, Fn, Phi, PhiIdx};
 
 /*
 #include "all.h"

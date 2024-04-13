@@ -12,6 +12,7 @@ mod all;
 mod cfg;
 mod optab;
 mod parse;
+mod ssa;
 mod util;
 
 use std::env;

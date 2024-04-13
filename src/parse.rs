@@ -1042,6 +1042,7 @@ impl Parser<'_> {
                         to_s(&new_b.name),
                     )));
                 }
+                // TODO? curf.set_blk_link(from_bi, to_bi);
                 if self.blink == BlkIdx::INVALID {
                     // First block
                     curf.start = new_bi;

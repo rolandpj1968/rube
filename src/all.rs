@@ -482,6 +482,13 @@ impl Ins {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct InsIdx(pub u32); // Index into Blk::ins
+
+impl InsIdx {
+    pub const INVALID: InsIdx = InsIdx(u32::MAX);
+}
+
 #[derive(new)]
 pub struct Phi {
     pub to: Ref,
@@ -521,7 +528,7 @@ pub struct Blk {
     pub s2: BlkIdx,
     pub link: BlkIdx,
 
-    pub id: u32,
+    pub id: u32, // TODO BlkId wrapper
     pub visit: u32,
 
     pub idom: BlkIdx, // maybe Vec<BlkIdx>?
@@ -589,6 +596,22 @@ struct Use {
 };
 
  */
+
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+pub enum UseT {
+    UXXX,
+    UPhi(PhiIdx),
+    UIns(InsIdx),
+    UJmp,
+}
+
+#[derive(new, Debug)]
+pub struct Use {
+    type_: UseT,
+    bid: u32,
+}
+
 #[derive(Debug, PartialEq)]
 #[repr(u8)]
 pub enum SymT {
@@ -639,7 +662,7 @@ struct Alias {
 };
  */
 
-#[derive(Debug)]
+#[derive(Debug, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum TmpWdth {
     WFull,
@@ -651,15 +674,36 @@ pub enum TmpWdth {
     Wuw,
 }
 
+impl TmpWdth {
+    fn from_opbh(opbh: O, opsb: O) -> TmpWdth {
+        TmpWdth::from_repr((TmpWdth::Wsb as u8) + ((opbh as u8) - (opsb as u8))).unwrap()
+    }
+
+    pub fn from_parbh(op: O) -> TmpWdth {
+        assert!(isparbh(op));
+        TmpWdth::from_opbh(op, O::Oparsb)
+    }
+
+    pub fn from_loadbh(op: O) -> TmpWdth {
+        assert!(isload(op) && op != O::Oload);
+        TmpWdth::from_opbh(op, O::Oloadsb)
+    }
+
+    pub fn from_ext(op: O) -> TmpWdth {
+        assert!(isext(op));
+        TmpWdth::from_opbh(op, O::Oextsb)
+    }
+}
+
 // TODO derive new?
 #[derive(Debug)]
 pub struct Tmp {
     pub name: Vec<u8>,
-    // Ins *def;
-    // Use *use;
-    pub ndef: u32,
-    pub nuse: u32,
-    // uint bid; /* id of a defining block */
+    pub def: InsIdx,
+    pub uses: Vec<Use>,
+    pub ndef: u32, // this is not always defs.len() - see filluse() for example
+    // pub nuse: u32,
+    pub bid: u32, /* id of a defining block - TODO: retread to BlkIdx??? It's not the same number always tho! */
     // uint cost;
     pub slot: i32, /* -1 for unset */
     pub cls: KExt,
@@ -668,20 +712,24 @@ pub struct Tmp {
     //     int w;  /* weight */
     //     bits m; /* avoid these registers */
     // } hint;
-    // int phi;
+    pub phi: TmpIdx,
     // Alias alias;
     pub width: TmpWdth,
     // int visit;
 }
 
 impl Tmp {
-    pub fn new(name: Vec<u8>, ndef: u32, nuse: u32, slot: i32, cls: KExt) -> Tmp {
+    pub fn new(name: Vec<u8>, /*ndef: u32, nuse: u32,*/ slot: i32, cls: KExt) -> Tmp {
         Tmp {
             name,
-            ndef,
-            nuse,
+            def: InsIdx::INVALID, // ??? QBE sets ndef to 1 initially in parse.c
+            uses: vec![Use::new(UseT::UXXX, 0)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
+            ndef: 1,                             // TODO??? QBE sets ndef to 1 initially in parse.c
+            bid: u32::MAX,                       // QBE inits to 0 in newtmp()
+
             slot,
             cls,
+            phi: TmpIdx::INVALID, // QBE inits to 0 in newtmp()
             width: TmpWdth::WFull,
         }
     }

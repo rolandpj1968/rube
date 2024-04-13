@@ -429,7 +429,21 @@ phicls(int t, Tmp *tmp)
     tmp[t].phi = t1;
     return t1;
 }
+ */
+// TODO - what is this doing?
+pub fn phicls(ti: TmpIdx, tmps: &mut Vec<Tmp>) -> TmpIdx {
+    //int t1;
 
+    let mut ti1: TmpIdx = tmps[ti.0 as usize].phi;
+    if ti1 == TmpIdx::INVALID {
+        return ti;
+    }
+    ti1 = phicls(ti1, tmps);
+    tmps[ti.0 as usize].phi = ti1;
+    return ti1;
+}
+
+/*
 Ref
 newtmp(char *prfx, int k,  Fn *fn)
 {
@@ -461,9 +475,7 @@ pub fn newtmp(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> TmpIdx {
         }
     }
 
-    fn_.add_tmp(Tmp::new(
-        name, /*ndef*/ 1, /*nuse*/ 1, /*slot*/ -1, /*cls*/ k,
-    ))
+    fn_.add_tmp(Tmp::new(name, /*slot*/ -1, /*cls*/ k))
 }
 
 pub fn newtmpref(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> Ref {
