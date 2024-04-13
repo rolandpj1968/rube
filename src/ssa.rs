@@ -2,7 +2,7 @@ use crate::all::{
     isext, isload, isparbh, to_s, Blk, BlkIdx, Fn, Ins, InsIdx, PhiIdx, Ref, Tmp, TmpIdx, TmpWdth,
     Use, UseT, KW, O, TMP0,
 };
-use crate::cfg::filldom;
+use crate::cfg::{filldom, fillfron};
 use crate::util::phicls;
 
 fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: u32) {
@@ -349,7 +349,7 @@ pub fn ssa(f: &mut Fn) {
             b1i = f.blk(b1i).link;
         }
     }
-    // fillfron(fn);
+    fillfron(f);
     // filllive(fn);
     // phiins(fn);
     // renblk(fn->start, stk, fn);
