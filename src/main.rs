@@ -10,6 +10,8 @@ extern crate static_assertions;
 mod abi;
 mod all;
 mod cfg;
+mod load;
+mod mem;
 mod optab;
 mod parse;
 mod ssa;

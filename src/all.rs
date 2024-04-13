@@ -355,8 +355,15 @@ pub fn cls_for_ret(j: J) -> Option<KExt> {
 //     Jjf1 = J::Jjffuo as u8,
 // }
 
+pub const OALLOC: O = O::Oalloc4;
+pub const OALLOC1: O = O::Oalloc16;
+
 fn in_range_o(x: O, l: O, u: O) -> bool {
     l <= x && x <= u
+}
+
+pub fn isstore(o: O) -> bool {
+    in_range_o(o, O::Ostoreb, O::Ostored)
 }
 
 pub fn isload(o: O) -> bool {
@@ -416,6 +423,14 @@ pub enum KExt {
 
     Ke = -2, /* erroneous mode */
              //Km = KBase::Kl as isize, /* memory pointer */
+}
+
+pub fn kwide(k: KExt) -> i32 {
+    (k as i32) & 1
+}
+
+pub fn kbase(k: KExt) -> i32 {
+    (k as i32) >> 1
 }
 
 pub const KX: KExt = KExt::Kx;
@@ -608,8 +623,9 @@ pub enum UseT {
 
 #[derive(new, Debug)]
 pub struct Use {
-    type_: UseT,
-    bid: u32,
+    pub type_: UseT,
+    pub bi: BlkIdx, // TODO - need this to access type_ PhiIdx or InsIdx, but now bid is redundant
+    pub bid: u32,
 }
 
 #[derive(Debug, PartialEq)]
@@ -723,9 +739,9 @@ impl Tmp {
         Tmp {
             name,
             def: InsIdx::INVALID, // ??? QBE sets ndef to 1 initially in parse.c
-            uses: vec![Use::new(UseT::UXXX, 0)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
-            ndef: 1,                             // TODO??? QBE sets ndef to 1 initially in parse.c
-            bid: u32::MAX,                       // QBE inits to 0 in newtmp()
+            uses: vec![Use::new(UseT::UXXX, BlkIdx::INVALID, 0)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
+            ndef: 1,       // TODO??? QBE sets ndef to 1 initially in parse.c
+            bid: u32::MAX, // QBE inits to 0 in newtmp()
 
             slot,
             cls,
