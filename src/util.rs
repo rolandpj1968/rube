@@ -604,23 +604,17 @@ pub fn bsinit(n: usize) -> BSet {
 }
 
 const_assert_eq!(NBIT, 64);
-/*
-inline static uint
-popcnt(bits b)
-{
-    b = (b & 0x5555555555555555) + ((b>>1) & 0x5555555555555555);
-    b = (b & 0x3333333333333333) + ((b>>2) & 0x3333333333333333);
-    b = (b & 0x0f0f0f0f0f0f0f0f) + ((b>>4) & 0x0f0f0f0f0f0f0f0f);
-    b += (b>>8);
-    b += (b>>16);
-    b += (b>>32);
-    return b & 0xff;
-}
- */
 
-// TODO: hrmmm, this looks like bit 0 is considered the hi bit?
-// Ah, no, had the conditions the wrong way round
-// It returns bit 4 for an all zero number, but meh!
+fn popcnt(mut b: Bits) -> u32 {
+    b = (b & 0x5555555555555555) + ((b >> 1) & 0x5555555555555555);
+    b = (b & 0x3333333333333333) + ((b >> 2) & 0x3333333333333333);
+    b = (b & 0x0f0f0f0f0f0f0f0f) + ((b >> 4) & 0x0f0f0f0f0f0f0f0f);
+    b += b >> 8;
+    b += b >> 16;
+    b += b >> 32;
+    (b & 0xff) as u32
+}
+
 fn firstbit(mut b: Bits) -> u32 {
     let mut n: u32 = 0;
     if (b & 0xffffffff) == 0 {
@@ -643,18 +637,15 @@ fn firstbit(mut b: Bits) -> u32 {
     n + FIRST_BIT[(b & 0xf) as usize]
 }
 
-/*
-uint
-bscount(BSet *bs)
-{
-    uint i, n;
-
-    n = 0;
-    for (i=0; i<bs->nt; i++)
-        n += popcnt(bs->t[i]);
-    return n;
+pub fn bscount(bs: &BSet) -> u32 {
+    let mut n: u32 = 0;
+    for bits in bs {
+        n += popcnt(*bits);
+    }
+    n
 }
 
+/*
 static inline uint
 bsmax(BSet *bs)
 {

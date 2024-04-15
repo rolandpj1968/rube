@@ -1,6 +1,6 @@
-use crate::all::{bshas, kbase, BSet, Blk, BlkIdx, Fn, Phi, PhiIdx, Ref, Tmp, TmpIdx};
+use crate::all::{bshas, kbase, BSet, Blk, BlkIdx, Fn, Phi, PhiIdx, Ref, Target, Tmp, TmpIdx};
 
-use crate::util::{bsclr, bscopy, bsequal, bsinit, bsiter, bsset, bsunion};
+use crate::util::{bsclr, bscopy, bscount, bsequal, bsinit, bsiter, bsset, bsunion};
 
 pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
     bscopy(v, &f.blk(si).in_);
@@ -27,11 +27,12 @@ pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
     }
 }
 
-fn bset(f: &mut Fn, r: &Ref, bi: BlkIdx, nlv: &mut [u32; 2], tmps: &[Tmp]) {
+// Hrmm, tmps is f.tmps???
+fn bset(f: &mut Fn, r: Ref, bi: BlkIdx, nlv: &mut [u32; 2]) {
     if let Ref::RTmp(ti) = r {
         bsset(&mut f.blk_mut(bi).gen, ti.0);
         if !bshas(&f.blk(bi).in_, ti.0) {
-            nlv[kbase(tmps[ti.0 as usize].cls) as usize] += 1;
+            nlv[kbase(f.tmp(ti).cls) as usize] += 1;
             bsset(&mut f.blk_mut(bi).in_, ti.0);
         }
     }
@@ -40,7 +41,7 @@ fn bset(f: &mut Fn, r: &Ref, bi: BlkIdx, nlv: &mut [u32; 2], tmps: &[Tmp]) {
 /* liveness analysis
  * requires rpo computation
  */
-pub fn filllive(f: &mut Fn, tmps: &[Tmp]) {
+pub fn filllive(f: &mut Fn, targ: &Target) {
     // Blk *b;
     // Ins *i;
     // int k, t, m[2], n, chg, nlv[2];
@@ -77,9 +78,9 @@ pub fn filllive(f: &mut Fn, tmps: &[Tmp]) {
             chg = chg || !bsequal(&f.blk(bi).out, &u);
 
             let mut nlv: [u32; 2] = [0; 2];
-            //         b->out->t[0] |= T.rglob; // TODO!!!
             {
                 let b: &mut Blk = f.blk_mut(bi);
+                b.out[0] |= targ.rglob;
                 bscopy(&mut b.in_, &b.out);
             }
             {
@@ -90,12 +91,13 @@ pub fn filllive(f: &mut Fn, tmps: &[Tmp]) {
             }
             {
                 let jmp_arg: Ref = f.blk(bi).jmp.arg; // Copying...
-                                                      // if (rtype(b->jmp.arg) == RCall) {
-                                                      //     assert((int)bscount(b->in) == T.nrglob &&
-                                                      //            b->in->t[0] == T.rglob);
-                                                      //     b->in->t[0] |= T.retregs(b->jmp.arg, nlv);
-                                                      // } else
-                                                      //     bset(b->jmp.arg, b, nlv, f->tmp);
+                if let Ref::RCall(c) = jmp_arg {
+                    let b: &mut Blk = f.blk_mut(bi);
+                    assert!(bscount(&b.in_) == targ.nrglob && b.in_[0] == targ.rglob);
+                    b.in_[0] |= (targ.retregs)(jmp_arg, &nlv); // TODO not implemented
+                } else {
+                    bset(f, jmp_arg, bi, &mut nlv);
+                }
             }
             //         for (k=0; k<2; k++)
             //             b->nlive[k] = nlv[k];

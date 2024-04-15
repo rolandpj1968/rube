@@ -117,7 +117,7 @@ fn dump_data(dat: &Dat, _typ: &[Typ]) {
 fn dump_func(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     println!("Got fn {:?}:", String::from_utf8_lossy(&f.name));
     println!();
-    elimsb(f);
+    elimsb(f); // TODO targ.abi0()
     fillrpo(f);
     filluse(f);
     promote(f).unwrap();
