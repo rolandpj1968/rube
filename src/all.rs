@@ -33,17 +33,17 @@ pub const NBIT: u32 = 8 * std::mem::size_of::<Bits>() as u32;
 pub struct Target {
     pub name: &'static [u8],
     pub apple: bool,
-    pub gpr0: i32, // first general purpose reg
-    pub ngpr: i32,
-    pub fpr0: i32, // first floating point reg
-    pub nfpr: i32,
+    pub gpr0: u32, // first general purpose reg
+    pub ngpr: u32,
+    pub fpr0: u32, // first floating point reg
+    pub nfpr: u32,
     pub rglob: Bits, // globally live regs (e.g., sp, fp)
-    pub nrglob: i32,
-    pub rsave: Vec<i32>, // caller-save [Vec???]
-    pub nrsave: [i32; 2],
-    pub retregs: fn(Ref, [i32; 2]) -> Bits,
-    pub argregs: fn(Ref, [i32; 2]) -> Bits,
-    pub memargs: fn(i32) -> i32,
+    pub nrglob: u32,
+    pub rsave: &'static [u32], // caller-save
+    pub nrsave: [u32; 2],
+    pub retregs: fn(Ref, &[u32; 2]) -> Bits,
+    pub argregs: fn(Ref, &[u32; 2]) -> Bits,
+    pub memargs: fn(u32) -> u32,
     pub abi0: fn(&mut Fn),
     pub abi1: fn(&mut Fn),
     pub isel: fn(&mut Fn),
@@ -57,7 +57,7 @@ pub fn bit(n: u32) -> Bits {
     (1 as Bits) << n
 }
 
-pub const RXX: usize = 0;
+pub const RXX: u32 = 0;
 pub const TMP0: u32 = NBIT;
 
 // TODO - just use BitSet

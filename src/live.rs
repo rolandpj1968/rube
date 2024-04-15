@@ -88,15 +88,15 @@ pub fn filllive(f: &mut Fn, tmps: &[Tmp]) {
                     nlv[kbase(f.tmp(TmpIdx(ti)).cls) as usize] += 1;
                 }
             }
-	    {
-		let jmp_arg: Ref = f.blk(bi).jmp.arg; // Copying...
-                if (rtype(b->jmp.arg) == RCall) {
-                    assert((int)bscount(b->in) == T.nrglob &&
-                           b->in->t[0] == T.rglob);
-                    b->in->t[0] |= T.retregs(b->jmp.arg, nlv);
-                } else
-                    bset(b->jmp.arg, b, nlv, f->tmp);
-	    }
+            {
+                let jmp_arg: Ref = f.blk(bi).jmp.arg; // Copying...
+                                                      // if (rtype(b->jmp.arg) == RCall) {
+                                                      //     assert((int)bscount(b->in) == T.nrglob &&
+                                                      //            b->in->t[0] == T.rglob);
+                                                      //     b->in->t[0] |= T.retregs(b->jmp.arg, nlv);
+                                                      // } else
+                                                      //     bset(b->jmp.arg, b, nlv, f->tmp);
+            }
             //         for (k=0; k<2; k++)
             //             b->nlive[k] = nlv[k];
             //         for (i=&b->ins[b->nins]; i!=b->ins;) {

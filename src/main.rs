@@ -9,6 +9,7 @@ extern crate static_assertions;
 
 mod abi;
 mod all;
+mod amd64;
 mod cfg;
 mod live;
 mod load;

@@ -1474,7 +1474,7 @@ impl Parser<'_> {
         self.cur_bi = BlkIdx::INVALID;
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
         let mut curf = Fn::new(lnk.clone());
-        for i in 0..(TMP0 as i32) {
+        for i in 0..TMP0 {
             if self.target.fpr0 <= i && i < self.target.fpr0 + self.target.nfpr {
                 // Ugh, returns Ref
                 let _ = newtmpref(b"", false, KD, &mut curf);
