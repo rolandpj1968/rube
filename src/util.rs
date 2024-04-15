@@ -1,4 +1,8 @@
-use crate::all::{bit, BSet, Bits, Con, ConIdx, Fn, KExt, Ref, Tmp, TmpIdx, KL, KW, KX, NBIT};
+use std::io::Write;
+
+use crate::all::{
+    bit, to_s, BSet, Bits, Con, ConIdx, Fn, KExt, Ref, Tmp, TmpIdx, KL, KW, KX, NBIT, TMP0,
+};
 use crate::parse::Parser; // ugh for intern()
 
 /*
@@ -761,15 +765,13 @@ pub fn bsiter(bs: &BSet, elt: &mut u32) -> bool {
     *elt = NBIT * t + firstbit(b);
     return true;
 }
-/*
-void
-dumpts(BSet *bs, Tmp *tmp, FILE *f)
-{
-    int t;
 
-    fprintf(f, "[");
-    for (t=Tmp0; bsiter(bs, &t); t++)
-        fprintf(f, " %s", tmp[t].name);
-    fprintf(f, " ]\n");
+pub fn dumpts(bs: &BSet, tmps: &[Tmp], f: &mut dyn Write) {
+    let _ = write!(f, "[");
+    let mut t: u32 = TMP0;
+    while bsiter(bs, &mut t) {
+        let _ = write!(f, " {}", to_s(&tmps[t as usize].name));
+        t += 1;
+    }
+    let _ = writeln!(f, " ]");
 }
- */
