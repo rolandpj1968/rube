@@ -53,7 +53,7 @@ pub struct Target {
     pub assym: &'static [u8],
 }
 
-pub fn bit(n: u32) -> Bits {
+pub const fn bit(n: u32) -> Bits {
     (1 as Bits) << n
 }
 

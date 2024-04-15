@@ -1,3 +1,6 @@
+// TODO remove eventually
+#![allow(dead_code, unused_variables)]
+
 use crate::abi::elimsb;
 use crate::all::{bit, Bits, Fn, Ref, Target};
 use crate::amd64::all::{Amd64Reg, NFPR, NFPS, NGPR, NGPS};
@@ -47,7 +50,7 @@ fn emitfin_dummy(/*FILE **/) {
     panic!("Implement me");
 }
 
-pub static T_amd64_sysv: Target = Target {
+pub static T_AMD64_SYSV: Target = Target {
     name: b"amd64_sysv",
     apple: false,
     emitfin: /*elf_emitfin*/emitfin_dummy, // TODO
@@ -70,7 +73,7 @@ pub static T_amd64_sysv: Target = Target {
     emitfn: /*amd64_emitfn*/emitfn_dummy, // TODO
 };
 
-pub static T_amd64_apple: Target = Target {
+pub static T_AMD64_APPLE: Target = Target {
     name: b"amd64_apple",
     apple: true,
     emitfin: /*macho_emitfin*/emitfin_dummy, // TODO

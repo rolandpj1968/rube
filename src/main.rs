@@ -27,13 +27,12 @@ use std::path::Path;
 
 use abi::elimsb;
 use all::{Bits, Dat, Fn, Ref, Target, Typ};
+use amd64::targ::T_AMD64_SYSV;
 use cfg::fillrpo;
 use mem::promote;
 use parse::{parse, printfn};
-use ssa::filluse;
+use ssa::{filluse, ssa};
 use util::Bucket;
-
-use crate::ssa::ssa;
 
 // Target T_amd64_sysv = {
 // 	.name = "amd64_sysv",
@@ -56,43 +55,43 @@ use crate::ssa::ssa;
 // 	.emitfn = amd64_emitfn, \
 // };
 
-fn dummy_retregs(_r: Ref, _something: [i32; 2]) -> Bits {
-    0
-}
-fn dummy_argregs(_r: Ref, _something: [i32; 2]) -> Bits {
-    0
-}
-fn dummy_memargs(_something: i32) -> i32 {
-    0
-}
-fn dummy_abi0(_fn_: &mut Fn) {}
-fn dummy_abi1(_fn_: &mut Fn) {}
-fn dummy_isel(_fn_: &mut Fn) {}
-fn dummy_emitfn(_fn_: &Fn) {}
-fn dummy_emitfin() {}
+// fn dummy_retregs(_r: Ref, _something: [i32; 2]) -> Bits {
+//     0
+// }
+// fn dummy_argregs(_r: Ref, _something: [i32; 2]) -> Bits {
+//     0
+// }
+// fn dummy_memargs(_something: i32) -> i32 {
+//     0
+// }
+// fn dummy_abi0(_fn_: &mut Fn) {}
+// fn dummy_abi1(_fn_: &mut Fn) {}
+// fn dummy_isel(_fn_: &mut Fn) {}
+// fn dummy_emitfn(_fn_: &Fn) {}
+// fn dummy_emitfin() {}
 
-static AMD64_SYSV: Target = Target {
-    name: b"amd64_sysv",
-    apple: false,
-    gpr0: 1,                //i32, // first general purpose reg
-    ngpr: 16,               //i32,
-    fpr0: 17,               //i32, // first floating point reg
-    nfpr: 15,               //i32,
-    rglob: 0, // not right but not needed for parser // Bits, // globally live regs (e.g., sp, fp)
-    nrglob: 0, // not right but not needed for parser // i32,
-    rsave: vec![], // not right but not needed for parser // Vec<i32>, // caller-save [Vec???]
-    nrsave: [9, 15], // [i32; 2],
-    retregs: dummy_retregs, // fn(Ref, [i32; 2]) -> Bits,
-    argregs: dummy_argregs, // fn(Ref, [i32; 2]) -> Bits,
-    memargs: dummy_memargs, // fn(i32) -> i32,
-    abi0: dummy_abi0, // fn(&mut Fn),
-    abi1: dummy_abi1, // fn(&mut Fn),
-    isel: dummy_isel, // fn(&mut Fn),
-    emitfn: dummy_emitfn, // fn(&Fn /*, FILE **/), // TODO
-    emitfin: dummy_emitfin, // (/*FILE **/),      // TODO
-    asloc: b".L", // &'static [u8],
-    assym: b"", //&'static [u8],
-};
+// static AMD64_SYSV: Target = Target {
+//     name: b"amd64_sysv",
+//     apple: false,
+//     gpr0: 1,                //i32, // first general purpose reg
+//     ngpr: 16,               //i32,
+//     fpr0: 17,               //i32, // first floating point reg
+//     nfpr: 15,               //i32,
+//     rglob: 0, // not right but not needed for parser // Bits, // globally live regs (e.g., sp, fp)
+//     nrglob: 0, // not right but not needed for parser // i32,
+//     rsave: vec![], // not right but not needed for parser // Vec<i32>, // caller-save [Vec???]
+//     nrsave: [9, 15], // [i32; 2],
+//     retregs: dummy_retregs, // fn(Ref, [i32; 2]) -> Bits,
+//     argregs: dummy_argregs, // fn(Ref, [i32; 2]) -> Bits,
+//     memargs: dummy_memargs, // fn(i32) -> i32,
+//     abi0: dummy_abi0, // fn(&mut Fn),
+//     abi1: dummy_abi1, // fn(&mut Fn),
+//     isel: dummy_isel, // fn(&mut Fn),
+//     emitfn: dummy_emitfn, // fn(&Fn /*, FILE **/), // TODO
+//     emitfin: dummy_emitfin, // (/*FILE **/),      // TODO
+//     asloc: b".L", // &'static [u8],
+//     assym: b"", //&'static [u8],
+// };
 
 // pub fn parse(
 //     T: &Target,
@@ -138,7 +137,7 @@ fn main() {
     let infile = File::open(args[1].clone()).unwrap();
 
     match parse(
-        &AMD64_SYSV,
+        &T_AMD64_SYSV,
         &infile,
         path,
         dump_dbgfile,
