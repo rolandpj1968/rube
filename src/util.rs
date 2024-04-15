@@ -633,11 +633,17 @@ fn firstbit(mut b: Bits) -> u32 {
         n += 8;
         b >>= 8;
     }
-    if !(b & 0xf) == 0 {
+    if (b & 0xf) == 0 {
         n += 4;
         b >>= 4;
     }
     static FIRST_BIT: [u32; 16] = [4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0];
+    println!(
+        "firstbit: {} + FIRST_BIT[{}] =  {}",
+        n,
+        (b & 0xf),
+        (n + FIRST_BIT[(b & 0xf) as usize])
+    );
     n + FIRST_BIT[(b & 0xf) as usize]
 }
 
@@ -749,12 +755,24 @@ pub fn bsiter(bs: &BSet, elt: &mut u32) -> bool {
     // uint t, i;
 
     let i: u32 = *elt;
+    println!(
+        "                                              bsiter() - i is {}",
+        i
+    );
     let mut t: u32 = i / NBIT;
     if (t as usize) >= bs.len() {
         return false;
     }
     let mut b: Bits = bs[t as usize];
+    println!(
+        "                                              bsiter() - b is {:016x}",
+        b
+    );
     b &= !(bit(i % NBIT) - 1);
+    println!(
+        "                                              bsiter() - b is {:016x} after clearing lo bits &= {:016x}",
+        b, (!(bit(i % NBIT) - 1))
+    );
     while b == 0 {
         t += 1;
         if (t as usize) >= bs.len() {
@@ -763,6 +781,10 @@ pub fn bsiter(bs: &BSet, elt: &mut u32) -> bool {
         b = bs[t as usize];
     }
     *elt = NBIT * t + firstbit(b);
+    println!(
+        "                                              firstbit(b) is {}",
+        firstbit(b)
+    );
     return true;
 }
 

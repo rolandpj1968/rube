@@ -122,7 +122,7 @@ fn dump_func(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     filluse(f);
     promote(f).unwrap();
     filluse(f);
-    ssa(f);
+    ssa(f, &T_AMD64_SYSV); // TODO thread through callback
     printfn(&mut stdout(), f, typ, itbl);
 }
 

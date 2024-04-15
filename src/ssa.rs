@@ -1,8 +1,9 @@
 use crate::all::{
-    isext, isload, isparbh, to_s, Blk, BlkIdx, Fn, Ins, InsIdx, PhiIdx, Ref, Tmp, TmpIdx, TmpWdth,
-    Use, UseT, KW, O, TMP0,
+    isext, isload, isparbh, to_s, Blk, BlkIdx, Fn, Ins, InsIdx, PhiIdx, Ref, Target, Tmp, TmpIdx,
+    TmpWdth, Use, UseT, KW, O, TMP0,
 };
 use crate::cfg::{filldom, fillfron};
+use crate::live::filllive;
 use crate::util::phicls;
 
 fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: u32) {
@@ -314,7 +315,7 @@ renblk(Blk *b, Name **stk, Fn *fn)
  */
 
 /* require rpo and use */
-pub fn ssa(f: &mut Fn) {
+pub fn ssa(f: &mut Fn, targ: &Target) {
     // Name **stk, *n;
     // int d, nt;
     // Blk *b, *b1;
@@ -350,7 +351,7 @@ pub fn ssa(f: &mut Fn) {
         }
     }
     fillfron(f);
-    // filllive(fn);
+    filllive(f, targ);
     // phiins(fn);
     // renblk(fn->start, stk, fn);
     // while (nt--)
