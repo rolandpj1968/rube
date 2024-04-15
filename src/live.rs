@@ -1,146 +1,166 @@
-/*
-#include "all.h"
+use crate::all::{bshas, kbase, BSet, Blk, BlkIdx, Fn, Phi, PhiIdx, Ref, Tmp, TmpIdx};
 
-void
-liveon(BSet *v, Blk *b, Blk *s)
-{
-    Phi *p;
-    uint a;
+use crate::util::{bsclr, bscopy, bsequal, bsinit, bsiter, bsset, bsunion};
 
-    bscopy(v, s->in);
-    for (p=s->phi; p; p=p->link)
-        if (rtype(p->to) == RTmp)
-            bsclr(v, p->to.val);
-    for (p=s->phi; p; p=p->link)
-        for (a=0; a<p->narg; a++)
-            if (p->blk[a] == b)
-            if (rtype(p->arg[a]) == RTmp) {
-                bsset(v, p->arg[a].val);
-                bsset(b->gen, p->arg[a].val);
+pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
+    bscopy(v, &f.blk(si).in_);
+    let mut pi: PhiIdx = f.blk(si).phi;
+    while pi != PhiIdx::INVALID {
+        let p: &Phi = f.phi(pi);
+        if let Ref::RTmp(ti) = p.to {
+            bsclr(v, ti.0);
+        }
+        pi = f.phi(pi).link;
+    }
+    let mut pi = f.blk(si).phi;
+    while pi != PhiIdx::INVALID {
+        assert!(f.phi(pi).args.len() == f.phi(pi).blks.len());
+        for a in 0..f.phi(pi).args.len() {
+            if f.phi(pi).blks[a] == bi {
+                if let Ref::RTmp(ati) = f.phi(pi).args[a] {
+                    bsset(v, ati.0);
+                    bsset(&mut f.blk_mut(bi).gen, ati.0);
+                }
             }
+        }
+        pi = f.phi(pi).link;
+    }
 }
 
-static void
-bset(Ref r, Blk *b, int *nlv, Tmp *tmp)
-{
-
-    if (rtype(r) != RTmp)
-        return;
-    bsset(b->gen, r.val);
-    if (!bshas(b->in, r.val)) {
-        nlv[KBASE(tmp[r.val].cls)]++;
-        bsset(b->in, r.val);
+fn bset(f: &mut Fn, r: &Ref, bi: BlkIdx, nlv: &mut [u32; 2], tmps: &[Tmp]) {
+    if let Ref::RTmp(ti) = r {
+        bsset(&mut f.blk_mut(bi).gen, ti.0);
+        if !bshas(&f.blk(bi).in_, ti.0) {
+            nlv[kbase(tmps[ti.0 as usize].cls) as usize] += 1;
+            bsset(&mut f.blk_mut(bi).in_, ti.0);
+        }
     }
 }
 
 /* liveness analysis
  * requires rpo computation
  */
-void
-filllive(Fn *f)
-{
-    Blk *b;
-    Ins *i;
-    int k, t, m[2], n, chg, nlv[2];
-    BSet u[1], v[1];
-    Mem *ma;
+pub fn filllive(f: &mut Fn, tmps: &[Tmp]) {
+    // Blk *b;
+    // Ins *i;
+    // int k, t, m[2], n, chg, nlv[2];
+    // BSet u[1], v[1];
+    // Mem *ma;
 
-    bsinit(u, f->ntmp);
-    bsinit(v, f->ntmp);
-    for (b=f->start; b; b=b->link) {
-        bsinit(b->in, f->ntmp);
-        bsinit(b->out, f->ntmp);
-        bsinit(b->gen, f->ntmp);
+    let ntmps: usize = f.tmps.len();
+    let mut u: BSet = bsinit(ntmps);
+    let mut v: BSet = bsinit(ntmps);
+
+    let mut bi: BlkIdx = f.start;
+    while bi != BlkIdx::INVALID {
+        let b: &mut Blk = f.blk_mut(bi);
+        b.in_ = bsinit(ntmps);
+        b.out = bsinit(ntmps);
+        b.gen = bsinit(ntmps);
+        bi = b.link;
     }
-    chg = 1;
-Again:
-    for (n=f->nblk-1; n>=0; n--) {
-        b = f->rpo[n];
+    let mut chg: bool = true;
 
-        bscopy(u, b->out);
-        if (b->s1) {
-            liveon(v, b, b->s1);
-            bsunion(b->out, v);
-        }
-        if (b->s2) {
-            liveon(v, b, b->s2);
-            bsunion(b->out, v);
-        }
-        chg |= !bsequal(b->out, u);
+    loop {
+        for n in (0..f.rpo.len()).rev() {
+            let bi: BlkIdx = f.rpo[n];
+            bscopy(&mut u, &f.blk(bi).out);
+            let (s1, s2) = f.blk(bi).s1_s2();
+            if s1 != BlkIdx::INVALID {
+                liveon(f, &mut v, bi, s1);
+                bsunion(&mut f.blk_mut(bi).out, &v);
+            }
+            if s2 != BlkIdx::INVALID {
+                liveon(f, &mut v, bi, s2);
+                bsunion(&mut f.blk_mut(bi).out, &v);
+            }
+            chg = chg || !bsequal(&f.blk(bi).out, &u);
 
-        memset(nlv, 0, sizeof nlv);
-        b->out->t[0] |= T.rglob;
-        bscopy(b->in, b->out);
-        for (t=0; bsiter(b->in, &t); t++)
-            nlv[KBASE(f->tmp[t].cls)]++;
-        if (rtype(b->jmp.arg) == RCall) {
-            assert((int)bscount(b->in) == T.nrglob &&
-                b->in->t[0] == T.rglob);
-            b->in->t[0] |= T.retregs(b->jmp.arg, nlv);
-        } else
-            bset(b->jmp.arg, b, nlv, f->tmp);
-        for (k=0; k<2; k++)
-            b->nlive[k] = nlv[k];
-        for (i=&b->ins[b->nins]; i!=b->ins;) {
-            if ((--i)->op == Ocall && rtype(i->arg[1]) == RCall) {
-                b->in->t[0] &= ~T.retregs(i->arg[1], m);
-                for (k=0; k<2; k++) {
-                    nlv[k] -= m[k];
-                    /* caller-save registers are used
-                     * by the callee, in that sense,
-                     * right in the middle of the call,
-                     * they are live: */
-                    nlv[k] += T.nrsave[k];
-                    if (nlv[k] > b->nlive[k])
-                        b->nlive[k] = nlv[k];
-                }
-                b->in->t[0] |= T.argregs(i->arg[1], m);
-                for (k=0; k<2; k++) {
-                    nlv[k] -= T.nrsave[k];
-                    nlv[k] += m[k];
+            let mut nlv: [u32; 2] = [0; 2];
+            //         b->out->t[0] |= T.rglob; // TODO!!!
+            {
+                let b: &mut Blk = f.blk_mut(bi);
+                bscopy(&mut b.in_, &b.out);
+            }
+            {
+                let mut ti: u32 = 0;
+                while bsiter(&f.blk(bi).in_, &mut ti) {
+                    nlv[kbase(f.tmp(TmpIdx(ti)).cls) as usize] += 1;
                 }
             }
-            if (!req(i->to, R)) {
-                assert(rtype(i->to) == RTmp);
-                t = i->to.val;
-                if (bshas(b->in, t))
-                    nlv[KBASE(f->tmp[t].cls)]--;
-                bsset(b->gen, t);
-                bsclr(b->in, t);
-            }
-            for (k=0; k<2; k++)
-                switch (rtype(i->arg[k])) {
-                case RMem:
-                    ma = &f->mem[i->arg[k].val];
-                    bset(ma->base, b, nlv, f->tmp);
-                    bset(ma->index, b, nlv, f->tmp);
-                    break;
-                default:
-                    bset(i->arg[k], b, nlv, f->tmp);
-                    break;
-                }
-            for (k=0; k<2; k++)
-                if (nlv[k] > b->nlive[k])
-                    b->nlive[k] = nlv[k];
+	    {
+		let jmp_arg: Ref = f.blk(bi).jmp.arg; // Copying...
+                if (rtype(b->jmp.arg) == RCall) {
+                    assert((int)bscount(b->in) == T.nrglob &&
+                           b->in->t[0] == T.rglob);
+                    b->in->t[0] |= T.retregs(b->jmp.arg, nlv);
+                } else
+                    bset(b->jmp.arg, b, nlv, f->tmp);
+	    }
+            //         for (k=0; k<2; k++)
+            //             b->nlive[k] = nlv[k];
+            //         for (i=&b->ins[b->nins]; i!=b->ins;) {
+            //             if ((--i)->op == Ocall && rtype(i->arg[1]) == RCall) {
+            //                 b->in->t[0] &= ~T.retregs(i->arg[1], m);
+            //                 for (k=0; k<2; k++) {
+            //                     nlv[k] -= m[k];
+            //                     /* caller-save registers are used
+            //                      * by the callee, in that sense,
+            //                      * right in the middle of the call,
+            //                      * they are live: */
+            //                     nlv[k] += T.nrsave[k];
+            //                     if (nlv[k] > b->nlive[k])
+            //                         b->nlive[k] = nlv[k];
+            //                 }
+            //                 b->in->t[0] |= T.argregs(i->arg[1], m);
+            //                 for (k=0; k<2; k++) {
+            //                     nlv[k] -= T.nrsave[k];
+            //                     nlv[k] += m[k];
+            //                 }
+            //             }
+            //             if (!req(i->to, R)) {
+            //                 assert(rtype(i->to) == RTmp);
+            //                 t = i->to.val;
+            //                 if (bshas(b->in, t))
+            //                     nlv[KBASE(f->tmp[t].cls)]--;
+            //                 bsset(b->gen, t);
+            //                 bsclr(b->in, t);
+            //             }
+            //             for (k=0; k<2; k++)
+            //                 switch (rtype(i->arg[k])) {
+            //                 case RMem:
+            //                     ma = &f->mem[i->arg[k].val];
+            //                     bset(ma->base, b, nlv, f->tmp);
+            //                     bset(ma->index, b, nlv, f->tmp);
+            //                     break;
+            //                 default:
+            //                     bset(i->arg[k], b, nlv, f->tmp);
+            //                     break;
+            //                 }
+            //             for (k=0; k<2; k++)
+            //                 if (nlv[k] > b->nlive[k])
+            //                     b->nlive[k] = nlv[k];
+            //         }
+            //     }
         }
-    }
-    if (chg) {
-        chg = 0;
-        goto Again;
+        if chg {
+            chg = false;
+        } else {
+            break;
+        }
     }
 
-    if (debug['L']) {
-        fprintf(stderr, "\n> Liveness analysis:\n");
-        for (b=f->start; b; b=b->link) {
-            fprintf(stderr, "\t%-10sin:   ", b->name);
-            dumpts(b->in, f->tmp, stderr);
-            fprintf(stderr, "\t          out:  ");
-            dumpts(b->out, f->tmp, stderr);
-            fprintf(stderr, "\t          gen:  ");
-            dumpts(b->gen, f->tmp, stderr);
-            fprintf(stderr, "\t          live: ");
-            fprintf(stderr, "%d %d\n", b->nlive[0], b->nlive[1]);
-        }
-    }
+    //     if (debug['L']) {
+    //         fprintf(stderr, "\n> Liveness analysis:\n");
+    //         for (b=f->start; b; b=b->link) {
+    //             fprintf(stderr, "\t%-10sin:   ", b->name);
+    //             dumpts(b->in, f->tmp, stderr);
+    //             fprintf(stderr, "\t          out:  ");
+    //             dumpts(b->out, f->tmp, stderr);
+    //             fprintf(stderr, "\t          gen:  ");
+    //             dumpts(b->gen, f->tmp, stderr);
+    //             fprintf(stderr, "\t          live: ");
+    //             fprintf(stderr, "%d %d\n", b->nlive[0], b->nlive[1]);
+    //         }
+    //     }
 }
- */

@@ -551,7 +551,9 @@ pub struct Blk {
     pub dlink: BlkIdx,
     pub frons: Vec<BlkIdx>,
     pub preds: Vec<BlkIdx>,
-    //pub BSet in[1], out[1], gen[1]; // TODO
+    pub in_: BSet,
+    pub out: BSet,
+    pub gen: BSet,
     pub nlive: [u32; 2],
     pub loop_: u32, // was i32 in QBE
     pub name: Vec<u8>,
@@ -575,7 +577,9 @@ impl Blk {
             dlink,
             frons: vec![],
             preds: vec![],
-            //pub BSet in[1], out[1], gen[1]; // TODO
+            in_: vec![],
+            out: vec![],
+            gen: vec![],
             nlive: [0u32; 2],
             loop_: 0,
             name: name.to_vec(),

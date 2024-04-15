@@ -1,4 +1,4 @@
-use crate::all::{bit, BSet, Con, ConIdx, Fn, KExt, Ref, Tmp, TmpIdx, KL, KW, KX, NBIT};
+use crate::all::{bit, BSet, Bits, Con, ConIdx, Fn, KExt, Ref, Tmp, TmpIdx, KL, KW, KX, NBIT};
 use crate::parse::Parser; // ugh for intern()
 
 /*
@@ -616,33 +616,34 @@ popcnt(bits b)
     b += (b>>32);
     return b & 0xff;
 }
+ */
 
-inline static int
-firstbit(bits b)
-{
-    int n;
-
-    n = 0;
-    if (!(b & 0xffffffff)) {
+// TODO: hrmmm, this looks like bit 0 is considered the hi bit?
+// Ah, no, had the conditions the wrong way round
+// It returns bit 4 for an all zero number, but meh!
+fn firstbit(mut b: Bits) -> u32 {
+    let mut n: u32 = 0;
+    if (b & 0xffffffff) == 0 {
         n += 32;
         b >>= 32;
     }
-    if (!(b & 0xffff)) {
+    if (b & 0xffff) == 0 {
         n += 16;
         b >>= 16;
     }
-    if (!(b & 0xff)) {
+    if (b & 0xff) == 0 {
         n += 8;
         b >>= 8;
     }
-    if (!(b & 0xf)) {
+    if !(b & 0xf) == 0 {
         n += 4;
         b >>= 4;
     }
-    n += (char[16]){4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0}[b & 0xf];
-    return n;
+    static FIRST_BIT: [u32; 16] = [4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0];
+    n + FIRST_BIT[(b & 0xf) as usize]
 }
 
+/*
 uint
 bscount(BSet *bs)
 {
@@ -677,14 +678,13 @@ pub fn bsset(bs: &mut BSet, elt: u32) {
     assert!(elt < bsmax(bs));
     bs[(elt / NBIT) as usize] |= bit(elt % NBIT);
 }
-/*
-void
-bsclr(BSet *bs, uint elt)
-{
-    assert(elt < bsmax(bs));
-    bs->t[elt/NBit] &= ~BIT(elt%NBit);
+
+pub fn bsclr(bs: &mut BSet, elt: u32) {
+    assert!(elt < bsmax(bs));
+    bs[(elt / NBIT) as usize] &= !bit(elt % NBIT);
 }
 
+/*
 #define BSOP(f, op)                           \
     void                                  \
     f(BSet *a, BSet *b)                   \
@@ -697,7 +697,23 @@ bsclr(BSet *bs, uint elt)
     }
 
 BSOP(bscopy, =)
+ */
+
+pub fn bscopy(a: &mut BSet, b: &BSet) {
+    *a = b.clone();
+}
+
+/*
 BSOP(bsunion, |=)
+ */
+
+pub fn bsunion(a: &mut BSet, b: &BSet) {
+    assert!(a.len() == b.len());
+    for i in 0..a.len() {
+        a[i] |= b[i];
+    }
+}
+/*
 BSOP(bsinter, &=)
 BSOP(bsdiff, &= ~)
 
@@ -724,6 +740,7 @@ bszero(BSet *bs)
 {
     memset(bs->t, 0, bs->nt * sizeof bs->t[0]);
 }
+ */
 
 /* iterates on a bitset, use as follows
  *
@@ -731,28 +748,29 @@ bszero(BSet *bs)
  * 		use(i);
  *
  */
-int
-bsiter(BSet *bs, int *elt)
-{
-    bits b;
-    uint t, i;
+// TODO - maybe elt: &mut TmpIdx???
+pub fn bsiter(bs: &BSet, elt: &mut u32) -> bool {
+    // bits b;
+    // uint t, i;
 
-    i = *elt;
-    t = i/NBit;
-    if (t >= bs->nt)
-        return 0;
-    b = bs->t[t];
-    b &= ~(BIT(i%NBit) - 1);
-    while (!b) {
-        ++t;
-        if (t >= bs->nt)
-            return 0;
-        b = bs->t[t];
+    let i: u32 = *elt;
+    let mut t: u32 = i / NBIT;
+    if (t as usize) >= bs.len() {
+        return false;
     }
-    *elt = NBit*t + firstbit(b);
-    return 1;
+    let mut b: Bits = bs[t as usize];
+    b &= !(bit(i % NBIT) - 1);
+    while b == 0 {
+        t += 1;
+        if (t as usize) >= bs.len() {
+            return false;
+        }
+        b = bs[t as usize];
+    }
+    *elt = NBIT * t + firstbit(b);
+    return true;
 }
-
+/*
 void
 dumpts(BSet *bs, Tmp *tmp, FILE *f)
 {
