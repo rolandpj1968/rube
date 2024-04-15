@@ -67,10 +67,8 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     let mut chg: bool = true;
 
     loop {
-        println!("filllive outer loop... chg is {}", chg);
         for n in (0..f.rpo.len()).rev() {
             let bi: BlkIdx = f.rpo[n];
-            println!("   block {} in reverse rpo is {}", n, to_s(&f.blk(bi).name));
             bscopy(&mut u, &f.blk(bi).out);
             let (s1, s2) = f.blk(bi).s1_s2();
             if s1 != BlkIdx::INVALID {
@@ -83,25 +81,20 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             }
             chg = chg || !bsequal(&f.blk(bi).out, &u);
 
-            println!("                                 100");
-
             let mut nlv: [u32; 2] = [0; 2];
             {
                 let b: &mut Blk = f.blk_mut(bi);
                 b.out[0] |= targ.rglob;
                 bscopy(&mut b.in_, &b.out);
             }
-            println!("                                 200");
 
             {
                 let mut ti: u32 = 0;
                 while bsiter(&f.blk(bi).in_, &mut ti) {
-                    println!("                                   ti is {}", ti);
                     nlv[kbase(f.tmp(TmpIdx(ti)).cls) as usize] += 1;
                     ti += 1;
                 }
             }
-            println!("                                 300");
 
             {
                 let jmp_arg: Ref = f.blk(bi).jmp.arg; // Copying...
@@ -113,7 +106,6 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                     bset(f, jmp_arg, bi, &mut nlv);
                 }
             }
-            println!("                                 400");
 
             f.blk_mut(bi).nlive.copy_from_slice(&nlv);
             for ii in (0..f.blk(bi).ins.len()).rev() {
@@ -210,7 +202,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             /*e*/
             print!("\t          live: ");
             /*e*/
-            println!("{} {}\n", b.nlive[0], b.nlive[1]);
+            println!("{} {}", b.nlive[0], b.nlive[1]);
 
             bi = b.link;
         }
