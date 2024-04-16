@@ -693,7 +693,7 @@ pub enum AliasU {
 #[derive(Clone, Debug)]
 pub struct Alias {
     pub type_: AliasT,
-    pub base: i32, // ??? type???
+    pub base: TmpIdx,
     pub offset: i64,
     pub u: AliasU,
     pub slot: AliasIdx,
@@ -863,6 +863,8 @@ pub struct Lnk {
 pub struct Fn {
     pub blks: Vec<Blk>,
     pub phis: Vec<Phi>,
+    // Hrmmm, these actually are 1:1 with Tmp's
+    // Maybe make Alias.slot a TmpIdx?
     pub aliases: Vec<Alias>,
 
     pub start: BlkIdx,
