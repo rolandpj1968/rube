@@ -7,7 +7,7 @@ use crate::all::{
     bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, Ins, InsIdx, KExt, Phi, PhiIdx,
     Ref, RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, KW, KX, O, TMP0, UNDEF,
 };
-use crate::cfg::{dom, filldom, fillfron};
+use crate::cfg::{dom, filldom, fillfron, sdom};
 use crate::live::filllive;
 use crate::parse::printfn;
 use crate::util::{bsclr, bsinit, bsset, clsmerge, newtmpref, phicls, Bucket};
@@ -143,16 +143,6 @@ fn refindex(f: &mut Fn, ti: TmpIdx) -> Ref {
 }
 
 fn phiins(f: &mut Fn) -> RubeResult<()> {
-    // BSet u[1], defs[1];
-    // Blk *a, *b, **blist, **be, **bp;
-    // Ins *i;
-    // Phi *p;
-    // Use *use;
-    // Ref r;
-    // int t, nt, ok;
-    // uint n, defb;
-    // short k;
-
     let mut blist: Vec<BlkIdx> = vec![BlkIdx::INVALID; f.blks.len()];
     let be: usize = f.blks.len();
     let nt: u32 = f.tmps.len() as u32;
@@ -443,84 +433,111 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     Ok(())
 }
 
-/*
-static int
-phicheck(Phi *p, Blk *b, Ref t)
-{
-    Blk *b1;
-    uint n;
-
-    for (n=0; n<p->narg; n++)
-        if (req(p->arg[n], t)) {
-            b1 = p->blk[n];
-            if (b1 != b && !sdom(b, b1))
-                return 1;
+fn phicheck(f: &Fn, pi: PhiIdx, bi: BlkIdx, t: Ref) -> bool {
+    let p: &Phi = f.phi(pi);
+    for n in 0..p.args.len() {
+        if p.args[n] == t {
+            let bi1 = p.blks[n];
+            if bi1 != bi && !sdom(f, bi, bi1) {
+                return true;
+            }
         }
-    return 0;
+    }
+    false
 }
 
 /* require use and ssa */
-void
-ssacheck(Fn *fn)
-{
-    Tmp *t;
-    Ins *i;
-    Phi *p;
-    Use *u;
-    Blk *b, *bu;
-    Ref r;
+pub fn ssacheck(f: &Fn) -> RubeResult<()> {
+    // Tmp *t;
+    // Ins *i;
+    // Phi *p;
+    // Use *u;
+    // Blk *b, *bu;
+    // Ref r;
 
-    for (t=&fn->tmp[Tmp0]; t-fn->tmp < fn->ntmp; t++) {
-        if (t->ndef > 1)
-            err("ssa temporary %%%s defined more than once",
-                t->name);
-        if (t->nuse > 0 && t->ndef == 0) {
-            bu = fn->rpo[t->use[0].bid];
-            goto Err;
+    for t in f.tmps.iter().skip(TMP0 as usize) {
+        if t.ndef > 1 {
+            return Err(Box::new(SsaError::new(&format!(
+                "ssa temporary %{} defined more than once",
+                to_s(&t.name)
+            ))));
+        }
+        if !t.uses.is_empty() && t.ndef == 0 {
+            let bui: BlkIdx = f.rpo[t.uses[0].bid as usize];
+            return Err(ssacheck_err(f, t, bui));
         }
     }
-    for (b=fn->start; b; b=b->link) {
-        for (p=b->phi; p; p=p->link) {
-            r = p->to;
-            t = &fn->tmp[r.val];
-            for (u=t->use; u<&t->use[t->nuse]; u++) {
-                bu = fn->rpo[u->bid];
-                if (u->type == UPhi) {
-                    if (phicheck(u->u.phi, b, r))
-                        goto Err;
-                } else
-                    if (bu != b && !sdom(b, bu))
-                        goto Err;
-            }
-        }
-        for (i=b->ins; i<&b->ins[b->nins]; i++) {
-            if (rtype(i->to) != RTmp)
-                continue;
-            r = i->to;
-            t = &fn->tmp[r.val];
-            for (u=t->use; u<&t->use[t->nuse]; u++) {
-                bu = fn->rpo[u->bid];
-                if (u->type == UPhi) {
-                    if (phicheck(u->u.phi, b, r))
-                        goto Err;
+    let mut bi: BlkIdx = f.start;
+    while bi != BlkIdx::INVALID {
+        let b: &Blk = f.blk(bi);
+        let mut pi: PhiIdx = b.phi;
+        while pi != PhiIdx::INVALID {
+            let p: &Phi = f.phi(pi);
+            let r: Ref = p.to;
+            let ti: TmpIdx = if let Ref::RTmp(ti0) = r {
+                ti0
+            } else {
+                return Err(Box::new(SsaError::new(&format!(
+                    "phi does not define a temporary in @{}",
+                    to_s(&b.name)
+                ))));
+            };
+            let t: &Tmp = f.tmp(ti);
+            for u in &t.uses {
+                let bui: BlkIdx = f.rpo[u.bid as usize];
+
+                if let UseT::UPhi(upi) = u.type_ {
+                    if phicheck(f, upi, bi, r) {
+                        return Err(ssacheck_err(f, t, bui));
+                    }
                 } else {
-                    if (bu == b) {
-                        if (u->type == UIns)
-                            if (u->u.ins <= i)
-                                goto Err;
-                    } else
-                        if (!sdom(b, bu))
-                            goto Err;
+                    if bui != bi && !sdom(f, bi, bui) {
+                        return Err(ssacheck_err(f, t, bui));
+                    }
                 }
             }
+            for (ii, i) in b.ins.iter().enumerate() {
+                if let Ref::RTmp(ti) = i.to {
+                    let t: &Tmp = f.tmp(ti);
+                    for u in &t.uses {
+                        let bui: BlkIdx = f.rpo[u.bid as usize];
+                        match u.type_ {
+                            UseT::UPhi(upi) => {
+                                if phicheck(f, upi, bi, r) {
+                                    return Err(ssacheck_err(f, t, bui));
+                                }
+                            }
+                            UseT::UIns(uii) => {
+                                if bui == bi && uii.0 <= (ii as u32) {
+                                    return Err(ssacheck_err(f, t, bui));
+                                }
+                            }
+                            _ => {
+                                if bui != bi && !sdom(f, bi, bui) {
+                                    return Err(ssacheck_err(f, t, bui));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            pi = p.link;
         }
+        bi = b.link;
     }
-    return;
-Err:
-    if (t->visit)
-        die("%%%s violates ssa invariant", t->name);
-    else
-        err("ssa temporary %%%s is used undefined in @%s",
-            t->name, bu->name);
+    Ok(())
 }
- */
+
+fn ssacheck_err(f: &Fn, t: &Tmp, bui: BlkIdx) -> Box<SsaError> {
+    Box::new(SsaError::new(&{
+        if t.visit != TmpIdx::INVALID {
+            format!("%{} violates ssa invariant", to_s(&t.name))
+        } else {
+            format!(
+                "ssa temporary %{} is used undefined in @{}",
+                to_s(&t.name),
+                to_s(&f.blk(bui).name)
+            )
+        }
+    }))
+}

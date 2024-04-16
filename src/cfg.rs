@@ -200,7 +200,7 @@ pub fn filldom(f: &mut Fn) {
     }
 }
 
-fn sdom(f: &Fn, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
+pub fn sdom(f: &Fn, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
     assert!(b1i != BlkIdx::INVALID && b2i != BlkIdx::INVALID);
     if b1i == b2i {
         return false;
