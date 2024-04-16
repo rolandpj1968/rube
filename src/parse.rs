@@ -1921,10 +1921,19 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
         ConT::CBits => match c.bits {
             ConBits::None => assert!(false),
             ConBits::F(s) => {
-                let _ = write!(f, "s_{:.6}", s);
+                let _ = if s == 0.0 {
+                    write!(f, "0")
+                } else {
+                    write!(f, "s_{:.6}", s)
+                };
             }
             ConBits::D(d) => {
-                let _ = write!(f, "d_{:.6}", d);
+                // match QBE output of 0.0
+                let _ = if d == 0.0 {
+                    write!(f, "0")
+                } else {
+                    write!(f, "d_{:.6}", d)
+                };
             }
             ConBits::I(i) => {
                 let _ = write!(f, "{}", i);

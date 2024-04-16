@@ -286,7 +286,7 @@ fn rendef(
     r: Ref,
     namel: &mut NameIdx,
     names: &mut Vec<Name>,
-    stk: &mut Vec<NameIdx>,
+    stk: &mut [NameIdx],
 ) -> Ref {
     if r == Ref::R {
         return r;
@@ -318,7 +318,7 @@ fn getstk(
     ti: TmpIdx,
     namel: &mut NameIdx,
     names: &mut Vec<Name>,
-    stk: &mut Vec<NameIdx>,
+    stk: &mut [NameIdx],
 ) -> Ref {
     let mut ni: NameIdx = stk[ti.0 as usize];
     while ni != NameIdx::INVALID && !dom(f, names[ni.0 as usize].bi, bi) {
@@ -335,13 +335,7 @@ fn getstk(
     }
 }
 
-fn renblk(
-    f: &mut Fn,
-    bi: BlkIdx,
-    namel: &mut NameIdx,
-    names: &mut Vec<Name>,
-    stk: &mut Vec<NameIdx>,
-) {
+fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, stk: &mut [NameIdx]) {
     let mut pi = f.blk(bi).phi;
     while pi != PhiIdx::INVALID {
         let to: Ref = f.phi(pi).to;
