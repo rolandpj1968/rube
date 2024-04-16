@@ -34,6 +34,8 @@ use parse::{parse, printfn};
 use ssa::{filluse, ssa};
 use util::Bucket;
 
+use crate::ssa::ssacheck;
+
 fn dump_dbgfile(name: &[u8]) {
     println!("Got dbgfile {:?}", String::from_utf8_lossy(name));
 }
@@ -56,6 +58,7 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     filluse(f);
     ssa(f, targ, typ, itbl).unwrap();
     filluse(f);
+    ssacheck(f).unwrap();
     printfn(&mut stdout(), f, typ, itbl);
 }
 
