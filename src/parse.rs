@@ -393,11 +393,11 @@ impl Parser<'_> {
             inpath: path,
             thead: (Token::Txxx, TokVal::None),
             lnum: 1,
-            tmph: [TmpIdx::INVALID; (TMASK + 1) as usize],
-            plink: PhiIdx::INVALID,
-            cur_bi: BlkIdx::INVALID,
-            blink: BlkIdx::INVALID,
-            blkh: [BlkIdx::INVALID; (BMASK + 1) as usize],
+            tmph: [TmpIdx::NONE; (TMASK + 1) as usize],
+            plink: PhiIdx::NONE,
+            cur_bi: BlkIdx::NONE,
+            blink: BlkIdx::NONE,
+            blkh: [BlkIdx::NONE; (BMASK + 1) as usize],
             rcls: K0,
             typ: vec![],
             insb: vec![],
@@ -785,7 +785,7 @@ impl Parser<'_> {
     fn tmpref(&mut self, name: &[u8], curf: &mut Fn) -> Ref {
         let tmph_i = (hash(name) & TMASK) as usize;
         let ti: TmpIdx = self.tmph[tmph_i];
-        if ti != TmpIdx::INVALID {
+        if ti != TmpIdx::NONE {
             if curf.tmp(ti).name == name {
                 return Ref::RTmp(ti);
             }
@@ -831,14 +831,14 @@ impl Parser<'_> {
         let (t, tv) = self.next()?;
         match t {
             Token::Ttyp => Ok((KC, self.findtyp(&tv.as_str())?)),
-            Token::Tsb => Ok((KSB, TypIdx::INVALID)),
-            Token::Tub => Ok((KUB, TypIdx::INVALID)),
-            Token::Tsh => Ok((KSH, TypIdx::INVALID)),
-            Token::Tuh => Ok((KUH, TypIdx::INVALID)),
-            Token::Tw => Ok((KW, TypIdx::INVALID)),
-            Token::Tl => Ok((KL, TypIdx::INVALID)),
-            Token::Ts => Ok((KS, TypIdx::INVALID)),
-            Token::Td => Ok((KD, TypIdx::INVALID)),
+            Token::Tsb => Ok((KSB, TypIdx::NONE)),
+            Token::Tub => Ok((KUB, TypIdx::NONE)),
+            Token::Tsh => Ok((KSH, TypIdx::NONE)),
+            Token::Tuh => Ok((KUH, TypIdx::NONE)),
+            Token::Tw => Ok((KW, TypIdx::NONE)),
+            Token::Tl => Ok((KL, TypIdx::NONE)),
+            Token::Ts => Ok((KS, TypIdx::NONE)),
+            Token::Td => Ok((KD, TypIdx::NONE)),
             _ => Err(self.err("invalid class specifier")),
         }
     }
@@ -866,7 +866,7 @@ fn op_par_bh(k: KExt) -> O {
 
 impl Parser<'_> {
     fn parserefl(&mut self, arg: bool, curf: &mut Fn) -> RubeResult<bool> {
-        let mut ty: TypIdx = TypIdx::INVALID;
+        let mut ty: TypIdx = TypIdx::NONE;
         let mut k: KExt = KE; // KW???
         let mut env: bool = false;
         let mut hasenv: bool = false;
@@ -961,7 +961,7 @@ impl Parser<'_> {
     fn findblk(&mut self, curf: &mut Fn, name: &[u8]) -> BlkIdx {
         let h: u32 = hash(name) & BMASK;
         let mut bi: BlkIdx = self.blkh[h as usize];
-        while bi != BlkIdx::INVALID {
+        while bi != BlkIdx::NONE {
             let b: &Blk = curf.blk(bi);
             if b.name == name {
                 return bi;
@@ -992,7 +992,7 @@ impl Parser<'_> {
         let mut blk: Vec<BlkIdx> = vec![];
         let mut r: Ref = Ref::R;
         let mut k: KExt = KE; // KW???
-        let mut ty: TypIdx = TypIdx::INVALID;
+        let mut ty: TypIdx = TypIdx::NONE;
 
         let mut op_tok: Token = Token::Txxx;
         //let mut op_tv: TokVal = TokVal::None;
@@ -1031,7 +1031,7 @@ impl Parser<'_> {
             // New block
             Token::Tlbl => {
                 let new_bi: BlkIdx = self.findblk(curf, &tv.as_str());
-                if self.cur_bi != BlkIdx::INVALID && curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
+                if self.cur_bi != BlkIdx::NONE && curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
                     self.closeblk(curf);
                     let curb: &mut Blk = curf.blk_mut(self.cur_bi);
                     curb.jmp.type_ = J::Jjmp;
@@ -1045,14 +1045,14 @@ impl Parser<'_> {
                     )));
                 }
                 // TODO? curf.set_blk_link(from_bi, to_bi);
-                if self.blink == BlkIdx::INVALID {
+                if self.blink == BlkIdx::NONE {
                     // First block
                     curf.start = new_bi;
                 } else {
                     curf.blk_mut(self.cur_bi).link = new_bi;
                 }
                 self.cur_bi = new_bi;
-                self.plink = PhiIdx::INVALID;
+                self.plink = PhiIdx::NONE;
                 self.expect(Token::Tnl)?;
                 return Ok(PState::PPhi);
             }
@@ -1223,8 +1223,8 @@ impl Parser<'_> {
                             return Err(self.err("unexpected phi instruction"));
                         }
                         let pi =
-                            curf.add_phi(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::INVALID));
-                        if self.plink == PhiIdx::INVALID {
+                            curf.add_phi(Phi::new(r, arg.clone(), blk.clone(), k, PhiIdx::NONE));
+                        if self.plink == PhiIdx::NONE {
                             curf.blk_mut(self.cur_bi).phi = pi;
                         } else {
                             let prev_phi = &mut curf.phi_mut(self.plink);
@@ -1299,9 +1299,9 @@ impl Parser<'_> {
     fn typecheck(&self, fn_: &mut Fn) -> RubeResult<()> {
         fillpreds(fn_);
         let mut bi: BlkIdx = fn_.start;
-        while bi != BlkIdx::INVALID {
+        while bi != BlkIdx::NONE {
             let mut pi: PhiIdx = fn_.blk(bi).phi;
-            while pi != PhiIdx::INVALID {
+            while pi != PhiIdx::NONE {
                 if let Ref::RTmp(ti) = fn_.phi(pi).to {
                     fn_.tmp_mut(ti).cls = fn_.phi(pi).cls;
                 } else {
@@ -1328,7 +1328,7 @@ impl Parser<'_> {
         }
 
         bi = fn_.start;
-        while bi != BlkIdx::INVALID {
+        while bi != BlkIdx::NONE {
             let b: &Blk = fn_.blk(bi);
 
             let mut pb: BSet = bsinit(fn_.blks.len());
@@ -1337,7 +1337,7 @@ impl Parser<'_> {
                 bsset(&mut pb, pred_bi.0);
             }
             let mut pi = b.phi;
-            while pi != PhiIdx::INVALID {
+            while pi != PhiIdx::NONE {
                 let p: &Phi = fn_.phi(pi);
                 if let Ref::RTmp(ti) = p.to {
                     let t: &Tmp = fn_.tmp(ti);
@@ -1453,13 +1453,13 @@ impl Parser<'_> {
                 }
             }
 
-            if b.s1 != BlkIdx::INVALID && fn_.blk(b.s1).jmp.type_ == J::Jxxx {
+            if b.s1 != BlkIdx::NONE && fn_.blk(b.s1).jmp.type_ == J::Jxxx {
                 return Err(self.err(&format!(
                     "block @{} is used undefined",
                     to_s(&fn_.blk(b.s1).name)
                 )));
             }
-            if b.s2 != BlkIdx::INVALID && fn_.blk(b.s2).jmp.type_ == J::Jxxx {
+            if b.s2 != BlkIdx::NONE && fn_.blk(b.s2).jmp.type_ == J::Jxxx {
                 return Err(self.err(&format!(
                     "block @{} is used undefined",
                     to_s(&fn_.blk(b.s2).name)
@@ -1473,7 +1473,7 @@ impl Parser<'_> {
     }
 
     fn parsefn(&mut self, lnk: &Lnk) -> RubeResult<Fn> {
-        self.cur_bi = BlkIdx::INVALID;
+        self.cur_bi = BlkIdx::NONE;
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
         let mut curf = Fn::new(lnk.clone());
         for i in 0..TMP0 {
@@ -1499,7 +1499,7 @@ impl Parser<'_> {
         ));
         curf.lnk = lnk.clone();
 
-        self.blink = BlkIdx::INVALID;
+        self.blink = BlkIdx::NONE;
 
         if self.peek_tok()? != Token::Tglo {
             (self.rcls, curf.retty) = self.parsecls()?;
@@ -1520,7 +1520,7 @@ impl Parser<'_> {
                 break;
             }
         }
-        if self.cur_bi == BlkIdx::INVALID {
+        if self.cur_bi == BlkIdx::NONE {
             return Err(self.err("empty function"));
         } else if curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
             return Err(self.err("last block misses jump"));
@@ -1529,16 +1529,16 @@ impl Parser<'_> {
         curf.nblk = curf.blks.len() as u32;
 
         let mut bi = curf.start;
-        while bi != BlkIdx::INVALID {
+        while bi != BlkIdx::NONE {
             let b: &mut Blk = curf.blk_mut(bi);
-            b.dlink = BlkIdx::INVALID;
+            b.dlink = BlkIdx::NONE;
             bi = b.link;
         }
         for i in 0..BMASK + 1 {
-            self.blkh[i as usize] = BlkIdx::INVALID;
+            self.blkh[i as usize] = BlkIdx::NONE;
         }
         for i in 0..TMASK + 1 {
-            self.tmph[i as usize] = TmpIdx::INVALID;
+            self.tmph[i as usize] = TmpIdx::NONE;
         }
 
         self.typecheck(&mut curf)?;
@@ -2041,11 +2041,11 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
     };
     let _ = writeln!(f, "function ${}() {{", to_s(&fn_.name));
     let mut bi: BlkIdx = fn_.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &Blk = fn_.blk(bi);
         let _ = writeln!(f, "@{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
-        while pi != PhiIdx::INVALID {
+        while pi != PhiIdx::NONE {
             let p: &Phi = fn_.phi(pi);
             let _ = write!(f, "\t");
             printref(f, fn_, typ, itbl, &p.to);
@@ -2135,7 +2135,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     printref(f, fn_, typ, itbl, &b.jmp.arg);
                     let _ = write!(f, ", ");
                 }
-                assert!(b.s1 != BlkIdx::INVALID && b.s2 != BlkIdx::INVALID);
+                assert!(b.s1 != BlkIdx::NONE && b.s2 != BlkIdx::NONE);
                 let _ = write!(
                     f,
                     "@{}, @{}",

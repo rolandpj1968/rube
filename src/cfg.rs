@@ -16,20 +16,20 @@ newblk()
  */
 
 fn edgedel(f: &mut Fn, bsi: BlkIdx, bdi: BlkIdx) {
-    if bdi == BlkIdx::INVALID {
+    if bdi == BlkIdx::NONE {
         return;
     }
     {
         let b: &mut Blk = f.blk_mut(bsi);
         if b.s1 == bdi {
-            b.s1 = BlkIdx::INVALID;
+            b.s1 = BlkIdx::NONE;
         }
         if b.s2 == bdi {
-            b.s2 = BlkIdx::INVALID;
+            b.s2 = BlkIdx::NONE;
         }
     }
     let mut pi: PhiIdx = f.blk(bdi).phi;
-    while pi != PhiIdx::INVALID {
+    while pi != PhiIdx::NONE {
         let p: &mut Phi = f.phi_mut(pi);
         let mut a: usize = 0;
         while p.blks[a] != bsi {
@@ -54,18 +54,18 @@ fn edgedel(f: &mut Fn, bsi: BlkIdx, bdi: BlkIdx) {
 
 pub fn fillpreds(f: &mut Fn) {
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &mut Blk = f.blk_mut(bi);
         b.preds.clear();
         bi = b.link;
     }
     bi = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let (s1, s2) = f.blk(bi).s1_s2();
-        if s1 != BlkIdx::INVALID {
+        if s1 != BlkIdx::NONE {
             f.blk_mut(s1).preds.push(bi);
         }
-        if s2 != BlkIdx::INVALID && s1 != s2 {
+        if s2 != BlkIdx::NONE && s1 != s2 {
             f.blk_mut(s2).preds.push(bi);
         }
         bi = f.blk(bi).link;
@@ -73,14 +73,14 @@ pub fn fillpreds(f: &mut Fn) {
 }
 
 fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
-    if bi == BlkIdx::INVALID || f.blk(bi).id != u32::MAX {
+    if bi == BlkIdx::NONE || f.blk(bi).id != u32::MAX {
         return x;
     }
 
     f.blk_mut(bi).id = 1;
 
     let (mut s1, mut s2) = f.blk(bi).s1_s2();
-    if s1 != BlkIdx::INVALID && s2 != BlkIdx::INVALID && f.blk(s1).loop_ > f.blk(s2).loop_ {
+    if s1 != BlkIdx::NONE && s2 != BlkIdx::NONE && f.blk(s1).loop_ > f.blk(s2).loop_ {
         (s1, s2) = (s2, s1);
     }
 
@@ -97,7 +97,7 @@ fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &mut Blk = f.blk_mut(bi);
         b.id = u32::MAX;
         bi = b.link;
@@ -106,10 +106,10 @@ pub fn fillrpo(f: &mut Fn) {
     // Deliberately wraps from u32::MAX
     let n: u32 = rporec(f, f.start, f.nblk - 1).wrapping_add(1);
     f.nblk -= n;
-    f.rpo = vec![BlkIdx::INVALID; f.nblk as usize];
-    let mut prev_bi = BlkIdx::INVALID;
+    f.rpo = vec![BlkIdx::NONE; f.nblk as usize];
+    let mut prev_bi = BlkIdx::NONE;
     let mut bi = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let (id, s1, s2, next_bi) = {
             let b: &Blk = f.blk(bi);
             (b.id, b.s1, b.s2, b.link)
@@ -139,7 +139,7 @@ pub fn fillrpo(f: &mut Fn) {
  */
 
 fn inter(f: &Fn, mut bi1: BlkIdx, mut bi2: BlkIdx) -> BlkIdx {
-    if bi1 == BlkIdx::INVALID {
+    if bi1 == BlkIdx::NONE {
         return bi2;
     }
 
@@ -149,7 +149,7 @@ fn inter(f: &Fn, mut bi1: BlkIdx, mut bi2: BlkIdx) -> BlkIdx {
         }
         while f.blk(bi1).id > f.blk(bi2).id {
             bi1 = f.blk(bi1).idom;
-            assert!(bi1 != BlkIdx::INVALID);
+            assert!(bi1 != BlkIdx::NONE);
         }
     }
     return bi1;
@@ -157,11 +157,11 @@ fn inter(f: &Fn, mut bi1: BlkIdx, mut bi2: BlkIdx) -> BlkIdx {
 
 pub fn filldom(f: &mut Fn) {
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &mut Blk = f.blk_mut(bi);
-        b.idom = BlkIdx::INVALID;
-        b.dom = BlkIdx::INVALID;
-        b.dlink = BlkIdx::INVALID;
+        b.idom = BlkIdx::NONE;
+        b.dom = BlkIdx::NONE;
+        b.dlink = BlkIdx::NONE;
 
         bi = b.link;
     }
@@ -169,10 +169,10 @@ pub fn filldom(f: &mut Fn) {
         let mut ch: u32 = 0;
         for n in 1..f.rpo.len() {
             bi = f.rpo[n];
-            let mut di: BlkIdx = BlkIdx::INVALID;
+            let mut di: BlkIdx = BlkIdx::NONE;
             for p in 0..f.blk(bi).preds.len() {
                 let b: &Blk = f.blk(bi);
-                if f.blk(b.preds[p]).idom != BlkIdx::INVALID || b.preds[p] == f.start {
+                if f.blk(b.preds[p]).idom != BlkIdx::NONE || b.preds[p] == f.start {
                     di = inter(f, di, b.preds[p]);
                 }
             }
@@ -187,9 +187,9 @@ pub fn filldom(f: &mut Fn) {
         }
     }
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let di: BlkIdx = f.blk(bi).idom;
-        if di != BlkIdx::INVALID {
+        if di != BlkIdx::NONE {
             assert!(di != bi);
             let ddomi = f.blk(di).dom;
             f.blk_mut(bi).dlink = ddomi;
@@ -201,7 +201,7 @@ pub fn filldom(f: &mut Fn) {
 }
 
 pub fn sdom(f: &Fn, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
-    assert!(b1i != BlkIdx::INVALID && b2i != BlkIdx::INVALID);
+    assert!(b1i != BlkIdx::NONE && b2i != BlkIdx::NONE);
     if b1i == b2i {
         return false;
     }
@@ -228,22 +228,22 @@ pub fn addfron(f: &mut Fn, ai: BlkIdx, bi: BlkIdx) {
 /* fill the dominance frontier */
 pub fn fillfron(f: &mut Fn) {
     let mut bi = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &mut Blk = f.blk_mut(bi);
         b.frons.clear();
         bi = b.link;
     }
     bi = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let (s1, s2) = f.blk(bi).s1_s2();
-        if s1 != BlkIdx::INVALID {
+        if s1 != BlkIdx::NONE {
             let mut ai = bi;
             while !sdom(f, ai, s1) {
                 addfron(f, ai, s1);
                 ai = f.blk(ai).idom;
             }
         }
-        if s2 != BlkIdx::INVALID {
+        if s2 != BlkIdx::NONE {
             let mut ai = bi;
             while !sdom(f, ai, s2) {
                 addfron(f, ai, s2);

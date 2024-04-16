@@ -503,7 +503,7 @@ impl Ins {
 pub struct InsIdx(pub u32); // Index into Blk::ins
 
 impl InsIdx {
-    pub const INVALID: InsIdx = InsIdx(u32::MAX);
+    pub const NONE: InsIdx = InsIdx(u32::MAX);
 }
 
 #[derive(new)]
@@ -519,7 +519,7 @@ pub struct Phi {
 pub struct PhiIdx(pub u32); // Index into Fn::phis
 
 impl PhiIdx {
-    pub const INVALID: PhiIdx = PhiIdx(u32::MAX);
+    pub const NONE: PhiIdx = PhiIdx(u32::MAX);
 }
 
 #[derive(Clone, Copy)]
@@ -564,18 +564,18 @@ pub struct Blk {
 impl Blk {
     pub fn new(name: &[u8], id: u32, dlink: BlkIdx) -> Blk {
         Blk {
-            phi: PhiIdx::INVALID,
+            phi: PhiIdx::NONE,
             ins: vec![],
             jmp: BlkJmp::new(),
-            s1: BlkIdx::INVALID,
-            s2: BlkIdx::INVALID,
-            link: BlkIdx::INVALID,
+            s1: BlkIdx::NONE,
+            s2: BlkIdx::NONE,
+            link: BlkIdx::NONE,
 
             id, // Same as BlkIdx for this block
             visit: 0,
 
-            idom: BlkIdx::INVALID, // maybe Vec<BlkIdx>?
-            dom: BlkIdx::INVALID,  // maybe Vec<BlkIdx>?
+            idom: BlkIdx::NONE, // maybe Vec<BlkIdx>?
+            dom: BlkIdx::NONE,  // maybe Vec<BlkIdx>?
             dlink,
             frons: vec![],
             preds: vec![],
@@ -598,7 +598,7 @@ impl Blk {
 pub struct BlkIdx(pub u32);
 
 impl BlkIdx {
-    pub const INVALID: BlkIdx = BlkIdx(u32::MAX);
+    pub const NONE: BlkIdx = BlkIdx(u32::MAX);
 }
 
 /*
@@ -704,7 +704,7 @@ pub struct Alias {
 pub struct AliasIdx(pub u32);
 
 impl AliasIdx {
-    pub const INVALID: AliasIdx = AliasIdx(u32::MAX);
+    pub const NONE: AliasIdx = AliasIdx(u32::MAX);
 }
 
 #[derive(Debug, FromRepr, PartialEq)]
@@ -767,17 +767,17 @@ impl Tmp {
     pub fn new(name: Vec<u8>, /*ndef: u32, nuse: u32,*/ slot: i32, cls: KExt) -> Tmp {
         Tmp {
             name,
-            def: InsIdx::INVALID, // ??? QBE sets ndef to 1 initially in parse.c
-            uses: vec![Use::new(UseT::UXXX, BlkIdx::INVALID, 0)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
+            def: InsIdx::NONE, // ??? QBE sets ndef to 1 initially in parse.c
+            uses: vec![Use::new(UseT::UXXX, BlkIdx::NONE, 0)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
             ndef: 1,       // TODO??? QBE sets ndef to 1 initially in parse.c
             bid: u32::MAX, // QBE inits to 0 in newtmp()
 
             slot,
             cls,
-            phi: TmpIdx::INVALID,     // QBE inits to 0 in newtmp()
-            alias: AliasIdx::INVALID, // QBE inits to 0 in newtmp()
+            phi: TmpIdx::NONE,     // QBE inits to 0 in newtmp()
+            alias: AliasIdx::NONE, // QBE inits to 0 in newtmp()
             width: TmpWdth::WFull,
-            visit: TmpIdx::INVALID,
+            visit: TmpIdx::NONE,
         }
     }
 }
@@ -787,7 +787,7 @@ impl Tmp {
 pub struct TmpIdx(pub u32);
 
 impl TmpIdx {
-    pub const INVALID: TmpIdx = TmpIdx(u32::MAX);
+    pub const NONE: TmpIdx = TmpIdx(u32::MAX);
 }
 
 #[derive(Debug, PartialEq)]
@@ -831,7 +831,7 @@ pub struct ConIdx(pub u32);
 
 impl ConIdx {
     pub const UNDEF: ConIdx = ConIdx(0); /* represents uninitialized data */
-    pub const INVALID: ConIdx = ConIdx(u32::MAX);
+    pub const NONE: ConIdx = ConIdx(u32::MAX);
 }
 
 #[derive(Debug)]
@@ -848,7 +848,7 @@ pub type Mem = Addr;
 pub struct MemIdx(pub u32); // Index into Fn::mem
 
 impl MemIdx {
-    pub const INVALID: MemIdx = MemIdx(u32::MAX);
+    pub const NONE: MemIdx = MemIdx(u32::MAX);
 }
 
 #[derive(Clone)]
@@ -889,12 +889,12 @@ impl Fn {
             blks: vec![],
             phis: vec![],
             aliases: vec![],
-            start: BlkIdx::INVALID,
+            start: BlkIdx::NONE,
             tmps: vec![],
             cons: vec![],
             mems: vec![],
             nblk: 0,
-            retty: TypIdx::INVALID,
+            retty: TypIdx::NONE,
             retr: Ref::R,
             rpo: vec![],
             //bits reg,
@@ -907,12 +907,12 @@ impl Fn {
     }
 
     pub fn blk(&self, bi: BlkIdx) -> &Blk {
-        assert!(bi != BlkIdx::INVALID);
+        assert!(bi != BlkIdx::NONE);
         &self.blks[bi.0 as usize]
     }
 
     pub fn blk_mut(&mut self, bi: BlkIdx) -> &mut Blk {
-        assert!(bi != BlkIdx::INVALID);
+        assert!(bi != BlkIdx::NONE);
         &mut self.blks[bi.0 as usize]
     }
 
@@ -923,7 +923,7 @@ impl Fn {
     }
 
     pub fn set_blk_link(&mut self, from_bi: BlkIdx, to_bi: BlkIdx) {
-        if from_bi == BlkIdx::INVALID {
+        if from_bi == BlkIdx::NONE {
             self.start = to_bi;
         } else {
             self.blk_mut(from_bi).link = to_bi;
@@ -931,12 +931,12 @@ impl Fn {
     }
 
     pub fn phi(&self, pi: PhiIdx) -> &Phi {
-        assert!(pi != PhiIdx::INVALID);
+        assert!(pi != PhiIdx::NONE);
         &self.phis[pi.0 as usize]
     }
 
     pub fn phi_mut(&mut self, pi: PhiIdx) -> &mut Phi {
-        assert!(pi != PhiIdx::INVALID);
+        assert!(pi != PhiIdx::NONE);
         &mut self.phis[pi.0 as usize]
     }
 
@@ -947,12 +947,12 @@ impl Fn {
     }
 
     pub fn alias(&self, ai: AliasIdx) -> &Alias {
-        assert!(ai != AliasIdx::INVALID);
+        assert!(ai != AliasIdx::NONE);
         &self.aliases[ai.0 as usize]
     }
 
     pub fn alias_mut(&mut self, ai: AliasIdx) -> &mut Alias {
-        assert!(ai != AliasIdx::INVALID);
+        assert!(ai != AliasIdx::NONE);
         &mut self.aliases[ai.0 as usize]
     }
 
@@ -963,12 +963,12 @@ impl Fn {
     }
 
     pub fn tmp(&self, ti: TmpIdx) -> &Tmp {
-        assert!(ti != TmpIdx::INVALID);
+        assert!(ti != TmpIdx::NONE);
         &self.tmps[ti.0 as usize]
     }
 
     pub fn tmp_mut(&mut self, ti: TmpIdx) -> &mut Tmp {
-        assert!(ti != TmpIdx::INVALID);
+        assert!(ti != TmpIdx::NONE);
         &mut self.tmps[ti.0 as usize]
     }
 
@@ -979,12 +979,12 @@ impl Fn {
     }
 
     pub fn con(&self, ci: ConIdx) -> &Con {
-        assert!(ci != ConIdx::INVALID);
+        assert!(ci != ConIdx::NONE);
         &self.cons[ci.0 as usize]
     }
 
     pub fn con_mut(&mut self, ci: ConIdx) -> &mut Con {
-        assert!(ci != ConIdx::INVALID);
+        assert!(ci != ConIdx::NONE);
         &mut self.cons[ci.0 as usize]
     }
 
@@ -995,7 +995,7 @@ impl Fn {
     }
 
     pub fn mem(&self, mi: MemIdx) -> &Mem {
-        assert!(mi != MemIdx::INVALID);
+        assert!(mi != MemIdx::NONE);
         &self.mems[mi.0 as usize]
     }
 }
@@ -1039,7 +1039,7 @@ pub struct Typ {
 pub struct TypIdx(pub u32);
 
 impl TypIdx {
-    pub const INVALID: TypIdx = TypIdx(u32::MAX);
+    pub const NONE: TypIdx = TypIdx(u32::MAX);
 }
 
 impl Typ {

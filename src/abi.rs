@@ -8,7 +8,7 @@ use crate::all::{isargbh, isparbh, isretbh, Blk, BlkIdx, Fn, J, O};
  */
 pub fn elimsb(f: &mut Fn) {
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &mut Blk = f.blk_mut(bi);
         for i in &mut b.ins {
             if isargbh(i.op) {

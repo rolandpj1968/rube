@@ -9,7 +9,7 @@ use crate::util::{bsclr, bscopy, bscount, bsequal, bsinit, bsiter, bsset, bsunio
 pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
     bscopy(v, &f.blk(si).in_);
     let mut pi: PhiIdx = f.blk(si).phi;
-    while pi != PhiIdx::INVALID {
+    while pi != PhiIdx::NONE {
         let p: &Phi = f.phi(pi);
         if let Ref::RTmp(ti) = p.to {
             bsclr(v, ti.0);
@@ -17,7 +17,7 @@ pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
         pi = f.phi(pi).link;
     }
     let mut pi = f.blk(si).phi;
-    while pi != PhiIdx::INVALID {
+    while pi != PhiIdx::NONE {
         assert!(f.phi(pi).args.len() == f.phi(pi).blks.len());
         for a in 0..f.phi(pi).args.len() {
             if f.phi(pi).blks[a] == bi {
@@ -57,7 +57,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     let mut v: BSet = bsinit(ntmps);
 
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &mut Blk = f.blk_mut(bi);
         b.in_ = bsinit(ntmps);
         b.out = bsinit(ntmps);
@@ -71,11 +71,11 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             let bi: BlkIdx = f.rpo[n];
             bscopy(&mut u, &f.blk(bi).out);
             let (s1, s2) = f.blk(bi).s1_s2();
-            if s1 != BlkIdx::INVALID {
+            if s1 != BlkIdx::NONE {
                 liveon(f, &mut v, bi, s1);
                 bsunion(&mut f.blk_mut(bi).out, &v);
             }
-            if s2 != BlkIdx::INVALID {
+            if s2 != BlkIdx::NONE {
                 liveon(f, &mut v, bi, s2);
                 bsunion(&mut f.blk_mut(bi).out, &v);
             }
@@ -142,7 +142,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                         } else {
                             // to MUST be R or RTmp
                             assert!(false);
-                            TmpIdx::INVALID
+                            TmpIdx::NONE
                         }
                     };
                     //t = i->to.val;
@@ -188,7 +188,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
         /*e*/
         println!("\n> Liveness analysis:");
         let mut bi = f.start;
-        while bi != BlkIdx::INVALID {
+        while bi != BlkIdx::NONE {
             let b: &Blk = f.blk(bi);
             /*e*/
             print!("\t{:<10}in:   ", to_s(&b.name));

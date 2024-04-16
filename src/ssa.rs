@@ -48,22 +48,22 @@ pub fn filluse(f: &mut Fn) {
     /* todo, is this the correct file? */
     for tmp in f.tmps.iter_mut().skip(TMP0 as usize) {
         // TODO - Tmp::clear()???
-        tmp.def = InsIdx::INVALID; // QBE initialises with 0
+        tmp.def = InsIdx::NONE; // QBE initialises with 0
         tmp.bid = u32::MAX;
         tmp.ndef = 0;
         tmp.cls = KW; // QBE sets to 0
-        tmp.phi = TmpIdx::INVALID; // QBE sets to 0
+        tmp.phi = TmpIdx::NONE; // QBE sets to 0
         tmp.width = TmpWdth::WFull;
         tmp.uses.clear();
     }
 
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let (bid, mut pi) = {
             let b: &Blk = f.blk(bi);
             (b.id, b.phi)
         };
-        while pi != PhiIdx::INVALID {
+        while pi != PhiIdx::NONE {
             let cls = f.phi(pi).cls;
             if let Ref::RTmp(mut tip) = f.phi(pi).to {
                 {
@@ -143,13 +143,13 @@ fn refindex(f: &mut Fn, ti: TmpIdx) -> Ref {
 }
 
 fn phiins(f: &mut Fn) -> RubeResult<()> {
-    let mut blist: Vec<BlkIdx> = vec![BlkIdx::INVALID; f.blks.len()];
+    let mut blist: Vec<BlkIdx> = vec![BlkIdx::NONE; f.blks.len()];
     let be: usize = f.blks.len();
     let nt: u32 = f.tmps.len() as u32;
     for tii in TMP0..nt {
         let ti: TmpIdx = TmpIdx(tii);
-        f.tmp_mut(ti).visit = TmpIdx::INVALID;
-        if f.tmp(ti).phi != TmpIdx::INVALID {
+        f.tmp_mut(ti).visit = TmpIdx::NONE;
+        if f.tmp(ti).phi != TmpIdx::NONE {
             continue;
         }
         if f.tmp(ti).ndef == 1 {
@@ -168,7 +168,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         let mut bp: usize = be;
         let rt: Ref = Ref::RTmp(ti);
         let mut bi = f.start;
-        while bi != BlkIdx::INVALID {
+        while bi != BlkIdx::NONE {
             f.blk_mut(bi).visit = 0;
             let mut r: Ref = Ref::R;
             for ii in 0..f.blk(bi).ins.len() {
@@ -255,7 +255,7 @@ fn nnew(r: Ref, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, up: Name
 
     if *namel == NameIdx::INVALID {
         ni = NameIdx(names.len() as u32);
-        names.push(Name::new(Ref::R, BlkIdx::INVALID, NameIdx::INVALID));
+        names.push(Name::new(Ref::R, BlkIdx::NONE, NameIdx::INVALID));
     } else {
         ni = *namel;
         *namel = names[ni.0 as usize].up;
@@ -282,7 +282,7 @@ fn rendef(
         return r;
     }
     if let Ref::RTmp(ti) = r {
-        if f.tmp(ti).visit == TmpIdx::INVALID {
+        if f.tmp(ti).visit == TmpIdx::NONE {
             return r;
         }
         let r1: Ref = refindex(f, ti);
@@ -327,7 +327,7 @@ fn getstk(
 
 fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, stk: &mut [NameIdx]) {
     let mut pi = f.blk(bi).phi;
-    while pi != PhiIdx::INVALID {
+    while pi != PhiIdx::NONE {
         let to: Ref = f.phi(pi).to;
         let to_new = rendef(f, bi, to, namel, names, stk);
         f.phi_mut(pi).to = to_new;
@@ -337,7 +337,7 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
     for ii in 0..f.blk(bi).ins.len() {
         for m in 0..2 {
             if let Ref::RTmp(ti) = f.blk(bi).ins[ii].args[m] {
-                if f.tmp(ti).visit != TmpIdx::INVALID {
+                if f.tmp(ti).visit != TmpIdx::NONE {
                     f.blk_mut(bi).ins[ii].args[m] = getstk(f, bi, ti, namel, names, stk);
                 }
             }
@@ -348,21 +348,21 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
     }
     let jmp_arg: Ref = f.blk(bi).jmp.arg;
     if let Ref::RTmp(ti) = jmp_arg {
-        if f.tmp(ti).visit != TmpIdx::INVALID {
+        if f.tmp(ti).visit != TmpIdx::NONE {
             f.blk_mut(bi).jmp.arg = getstk(f, bi, ti, namel, names, stk);
         }
     }
     let (s1, s2) = f.blk(bi).s1_s2();
-    let succ: [BlkIdx; 2] = [s1, if s1 == s2 { BlkIdx::INVALID } else { s2 }];
+    let succ: [BlkIdx; 2] = [s1, if s1 == s2 { BlkIdx::NONE } else { s2 }];
     for si in succ {
-        if si == BlkIdx::INVALID {
+        if si == BlkIdx::NONE {
             continue; // QBE effectively break's
         }
         let mut pi: PhiIdx = f.blk(si).phi;
-        while pi != PhiIdx::INVALID {
+        while pi != PhiIdx::NONE {
             if let Ref::RTmp(to_ti) = f.phi(pi).to {
                 let ti: TmpIdx = f.tmp(to_ti).visit;
-                if ti != TmpIdx::INVALID {
+                if ti != TmpIdx::NONE {
                     let arg: Ref = getstk(f, bi, ti, namel, names, stk);
                     let p: &mut Phi = f.phi_mut(pi);
                     p.args.push(arg);
@@ -376,7 +376,7 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
         }
     }
     let mut si: BlkIdx = f.blk(bi).dom;
-    while si != BlkIdx::INVALID {
+    while si != BlkIdx::NONE {
         renblk(f, si, namel, names, stk);
         si = f.blk(si).dlink;
     }
@@ -394,13 +394,13 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
         // TODO obviously
         eprintln!("\n> Dominators:");
         let mut b1i: BlkIdx = f.start;
-        while b1i != BlkIdx::INVALID {
+        while b1i != BlkIdx::NONE {
             let b1: &Blk = f.blk(b1i);
-            if b1.dom != BlkIdx::INVALID {
+            if b1.dom != BlkIdx::NONE {
                 /*e*/
                 print!("{:>10}:", to_s(&b1.name));
                 let mut bi: BlkIdx = b1.dom;
-                while bi != BlkIdx::INVALID {
+                while bi != BlkIdx::NONE {
                     let b: &Blk = f.blk(bi);
                     /*e*/
                     print!(" {}", to_s(&b.name));
@@ -468,10 +468,10 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
         }
     }
     let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::INVALID {
+    while bi != BlkIdx::NONE {
         let b: &Blk = f.blk(bi);
         let mut pi: PhiIdx = b.phi;
-        while pi != PhiIdx::INVALID {
+        while pi != PhiIdx::NONE {
             let p: &Phi = f.phi(pi);
             let r: Ref = p.to;
             let ti: TmpIdx = if let Ref::RTmp(ti0) = r {
@@ -530,7 +530,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
 
 fn ssacheck_err(f: &Fn, t: &Tmp, bui: BlkIdx) -> Box<SsaError> {
     Box::new(SsaError::new(&{
-        if t.visit != TmpIdx::INVALID {
+        if t.visit != TmpIdx::NONE {
             format!("%{} violates ssa invariant", to_s(&t.name))
         } else {
             format!(
