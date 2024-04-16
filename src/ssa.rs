@@ -1,10 +1,38 @@
+use std::error::Error;
+use std::fmt;
+
 use crate::all::{
-    isext, isload, isparbh, to_s, Blk, BlkIdx, Fn, Ins, InsIdx, PhiIdx, Ref, Target, Tmp, TmpIdx,
-    TmpWdth, Use, UseT, KW, O, TMP0,
+    bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, Ins, InsIdx, KExt, Phi, PhiIdx,
+    Ref, RubeResult, Target, Tmp, TmpIdx, TmpWdth, Use, UseT, KW, KX, O, TMP0,
 };
 use crate::cfg::{filldom, fillfron};
 use crate::live::filllive;
-use crate::util::phicls;
+use crate::util::{bsclr, bsinit, bsset, clsmerge, newtmpref, phicls};
+
+#[derive(Debug)]
+struct SsaError {
+    msg: String,
+}
+
+impl SsaError {
+    fn new(msg: &str) -> SsaError {
+        SsaError {
+            msg: msg.to_string(),
+        }
+    }
+}
+
+impl fmt::Display for SsaError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.msg)
+    }
+}
+
+impl Error for SsaError {
+    fn description(&self) -> &str {
+        &self.msg
+    }
+}
 
 fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: u32) {
     tmp.uses.push(Use::new(ty, bi, bid));
@@ -105,102 +133,113 @@ pub fn filluse(f: &mut Fn) {
     }
 }
 
-/*
-static Ref
-refindex(int t, Fn *fn)
-{
-    return newtmp(fn->tmp[t].name, fn->tmp[t].cls, fn);
+fn refindex(f: &mut Fn, ti: TmpIdx) -> Ref {
+    let prfx: Vec<u8> = f.tmp(ti).name.clone();
+    let cls: KExt = f.tmp(ti).cls;
+    newtmpref(&prfx, true, cls, f)
 }
 
-static void
-phiins(Fn *fn)
-{
-    BSet u[1], defs[1];
-    Blk *a, *b, **blist, **be, **bp;
-    Ins *i;
-    Phi *p;
-    Use *use;
-    Ref r;
-    int t, nt, ok;
-    uint n, defb;
-    short k;
+fn phiins(f: &mut Fn) -> RubeResult<()> {
+    // BSet u[1], defs[1];
+    // Blk *a, *b, **blist, **be, **bp;
+    // Ins *i;
+    // Phi *p;
+    // Use *use;
+    // Ref r;
+    // int t, nt, ok;
+    // uint n, defb;
+    // short k;
 
-    bsinit(u, fn->nblk);
-    bsinit(defs, fn->nblk);
-    blist = emalloc(fn->nblk * sizeof blist[0]);
-    be = &blist[fn->nblk];
-    nt = fn->ntmp;
-    for (t=Tmp0; t<nt; t++) {
-        fn->tmp[t].visit = 0;
-        if (fn->tmp[t].phi != 0)
+    let mut blist: Vec<BlkIdx> = vec![BlkIdx::INVALID; f.blks.len()];
+    let be: usize = f.blks.len();
+    let nt: u32 = f.tmps.len() as u32;
+    for tii in TMP0..nt {
+        let ti: TmpIdx = TmpIdx(tii);
+        f.tmp_mut(ti).visit = TmpIdx::INVALID;
+        if f.tmp(ti).phi != TmpIdx::INVALID {
             continue;
-        if (fn->tmp[t].ndef == 1) {
-            ok = 1;
-            defb = fn->tmp[t].bid;
-            use = fn->tmp[t].use;
-            for (n=fn->tmp[t].nuse; n--; use++)
-                ok &= use->bid == defb;
-            if (ok || defb == fn->start->id)
-                continue;
         }
-        bszero(u);
-        k = -1;
-        bp = be;
-        for (b=fn->start; b; b=b->link) {
-            b->visit = 0;
-            r = R;
-            for (i=b->ins; i<&b->ins[b->nins]; i++) {
-                if (!req(r, R)) {
-                    if (req(i->arg[0], TMP(t)))
-                        i->arg[0] = r;
-                    if (req(i->arg[1], TMP(t)))
-                        i->arg[1] = r;
+        if f.tmp(ti).ndef == 1 {
+            let mut ok: bool = true;
+            let defb: u32 = f.tmp(ti).bid;
+            //use = f.tmp(ti).use;
+            for usei in (0..f.tmp(ti).uses.len()).rev() {
+                ok = ok && f.tmp(ti).uses[usei].bid == defb;
+            }
+            if ok || defb == f.blk(f.start).id {
+                continue;
+            }
+        }
+        let mut u: BSet = bsinit(f.blks.len());
+        let mut k: KExt = KX;
+        let mut bp: usize = be;
+        let rt: Ref = Ref::RTmp(ti);
+        let mut bi = f.start;
+        while bi != BlkIdx::INVALID {
+            f.blk_mut(bi).visit = 0;
+            let mut r: Ref = Ref::R;
+            for ii in 0..f.blk(bi).ins.len() {
+                let (to, cls, arg0, arg1) = {
+                    let i: &Ins = &f.blk(bi).ins[ii];
+                    (i.to, i.cls, i.args[0], i.args[1])
+                };
+                if r != Ref::R {
+                    if arg0 == rt {
+                        f.blk_mut(bi).ins[ii].args[0] = r;
+                    }
+                    if arg1 == rt {
+                        f.blk_mut(bi).ins[ii].args[1] = r;
+                    }
                 }
-                if (req(i->to, TMP(t))) {
-                    if (!bshas(b->out, t)) {
-                        r = refindex(t, fn);
-                        i->to = r;
+                if to == rt {
+                    if !bshas(&f.blk(bi).out, tii) {
+                        r = refindex(f, ti);
+                        f.blk_mut(bi).ins[ii].to = r;
                     } else {
-                        if (!bshas(u, b->id)) {
-                            bsset(u, b->id);
-                            *--bp = b;
+                        if !bshas(&u, f.blk(bi).id) {
+                            bsset(&mut u, f.blk(bi).id);
+                            bp -= 1;
+                            blist[bp] = bi;
                         }
-                        if (clsmerge(&k, i->cls))
-                            die("invalid input");
+                        if clsmerge(&mut k, cls) {
+                            // TODO - better msg
+                            return Err(Box::new(SsaError::new("invalid input")));
+                        }
                     }
                 }
             }
-            if (!req(r, R) && req(b->jmp.arg, TMP(t)))
-                b->jmp.arg = r;
+            if r != Ref::R && f.blk(bi).jmp.arg == rt {
+                f.blk_mut(bi).jmp.arg = r;
+            }
+            bi = f.blk(bi).link;
         }
-        bscopy(defs, u);
-        while (bp != be) {
-            fn->tmp[t].visit = t;
-            b = *bp++;
-            bsclr(u, b->id);
-            for (n=0; n<b->nfron; n++) {
-                a = b->fron[n];
-                if (a->visit++ == 0)
-                if (bshas(a->in, t)) {
-                    p = alloc(sizeof *p);
-                    p->cls = k;
-                    p->to = TMP(t);
-                    p->link = a->phi;
-                    p->arg = vnew(0, sizeof p->arg[0], PFn);
-                    p->blk = vnew(0, sizeof p->blk[0], PFn);
-                    a->phi = p;
-                    if (!bshas(defs, a->id))
-                    if (!bshas(u, a->id)) {
-                        bsset(u, a->id);
-                        *--bp = a;
+        let defs: BSet = u.clone();
+        while bp != be {
+            f.tmp_mut(ti).visit = ti;
+            let bi: BlkIdx = blist[bp];
+            bp += 1;
+            bsclr(&mut u, f.blk(bi).id);
+            for n in 0..f.blk(bi).frons.len() {
+                let ai: BlkIdx = f.blk(bi).frons[n];
+                let a_visit = f.blk(ai).visit;
+                f.blk_mut(ai).visit += 1;
+                if a_visit == 0 && bshas(&f.blk(ai).in_, ti.0) {
+                    let a_pi: PhiIdx = f.blk(ai).phi;
+                    let pi: PhiIdx = f.add_phi(Phi::new(rt, vec![], vec![], k, a_pi));
+                    f.blk_mut(ai).phi = pi;
+                    let a_id = f.blk(ai).id;
+                    if !bshas(&defs, a_id) && !bshas(&u, a_id) {
+                        bsset(&mut u, a_id);
+                        bp -= 1;
+                        blist[bp] = ai;
                     }
                 }
             }
         }
     }
-    free(blist);
+    Ok(())
 }
- */
+
 struct Name {
     r: Ref,
     bi: BlkIdx,
@@ -315,7 +354,7 @@ renblk(Blk *b, Name **stk, Fn *fn)
  */
 
 /* require rpo and use */
-pub fn ssa(f: &mut Fn, targ: &Target) {
+pub fn ssa(f: &mut Fn, targ: &Target) -> RubeResult<()> {
     // Name **stk, *n;
     // int d, nt;
     // Blk *b, *b1;
@@ -352,7 +391,7 @@ pub fn ssa(f: &mut Fn, targ: &Target) {
     }
     fillfron(f);
     filllive(f, targ);
-    // phiins(fn);
+    phiins(f)?;
     // renblk(fn->start, stk, fn);
     // while (nt--)
     //     while ((n=stk[nt])) {
@@ -365,6 +404,8 @@ pub fn ssa(f: &mut Fn, targ: &Target) {
     //     fprintf(stderr, "\n> After SSA construction:\n");
     //     printfn(fn, stderr);
     // }
+
+    Ok(())
 }
 
 /*

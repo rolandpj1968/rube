@@ -735,7 +735,7 @@ pub struct Tmp {
     pub phi: TmpIdx,
     // Alias alias;
     pub width: TmpWdth,
-    // int visit;
+    pub visit: TmpIdx, /*u32*/ // bool??? TmpIdx??
 }
 
 impl Tmp {
@@ -751,6 +751,7 @@ impl Tmp {
             cls,
             phi: TmpIdx::INVALID, // QBE inits to 0 in newtmp()
             width: TmpWdth::WFull,
+            visit: TmpIdx::INVALID,
         }
     }
 }

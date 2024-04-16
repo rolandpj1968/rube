@@ -14,8 +14,10 @@ struct MemError {
 }
 
 impl MemError {
-    fn new(msg: String) -> MemError {
-        MemError { msg }
+    fn new(msg: &str) -> MemError {
+        MemError {
+            msg: msg.to_string(),
+        }
     }
 }
 
@@ -120,7 +122,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                             b"<unknown>"
                         }
                     };
-                    return Err(Box::new(MemError::new(format!(
+                    return Err(Box::new(MemError::new(&format!(
                         "slot %{} is read but never stored to in function {}",
                         to_s(t_name),
                         to_s(&f.name)

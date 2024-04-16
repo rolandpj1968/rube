@@ -28,8 +28,10 @@ struct ParseError {
 }
 
 impl ParseError {
-    fn new(msg: String) -> ParseError {
-        ParseError { msg }
+    fn new(msg: &str) -> ParseError {
+        ParseError {
+            msg: msg.to_string(),
+        }
     }
 }
 
@@ -404,7 +406,7 @@ impl Parser<'_> {
     }
 
     fn err(&self, s: &str) -> Box<ParseError> {
-        Box::new(ParseError::new(format!(
+        Box::new(ParseError::new(&format!(
             "qbe:{}:{}: {}",
             self.inpath.display(),
             self.lnum,

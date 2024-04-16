@@ -1,7 +1,7 @@
 use std::io::stdout;
 
 use crate::all::{
-    bshas, kbase, to_s, BSet, Blk, BlkIdx, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target, Tmp, TmpIdx, O,
+    bshas, kbase, to_s, BSet, Blk, BlkIdx, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target, TmpIdx, O,
 };
 
 use crate::util::{bsclr, bscopy, bscount, bsequal, bsinit, bsiter, bsset, bsunion, dumpts};

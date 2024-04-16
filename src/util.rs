@@ -694,6 +694,7 @@ pub fn bsclr(bs: &mut BSet, elt: u32) {
 BSOP(bscopy, =)
  */
 
+// TODO - just replace inline with clone
 pub fn bscopy(a: &mut BSet, b: &BSet) {
     *a = b.clone();
 }
