@@ -426,18 +426,13 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     fillfron(f);
     filllive(f, targ);
     phiins(f)?;
-    if true {
-        /*e*/
-        println!("\n> After Phi insertion:");
-        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
-    }
     let mut namel: NameIdx = NameIdx::INVALID;
     let mut names: Vec<Name> = vec![];
     let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
     renblk(f, f.start, &mut namel, &mut names, &mut stk);
     // TODO
     //debug['L'] = d;
-    if true
+    if false
     /*TODO: debug['N']*/
     {
         /*e*/

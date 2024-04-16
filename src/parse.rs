@@ -2050,8 +2050,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             let _ = write!(f, "\t");
             printref(f, fn_, typ, itbl, &p.to);
             let _ = write!(f, " ={} phi ", KTOC[p.cls as usize]);
-            // TODO - temporarily disabled to debug phiins()
-            //assert!(!p.args.is_empty());
+            assert!(!p.args.is_empty());
             assert!(p.args.len() == p.blks.len());
             for n in 0..p.args.len() {
                 let bi: BlkIdx = p.blks[n];
