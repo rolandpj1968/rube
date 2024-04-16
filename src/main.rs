@@ -26,7 +26,7 @@ use std::io::stdout;
 use std::path::Path;
 
 use abi::elimsb;
-use all::{Dat, Fn, Typ};
+use all::{Dat, Fn, Target, Typ};
 use amd64::targ::T_AMD64_SYSV;
 use cfg::fillrpo;
 use mem::promote;
@@ -46,7 +46,7 @@ fn dump_data(dat: &Dat, _typ: &[Typ]) {
     );
 }
 
-fn dump_func(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
+fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     println!("Got fn {:?}:", String::from_utf8_lossy(&f.name));
     println!();
     elimsb(f); // TODO targ.abi0()
@@ -54,7 +54,8 @@ fn dump_func(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     filluse(f);
     promote(f).unwrap();
     filluse(f);
-    ssa(f, &T_AMD64_SYSV, typ, itbl).unwrap(); /* TODO thread through callback */
+    ssa(f, targ, typ, itbl).unwrap();
+    filluse(f);
     printfn(&mut stdout(), f, typ, itbl);
 }
 

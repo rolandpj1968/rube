@@ -367,7 +367,7 @@ lazy_static! {
 
 // Ugh, pub for util::intern(), util::str_()
 pub struct Parser<'a> {
-    target: &'a Target,
+    targ: &'a Target,
     inf: Bytes<BufReader<&'a File>>,
     ungetc: Option<u8>,
     inpath: &'a Path,
@@ -387,7 +387,7 @@ pub struct Parser<'a> {
 impl Parser<'_> {
     fn new<'a>(target: &'a Target, f: &'a File, path: &'a Path) -> Parser<'a> {
         Parser {
-            target,
+            targ: target,
             inf: BufReader::new(f).bytes(), // TODO use .peekable() instead of ungetc()
             ungetc: None,
             inpath: path,
@@ -1477,7 +1477,7 @@ impl Parser<'_> {
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
         let mut curf = Fn::new(lnk.clone());
         for i in 0..TMP0 {
-            if self.target.fpr0 <= i && i < self.target.fpr0 + self.target.nfpr {
+            if self.targ.fpr0 <= i && i < self.targ.fpr0 + self.targ.nfpr {
                 // Ugh, returns Ref
                 let _ = newtmpref(b"", false, KD, &mut curf);
             } else {
@@ -1849,7 +1849,7 @@ impl Parser<'_> {
         &mut self,
         dbgfile: fn(&[u8]) -> (),
         data: fn(&Dat, &[Typ]) -> (),
-        func: fn(&mut Fn, &[Typ], &[Bucket]) -> (),
+        func: fn(&mut Fn, targ: &Target, &[Typ], &[Bucket]) -> (),
     ) -> RubeResult<()> {
         loop {
             let mut lnk = Lnk {
@@ -1867,7 +1867,7 @@ impl Parser<'_> {
                 }
 
                 Token::Tfunc => {
-                    func(&mut self.parsefn(&lnk)?, &self.typ, &self.itbl);
+                    func(&mut self.parsefn(&lnk)?, self.targ, &self.typ, &self.itbl);
                 }
 
                 Token::Tdata => {
@@ -1893,15 +1893,15 @@ impl Parser<'_> {
 }
 
 pub fn parse(
-    target: &Target,
+    targ: &Target,
     f: &File,
     path: &Path,
     dbgfile: fn(&[u8]) -> (),
     data: fn(&Dat, &[Typ]) -> (),
-    func: fn(&mut Fn, &[Typ], &[Bucket]) -> (),
+    func: fn(&mut Fn, targ: &Target, &[Typ], &[Bucket]) -> (),
 ) -> RubeResult<()> {
     // Allocate on the heap cos it's laaarge; TODO do we need tmph? Revert to stack
-    let mut parser = Box::new(Parser::new(target, f, path));
+    let mut parser = Box::new(Parser::new(targ, f, path));
 
     parser.parse(dbgfile, data, func)
 }
