@@ -1,13 +1,16 @@
+use derive_new::new;
 use std::error::Error;
 use std::fmt;
+use std::io::stdout;
 
 use crate::all::{
     bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, Ins, InsIdx, KExt, Phi, PhiIdx,
-    Ref, RubeResult, Target, Tmp, TmpIdx, TmpWdth, Use, UseT, KW, KX, O, TMP0,
+    Ref, RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, KW, KX, O, TMP0, UNDEF,
 };
-use crate::cfg::{filldom, fillfron};
+use crate::cfg::{dom, filldom, fillfron};
 use crate::live::filllive;
-use crate::util::{bsclr, bsinit, bsset, clsmerge, newtmpref, phicls};
+use crate::parse::printfn;
+use crate::util::{bsclr, bsinit, bsset, clsmerge, newtmpref, phicls, Bucket};
 
 #[derive(Debug)]
 struct SsaError {
@@ -240,121 +243,168 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     Ok(())
 }
 
+#[derive(new)]
 struct Name {
     r: Ref,
     bi: BlkIdx,
     up: NameIdx,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct NameIdx(u32);
+
+impl NameIdx {
+    const INVALID: NameIdx = NameIdx(u32::MAX);
+}
 
 /*
 static Name *namel;
+ */
+fn nnew(r: Ref, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, up: NameIdx) -> NameIdx {
+    let ni: NameIdx;
 
-static Name *
-nnew(Ref r, Blk *b, Name *up)
-{
-    Name *n;
-
-    if (namel) {
-        n = namel;
-        namel = n->up;
-    } else
-        /* could use alloc, here
-         * but namel should be reset
-         */
-        n = emalloc(sizeof *n);
-    n->r = r;
-    n->b = b;
-    n->up = up;
-    return n;
-}
-
-static void
-nfree(Name *n)
-{
-    n->up = namel;
-    namel = n;
-}
-
-static void
-rendef(Ref *r, Blk *b, Name **stk, Fn *fn)
-{
-    Ref r1;
-    int t;
-
-    t = r->val;
-    if (req(*r, R) || !fn->tmp[t].visit)
-        return;
-    r1 = refindex(t, fn);
-    fn->tmp[r1.val].visit = t;
-    stk[t] = nnew(r1, b, stk[t]);
-    *r = r1;
-}
-
-static Ref
-getstk(int t, Blk *b, Name **stk)
-{
-    Name *n, *n1;
-
-    n = stk[t];
-    while (n && !dom(n->b, b)) {
-        n1 = n;
-        n = n->up;
-        nfree(n1);
+    if *namel == NameIdx::INVALID {
+        ni = NameIdx(names.len() as u32);
+        names.push(Name::new(Ref::R, BlkIdx::INVALID, NameIdx::INVALID));
+    } else {
+        ni = *namel;
+        *namel = names[ni.0 as usize].up;
     }
-    stk[t] = n;
-    if (!n) {
-        /* uh, oh, warn */
-        return UNDEF;
-    } else
-        return n->r;
+    names[ni.0 as usize] = Name::new(r, bi, up);
+
+    ni
 }
 
-static void
-renblk(Blk *b, Name **stk, Fn *fn)
-{
-    Phi *p;
-    Ins *i;
-    Blk *s, **ps, *succ[3];
-    int t, m;
+fn nfree(ni: NameIdx, namel: &mut NameIdx, names: &mut Vec<Name>) {
+    names[ni.0 as usize].up = *namel;
+    *namel = ni;
+}
 
-    for (p=b->phi; p; p=p->link)
-        rendef(&p->to, b, stk, fn);
-    for (i=b->ins; i<&b->ins[b->nins]; i++) {
-        for (m=0; m<2; m++) {
-            t = i->arg[m].val;
-            if (rtype(i->arg[m]) == RTmp)
-            if (fn->tmp[t].visit)
-                i->arg[m] = getstk(t, b, stk);
+fn rendef(
+    f: &mut Fn,
+    bi: BlkIdx,
+    r: Ref,
+    namel: &mut NameIdx,
+    names: &mut Vec<Name>,
+    stk: &mut Vec<NameIdx>,
+) -> Ref {
+    if r == Ref::R {
+        return r;
+    }
+    if let Ref::RTmp(ti) = r {
+        if f.tmp(ti).visit != TmpIdx::INVALID {
+            return r;
         }
-        rendef(&i->to, b, stk, fn);
+        let r1: Ref = refindex(f, ti);
+        // TODO - there must be a better way of indicating that refindex() returns Ref::RTmp
+        if let Ref::RTmp(t1i) = r1 {
+            f.tmp_mut(t1i).visit = ti;
+            let ni: NameIdx = nnew(r1, bi, namel, names, stk[ti.0 as usize]);
+            stk[ti.0 as usize] = ni;
+        } else {
+            assert!(false);
+        }
+        r1
+    } else {
+        // r must be R or RTmp
+        assert!(false);
+        r
     }
-    t = b->jmp.arg.val;
-    if (rtype(b->jmp.arg) == RTmp)
-    if (fn->tmp[t].visit)
-        b->jmp.arg = getstk(t, b, stk);
-    succ[0] = b->s1;
-    succ[1] = b->s2 == b->s1 ? 0 : b->s2;
-    succ[2] = 0;
-    for (ps=succ; (s=*ps); ps++)
-        for (p=s->phi; p; p=p->link) {
-            t = p->to.val;
-            if ((t=fn->tmp[t].visit)) {
-                m = p->narg++;
-                vgrow(&p->arg, p->narg);
-                vgrow(&p->blk, p->narg);
-                p->arg[m] = getstk(t, b, stk);
-                p->blk[m] = b;
+}
+
+fn getstk(
+    f: &Fn,
+    bi: BlkIdx,
+    ti: TmpIdx,
+    namel: &mut NameIdx,
+    names: &mut Vec<Name>,
+    stk: &mut Vec<NameIdx>,
+) -> Ref {
+    let mut ni: NameIdx = stk[ti.0 as usize];
+    while ni != NameIdx::INVALID && !dom(f, names[ni.0 as usize].bi, bi) {
+        let ni1: NameIdx = ni;
+        ni = names[ni.0 as usize].up;
+        nfree(ni1, namel, names);
+    }
+    stk[ti.0 as usize] = ni;
+    if ni == NameIdx::INVALID {
+        /* uh, oh, warn */
+        UNDEF
+    } else {
+        names[ni.0 as usize].r
+    }
+}
+
+fn renblk(
+    f: &mut Fn,
+    bi: BlkIdx,
+    namel: &mut NameIdx,
+    names: &mut Vec<Name>,
+    stk: &mut Vec<NameIdx>,
+) {
+    // Phi *p;
+    // Ins *i;
+    // Blk *s, **ps, *succ[3];
+    // int t, m;
+
+    let mut pi = f.blk(bi).phi;
+    while pi != PhiIdx::INVALID {
+        let to: Ref = f.phi(pi).to;
+        let to_new = rendef(f, bi, to, namel, names, stk);
+        f.phi_mut(pi).to = to_new;
+
+        pi = f.phi(pi).link;
+    }
+    for ii in 0..f.blk(bi).ins.len() {
+        for m in 0..2 {
+            if let Ref::RTmp(ti) = f.blk(bi).ins[ii].args[m] {
+                if f.tmp(ti).visit != TmpIdx::INVALID {
+                    f.blk_mut(bi).ins[ii].args[m] = getstk(f, bi, ti, namel, names, stk);
+                }
             }
         }
-    for (s=b->dom; s; s=s->dlink)
-        renblk(s, stk, fn);
+        let to: Ref = f.blk(bi).ins[ii].to;
+        let new_to: Ref = rendef(f, bi, to, namel, names, stk);
+        f.blk_mut(bi).ins[ii].to = new_to;
+    }
+    let jmp_arg: Ref = f.blk(bi).jmp.arg;
+    if let Ref::RTmp(ti) = jmp_arg {
+        if f.tmp(ti).visit != TmpIdx::INVALID {
+            f.blk_mut(bi).jmp.arg = getstk(f, bi, ti, namel, names, stk);
+        }
+    }
+    let (s1, s2) = f.blk(bi).s1_s2();
+    let succ: [BlkIdx; 2] = [s1, if s1 == s2 { BlkIdx::INVALID } else { s2 }];
+    for si in succ {
+        if si == BlkIdx::INVALID {
+            continue; // QBE effectively break's
+        }
+        let mut pi: PhiIdx = f.blk(si).phi;
+        while pi != PhiIdx::INVALID {
+            if let Ref::RTmp(to_ti) = f.phi(pi).to {
+                let ti: TmpIdx = f.tmp(to_ti).visit;
+                if ti != TmpIdx::INVALID {
+                    let arg: Ref = getstk(f, bi, ti, namel, names, stk);
+                    let p: &mut Phi = f.phi_mut(pi);
+                    p.args.push(arg);
+                    p.blks.push(bi);
+                }
+            } else {
+                // phi to MUST be an RTmp (TODO is there a better way?)
+                assert!(false);
+            }
+            pi = f.phi(pi).link;
+        }
+    }
+    let mut si: BlkIdx = f.blk(bi).dom;
+    while si != BlkIdx::INVALID {
+        renblk(f, si, namel, names, stk);
+        si = f.blk(si).dlink;
+    }
 }
- */
 
 /* require rpo and use */
-pub fn ssa(f: &mut Fn, targ: &Target) -> RubeResult<()> {
+pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
     // Name **stk, *n;
     // int d, nt;
     // Blk *b, *b1;
@@ -392,18 +442,19 @@ pub fn ssa(f: &mut Fn, targ: &Target) -> RubeResult<()> {
     fillfron(f);
     filllive(f, targ);
     phiins(f)?;
-    // renblk(fn->start, stk, fn);
-    // while (nt--)
-    //     while ((n=stk[nt])) {
-    //         stk[nt] = n->up;
-    //         nfree(n);
-    //     }
-    // debug['L'] = d;
-    // free(stk);
-    // if (debug['N']) {
-    //     fprintf(stderr, "\n> After SSA construction:\n");
-    //     printfn(fn, stderr);
-    // }
+    let mut namel: NameIdx = NameIdx::INVALID;
+    let mut names: Vec<Name> = vec![];
+    let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
+    renblk(f, f.start, &mut namel, &mut names, &mut stk);
+    // TODO
+    //debug['L'] = d;
+    if true
+    /*TODO: debug['N']*/
+    {
+        /*e*/
+        println!("\n> After SSA construction:");
+        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
+    }
 
     Ok(())
 }

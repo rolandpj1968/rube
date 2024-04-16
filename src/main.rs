@@ -54,7 +54,7 @@ fn dump_func(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     filluse(f);
     promote(f).unwrap();
     filluse(f);
-    ssa(f, &T_AMD64_SYSV).unwrap(); // TODO thread through callback
+    ssa(f, &T_AMD64_SYSV, typ, itbl).unwrap(); // TODO thread through callback
     printfn(&mut stdout(), f, typ, itbl);
 }
 

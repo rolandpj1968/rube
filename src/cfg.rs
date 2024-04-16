@@ -211,7 +211,7 @@ fn sdom(f: &Fn, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
     b1i == b2i
 }
 
-fn dom(f: &Fn, b1i: BlkIdx, b2i: BlkIdx) -> bool {
+pub fn dom(f: &Fn, b1i: BlkIdx, b2i: BlkIdx) -> bool {
     b1i == b2i || sdom(f, b1i, b2i)
 }
 

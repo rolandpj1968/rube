@@ -77,6 +77,8 @@ pub enum Ref {
     RMem(MemIdx),
 }
 
+pub const UNDEF: Ref = Ref::RCon(ConIdx::UNDEF); /* represents uninitialized data */
+
 /*
 enum CmpI {
     Cieq,
@@ -804,6 +806,7 @@ impl Con {
 pub struct ConIdx(pub u32);
 
 impl ConIdx {
+    pub const UNDEF: ConIdx = ConIdx(0); /* represents uninitialized data */
     pub const INVALID: ConIdx = ConIdx(u32::MAX);
 }
 
