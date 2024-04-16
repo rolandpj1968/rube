@@ -292,7 +292,7 @@ fn rendef(
         return r;
     }
     if let Ref::RTmp(ti) = r {
-        if f.tmp(ti).visit != TmpIdx::INVALID {
+        if f.tmp(ti).visit == TmpIdx::INVALID {
             return r;
         }
         let r1: Ref = refindex(f, ti);
@@ -342,11 +342,6 @@ fn renblk(
     names: &mut Vec<Name>,
     stk: &mut Vec<NameIdx>,
 ) {
-    // Phi *p;
-    // Ins *i;
-    // Blk *s, **ps, *succ[3];
-    // int t, m;
-
     let mut pi = f.blk(bi).phi;
     while pi != PhiIdx::INVALID {
         let to: Ref = f.phi(pi).to;
@@ -405,12 +400,7 @@ fn renblk(
 
 /* require rpo and use */
 pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
-    // Name **stk, *n;
-    // int d, nt;
-    // Blk *b, *b1;
-
-    // nt = fn->ntmp;
-    // stk = emalloc(nt * sizeof stk[0]);
+    // TODO
     // d = debug['L'];
     // debug['L'] = 0;
     filldom(f);
@@ -442,6 +432,11 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     fillfron(f);
     filllive(f, targ);
     phiins(f)?;
+    if true {
+        /*e*/
+        println!("\n> After Phi insertion:");
+        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
+    }
     let mut namel: NameIdx = NameIdx::INVALID;
     let mut names: Vec<Name> = vec![];
     let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
