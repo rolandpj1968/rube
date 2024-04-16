@@ -634,14 +634,14 @@ pub struct Use {
     pub bid: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum SymT {
     SGlo,
     SThr,
 }
 
-#[derive(new, Debug, PartialEq)]
+#[derive(new, Clone, Copy, Debug, PartialEq)]
 pub struct Sym {
     pub type_: SymT,
     pub id: InternId,
@@ -660,29 +660,52 @@ enum {
     MayAlias,
     MustAlias
 };
-
-struct Alias {
-    enum {
-        ABot = 0,
-        ALoc = 1, /* stack local */
-        ACon = 2,
-        AEsc = 3, /* stack escaping */
-        ASym = 4,
-        AUnk = 6,
-    #define astack(t) ((t) & 1)
-    } type;
-    int base;
-    int64_t offset;
-    union {
-        Sym sym;
-        struct {
-            int sz; /* -1 if > NBit */
-            bits m;
-        } loc;
-    } u;
-    Alias *slot;
-};
  */
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
+pub enum AliasT {
+    ABot = 0,
+    ALoc = 1, /* stack local */
+    ACon = 2,
+    AEsc = 3, /* stack escaping */
+    ASym = 4,
+    AUnk = 6,
+}
+
+pub fn astack(t: AliasT) -> u8 {
+    (t as u8) & 1
+}
+
+#[derive(Clone, Debug)]
+pub struct AliasLoc {
+    pub sz: i32, /* -1 if > NBit */
+    pub m: Bits,
+}
+
+#[derive(Clone, Debug)]
+#[repr(u8)]
+pub enum AliasU {
+    ASym(Sym),
+    ALoc(AliasLoc),
+}
+
+#[derive(Clone, Debug)]
+pub struct Alias {
+    pub type_: AliasT,
+    pub base: i32, // ??? type???
+    pub offset: i64,
+    pub u: AliasU,
+    pub slot: AliasIdx,
+}
+
+// Index into Fn::aliases
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AliasIdx(pub u32);
+
+impl AliasIdx {
+    pub const INVALID: AliasIdx = AliasIdx(u32::MAX);
+}
 
 #[derive(Debug, FromRepr, PartialEq)]
 #[repr(u8)]
@@ -735,7 +758,7 @@ pub struct Tmp {
     //     bits m; /* avoid these registers */
     // } hint;
     pub phi: TmpIdx,
-    // Alias alias;
+    pub alias: AliasIdx,
     pub width: TmpWdth,
     pub visit: TmpIdx, /*u32*/ // bool??? TmpIdx??
 }
@@ -751,7 +774,8 @@ impl Tmp {
 
             slot,
             cls,
-            phi: TmpIdx::INVALID, // QBE inits to 0 in newtmp()
+            phi: TmpIdx::INVALID,     // QBE inits to 0 in newtmp()
+            alias: AliasIdx::INVALID, // QBE inits to 0 in newtmp()
             width: TmpWdth::WFull,
             visit: TmpIdx::INVALID,
         }
@@ -839,6 +863,8 @@ pub struct Lnk {
 pub struct Fn {
     pub blks: Vec<Blk>,
     pub phis: Vec<Phi>,
+    pub aliases: Vec<Alias>,
+
     pub start: BlkIdx,
     pub tmps: Vec<Tmp>,
     pub cons: Vec<Con>,
@@ -860,6 +886,7 @@ impl Fn {
         Fn {
             blks: vec![],
             phis: vec![],
+            aliases: vec![],
             start: BlkIdx::INVALID,
             tmps: vec![],
             cons: vec![],
@@ -915,6 +942,22 @@ impl Fn {
         let pi: PhiIdx = PhiIdx(self.phis.len() as u32);
         self.phis.push(p);
         pi
+    }
+
+    pub fn alias(&self, ai: AliasIdx) -> &Alias {
+        assert!(ai != AliasIdx::INVALID);
+        &self.aliases[ai.0 as usize]
+    }
+
+    pub fn alias_mut(&mut self, ai: AliasIdx) -> &mut Alias {
+        assert!(ai != AliasIdx::INVALID);
+        &mut self.aliases[ai.0 as usize]
+    }
+
+    pub fn add_alias(&mut self, a: Alias) -> AliasIdx {
+        let ai: AliasIdx = AliasIdx(self.aliases.len() as u32);
+        self.aliases.push(a);
+        ai
     }
 
     pub fn tmp(&self, ti: TmpIdx) -> &Tmp {

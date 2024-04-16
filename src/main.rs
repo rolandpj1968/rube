@@ -8,6 +8,7 @@ extern crate lazy_static;
 extern crate static_assertions;
 
 mod abi;
+mod alias;
 mod all;
 mod amd64;
 mod cfg;

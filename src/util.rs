@@ -223,7 +223,7 @@ intern(char *s)
 }
  */
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct InternId(u32);
 
 impl InternId {
