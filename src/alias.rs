@@ -57,60 +57,60 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
     let delta: i32 = (ap.offset - aq.offset) as i32; // Hrmm, this seems dodgy
     let ovlap: bool = ap.offset < aq.offset + (sq as i64) && aq.offset < ap.offset + (sp as i64);
 
-    if astack(ap.type_) != 0 && astack(aq.type_) != 0 {
-        /* if both are offsets of the same
-         * stack slot, they alias iif they
-         * overlap */
-        if ap.base == aq.base && ovlap {
-            return (CanAlias::Must, delta);
-        }
-        return (CanAlias::No, delta);
-    }
-
-    if ap.type_ == AliasT::ASym && aq.type_ == AliasT::ASym {
-        /* they conservatively alias if the
-         * symbols are different, or they
-         * alias for sure if they overlap */
-        if let AliasU::ASym(ap_sym) = ap.u {
-            if let AliasU::ASym(aq_sym) = aq.u {
-                return {
-                    if ap_sym == aq_sym {
-                        (CanAlias::May, delta)
-                    } else if ovlap {
-                        (CanAlias::Must, delta)
-                    } else {
-                        (CanAlias::No, delta)
-                    }
-                };
+    let can_alias: CanAlias = {
+        if astack(ap.type_) != 0 && astack(aq.type_) != 0 {
+            /* if both are offsets of the same
+             * stack slot, they alias iif they
+             * overlap */
+            if ap.base == aq.base && ovlap {
+                CanAlias::Must
+            } else {
+                CanAlias::No
             }
+        } else if ap.type_ == AliasT::ASym && aq.type_ == AliasT::ASym {
+            /* they conservatively alias if the
+             * symbols are different, or they
+             * alias for sure if they overlap */
+            if let AliasU::ASym(ap_sym) = ap.u {
+                if let AliasU::ASym(aq_sym) = aq.u {
+                    if ap_sym == aq_sym {
+                        CanAlias::May
+                    } else if ovlap {
+                        CanAlias::Must
+                    } else {
+                        CanAlias::No
+                    }
+                } else {
+                    assert!(false);
+                    CanAlias::May
+                }
+            } else {
+                assert!(false);
+                CanAlias::May
+            }
+        } else if (ap.type_ == AliasT::ACon && aq.type_ == AliasT::ACon)
+            || (ap.type_ == aq.type_ && ap.base == aq.base)
+        {
+            assert!(ap.type_ == AliasT::ACon || ap.type_ == AliasT::AUnk);
+            /* if they have the same base, we
+             * can rely on the offsets only */
+            if ovlap {
+                CanAlias::Must
+            } else {
+                CanAlias::No
+            }
+        } else if (ap.type_ == AliasT::AUnk && aq.type_ != AliasT::ALoc)
+            || (aq.type_ == AliasT::AUnk && ap.type_ != AliasT::ALoc)
+        {
+            /* if one of the two is unknown
+             * there may be aliasing unless
+             * the other is provably local */
+            CanAlias::May
+        } else {
+            CanAlias::No
         }
-        assert!(false);
-        return (CanAlias::May, delta);
-    }
-
-    if (ap.type_ == AliasT::ACon && aq.type_ == AliasT::ACon)
-        || (ap.type_ == aq.type_ && ap.base == aq.base)
-    {
-        assert!(ap.type_ == AliasT::ACon || ap.type_ == AliasT::AUnk);
-        /* if they have the same base, we
-         * can rely on the offsets only */
-        if ovlap {
-            return (CanAlias::Must, delta);
-        }
-        return (CanAlias::No, delta);
-    }
-
-    /* if one of the two is unknown
-     * there may be aliasing unless
-     * the other is provably local */
-    if ap.type_ == AliasT::AUnk && aq.type_ != AliasT::ALoc {
-        return (CanAlias::May, delta);
-    }
-    if aq.type_ == AliasT::AUnk && ap.type_ != AliasT::ALoc {
-        return (CanAlias::May, delta);
-    }
-
-    (CanAlias::No, delta)
+    };
+    (can_alias, delta)
 }
 
 pub fn escapes(f: &Fn, r: Ref) -> bool {
