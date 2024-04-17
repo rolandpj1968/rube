@@ -477,7 +477,7 @@ impl Op {
     }
 }
 
-#[derive(Clone, Debug, new)]
+#[derive(Clone, Copy, Debug, new)]
 pub struct Ins {
     pub op: O,
     pub cls: KExt, // Must be one of Kw, Kl, Ks, Kd
@@ -654,13 +654,13 @@ impl Sym {
     }; // Ugh, sort out Con
 }
 
-/*
-enum {
-    NoAlias,
-    MayAlias,
-    MustAlias
-};
- */
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
+pub enum CanAlias {
+    No,
+    May,
+    Must,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
@@ -697,6 +697,18 @@ pub struct Alias {
     pub offset: i64,
     pub u: AliasU,
     pub slot: AliasIdx,
+}
+
+impl Alias {
+    pub fn default() -> Alias {
+        Alias {
+            type_: AliasT::ABot,
+            base: TmpIdx::NONE,
+            offset: 0,
+            u: AliasU::ALoc(AliasLoc { sz: 0, m: 0 }),
+            slot: AliasIdx::NONE,
+        }
+    }
 }
 
 // Index into Fn::aliases

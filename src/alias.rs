@@ -1,42 +1,9 @@
-// use std::error::Error;
-// use std::fmt;
-
 use crate::all::{
     astack, bit, isload, isstore, to_s, Alias, AliasIdx, AliasLoc, AliasT, AliasU, Bits, BlkIdx,
-    Con, ConBits, ConT, Fn, Ins, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
+    CanAlias, Con, ConBits, ConT, Fn, Ins, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
 };
 
 use crate::load::storesz;
-
-// TODO - can collapse all these error classes and just add a module field.
-// #[derive(Debug)]
-// struct AliasError {
-//     msg: String,
-// }
-
-// impl AliasError {
-//     fn new(msg: &str) -> AliasError {
-//         AliasError {
-//             msg: msg.to_string(),
-//         }
-//     }
-// }
-
-// impl fmt::Display for AliasError {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "{}", self.msg)
-//     }
-// }
-
-// impl Error for AliasError {
-//     fn description(&self) -> &str {
-//         &self.msg
-//     }
-// }
-
-/*
-#include "all.h"
- */
 
 fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
     let mut a_out: Alias = a_in.clone();
@@ -81,14 +48,12 @@ fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
 }
 
 /*
-int
-alias(Ref p, int op, int sp, Ref q, int sq, int *delta, Fn *fn)
-{
+pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i32) {
     Alias ap, aq;
     int ovlap;
 
-    getalias(&ap, p, fn);
-    getalias(&aq, q, fn);
+    getalias(&ap, p, f);
+    getalias(&aq, q, f);
     ap.offset += op;
     /* when delta is meaningful (ovlap == 1),
      * we do not overflow int because sp and
@@ -138,7 +103,7 @@ alias(Ref p, int op, int sp, Ref q, int sq, int *delta, Fn *fn)
 }
  */
 
-fn escapes(f: &Fn, r: Ref) -> bool {
+pub fn escapes(f: &Fn, r: Ref) -> bool {
     if let Ref::RTmp(ti) = r {
         let ai: AliasIdx = f.tmp(ti).alias;
         let a: &Alias = f.alias(ai);
@@ -194,14 +159,9 @@ fn store(f: &mut Fn, r: Ref, sz: i32) {
 pub fn fillalias(f: &mut Fn) {
     // println!("        fillalias:      function ${}", to_s(&f.name));
 
+    f.aliases.clear();
     for ti in 0..f.tmps.len() {
-        let ai = f.add_alias(Alias {
-            type_: AliasT::ABot,
-            base: TmpIdx::NONE,
-            offset: 0,
-            u: AliasU::ALoc(AliasLoc { sz: 0, m: 0 }),
-            slot: AliasIdx::NONE,
-        });
+        let ai = f.add_alias(Alias::default());
         f.tmps[ti].alias = ai;
     }
 
@@ -282,22 +242,8 @@ pub fn fillalias(f: &mut Fn) {
                 *f.alias_mut(ai) = a0;
             }
             if i_op == O::Oadd {
-                let a0_in: Alias = Alias {
-                    type_: AliasT::ABot,
-                    base: TmpIdx::NONE,
-                    offset: 0,
-                    u: AliasU::ALoc(AliasLoc { sz: 0, m: 0 }),
-                    slot: AliasIdx::NONE,
-                };
-                let a0: Alias = getalias(f, &a0_in, i_arg0);
-                let a1_in: Alias = Alias {
-                    type_: AliasT::ABot,
-                    base: TmpIdx::NONE,
-                    offset: 0,
-                    u: AliasU::ALoc(AliasLoc { sz: 0, m: 0 }),
-                    slot: AliasIdx::NONE,
-                };
-                let a1: Alias = getalias(f, &a1_in, i_arg1);
+                let a0: Alias = getalias(f, &Alias::default(), i_arg0);
+                let a1: Alias = getalias(f, &Alias::default(), i_arg1);
                 if a0.type_ == AliasT::ACon {
                     *f.alias_mut(ai) = a1;
                     f.alias_mut(ai).offset += a0.offset;
