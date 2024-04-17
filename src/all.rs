@@ -685,6 +685,7 @@ pub struct AliasLoc {
 
 #[derive(Clone, Debug)]
 #[repr(u8)]
+// TODO - this is partially redundant with AliasT
 pub enum AliasU {
     ASym(Sym),
     ALoc(AliasLoc),

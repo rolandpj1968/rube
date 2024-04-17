@@ -47,61 +47,71 @@ fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
     a_out
 }
 
-/*
 pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i32) {
-    Alias ap, aq;
-    int ovlap;
-
-    getalias(&ap, p, f);
-    getalias(&aq, q, f);
-    ap.offset += op;
+    let mut ap: Alias = getalias(f, &Alias::default(), p);
+    let aq: Alias = getalias(f, &Alias::default(), q);
+    ap.offset += op as i64;
     /* when delta is meaningful (ovlap == 1),
      * we do not overflow int because sp and
      * sq are bounded by 2^28 */
-    *delta = ap.offset - aq.offset;
-    ovlap = ap.offset < aq.offset + sq && aq.offset < ap.offset + sp;
+    let delta: i32 = (ap.offset - aq.offset) as i32; // Hrmm, this seems dodgy
+    let ovlap: bool = ap.offset < aq.offset + (sq as i64) && aq.offset < ap.offset + (sp as i64);
 
-    if (astack(ap.type) && astack(aq.type)) {
+    if astack(ap.type_) != 0 && astack(aq.type_) != 0 {
         /* if both are offsets of the same
          * stack slot, they alias iif they
          * overlap */
-        if (ap.base == aq.base && ovlap)
-            return MustAlias;
-        return NoAlias;
+        if ap.base == aq.base && ovlap {
+            return (CanAlias::Must, delta);
+        }
+        return (CanAlias::No, delta);
     }
 
-    if (ap.type == ASym && aq.type == ASym) {
+    if ap.type_ == AliasT::ASym && aq.type_ == AliasT::ASym {
         /* they conservatively alias if the
          * symbols are different, or they
          * alias for sure if they overlap */
-        if (!symeq(ap.u.sym, aq.u.sym))
-            return MayAlias;
-        if (ovlap)
-            return MustAlias;
-        return NoAlias;
+        if let AliasU::ASym(ap_sym) = ap.u {
+            if let AliasU::ASym(aq_sym) = aq.u {
+                return {
+                    if ap_sym == aq_sym {
+                        (CanAlias::May, delta)
+                    } else if ovlap {
+                        (CanAlias::Must, delta)
+                    } else {
+                        (CanAlias::No, delta)
+                    }
+                };
+            }
+        }
+        assert!(false);
+        return (CanAlias::May, delta);
     }
 
-    if ((ap.type == ACon && aq.type == ACon)
-    || (ap.type == aq.type && ap.base == aq.base)) {
-        assert(ap.type == ACon || ap.type == AUnk);
+    if (ap.type_ == AliasT::ACon && aq.type_ == AliasT::ACon)
+        || (ap.type_ == aq.type_ && ap.base == aq.base)
+    {
+        assert!(ap.type_ == AliasT::ACon || ap.type_ == AliasT::AUnk);
         /* if they have the same base, we
          * can rely on the offsets only */
-        if (ovlap)
-            return MustAlias;
-        return NoAlias;
+        if ovlap {
+            return (CanAlias::Must, delta);
+        }
+        return (CanAlias::No, delta);
     }
 
     /* if one of the two is unknown
      * there may be aliasing unless
      * the other is provably local */
-    if (ap.type == AUnk && aq.type != ALoc)
-        return MayAlias;
-    if (aq.type == AUnk && ap.type != ALoc)
-        return MayAlias;
+    if ap.type_ == AliasT::AUnk && aq.type_ != AliasT::ALoc {
+        return (CanAlias::May, delta);
+    }
+    if aq.type_ == AliasT::AUnk && ap.type_ != AliasT::ALoc {
+        return (CanAlias::May, delta);
+    }
 
-    return NoAlias;
+    (CanAlias::No, delta)
 }
- */
 
 pub fn escapes(f: &Fn, r: Ref) -> bool {
     if let Ref::RTmp(ti) = r {
