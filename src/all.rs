@@ -116,7 +116,7 @@ enum O {
  */
 
 // Generated from 'gcc -E' on QBE
-#[derive(Clone, Copy, FromRepr, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, FromRepr, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum O {
     Oxxx,
@@ -477,7 +477,7 @@ impl Op {
     }
 }
 
-#[derive(Clone, new)]
+#[derive(Clone, Debug, new)]
 pub struct Ins {
     pub op: O,
     pub cls: KExt, // Must be one of Kw, Kl, Ks, Kd

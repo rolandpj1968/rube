@@ -2,8 +2,8 @@
 // use std::fmt;
 
 use crate::all::{
-    astack, bit, isload, isstore, Alias, AliasIdx, AliasLoc, AliasT, AliasU, Bits, BlkIdx, Con,
-    ConBits, ConT, Fn, Ins, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
+    astack, bit, isload, isstore, to_s, Alias, AliasIdx, AliasLoc, AliasT, AliasU, Bits, BlkIdx,
+    Con, ConBits, ConT, Fn, Ins, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
 };
 
 use crate::load::storesz;
@@ -144,7 +144,6 @@ fn escapes(f: &Fn, r: Ref) -> bool {
 
 fn esc(f: &mut Fn, r: Ref) {
     match r {
-        Ref::R => (), /*ok*/
         Ref::RTmp(ti) => {
             let ai: AliasIdx = f.tmp(ti).alias;
             let (a_type, a_slot) = {
@@ -155,6 +154,7 @@ fn esc(f: &mut Fn, r: Ref) {
                 f.alias_mut(a_slot).type_ = AliasT::AEsc;
             }
         }
+        Ref::R | Ref::RCon(_) | Ref::RInt(_) | Ref::RTyp(_) => (), /*ok*/
         _ => assert!(false),
     }
 }
@@ -186,6 +186,8 @@ fn store(f: &mut Fn, r: Ref, sz: i32) {
 }
 
 pub fn fillalias(f: &mut Fn) {
+    //println!("        fillalias:      function ${}", to_s(&f.name));
+
     for ti in 0..f.tmps.len() {
         let ai = f.add_alias(Alias {
             type_: AliasT::ABot,
@@ -218,6 +220,7 @@ pub fn fillalias(f: &mut Fn) {
         for ii in 0..f.blk(bi).ins.len() {
             let (i_to, i_op, i_arg0, i_arg1) = {
                 let i: &Ins = &f.blk(bi).ins[ii];
+                //println!("        fillalias:          ins ${:?}", i);
                 (i.to, i.op, i.args[0], i.args[1])
             };
 
@@ -293,6 +296,7 @@ pub fn fillalias(f: &mut Fn) {
                     *f.alias_mut(ai) = a1;
                     f.alias_mut(ai).offset += a0.offset;
                 } else if a1.type_ == AliasT::ACon {
+                    //println!("                               arg1 is a constant");
                     *f.alias_mut(ai) = a0;
                     f.alias_mut(ai).offset += a1.offset;
                 }
