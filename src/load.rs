@@ -1,52 +1,65 @@
-use crate::alias::escapes;
+use derive_new::new;
+
+use crate::alias::{alias, escapes};
 use crate::all::{
-    bit, isload, isstore, kwide, Alias, AliasIdx, AliasT, Bits, BlkIdx, Fn, Ins, InsIdx, KExt,
-    PhiIdx, Ref, KL, KW, O,
+    bit, isload, isstore, kwide, Alias, AliasIdx, AliasT, Bits, BlkIdx, CanAlias, Fn, Ins, InsIdx,
+    KExt, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, O,
 };
 use crate::cfg::dom;
+use crate::util::{getcon, newtmp};
 
 /*
 #include "all.h"
  */
 
-fn mask(w: u32) -> Bits {
-    bit(8 * w - 1) * 2 - 1 /* must work when w==8 */
+// TODO i32 is dodgy
+fn genmask(w: i32) -> Bits {
+    assert!(0 <= w && w <= 8);
+    bit((8 * w - 1) as u32) * 2 - 1 /* must work when w==8 */
 }
 
+#[derive(Debug)]
+#[repr(u8)]
 enum LocT {
     LRoot,   /* right above the original load */
     LLoad,   /* inserting a load is allowed */
     LNoLoad, /* only scalar operations allowed */
 }
 
+#[derive(Debug)]
 struct Loc {
     type_: LocT,
     off: InsIdx,
     bi: BlkIdx,
 }
 
+#[derive(Clone, Debug)]
 struct Slice {
     r: Ref,
     off: i32,
-    sz: i16,
+    sz: i16,   // Dodgy i16
     cls: KExt, /* load class */
 }
 
+#[derive(Debug)]
 struct UPhi {
     m: Slice,
     pi: PhiIdx,
 }
 
+#[derive(Debug)]
+#[repr(u8)]
 enum InsertU {
     Ins(Ins),
     Phi(UPhi),
 }
 
+#[derive(Debug, new)]
 struct Insert {
     // isphi: bool, covered by InsertU
-    num: u32,
+    num: TmpIdx, // TODO rename to ti
     bid: u32,
-    off: u32,
+    off: InsIdx, // TODO rename to ii
     new: InsertU,
 }
 
@@ -91,54 +104,50 @@ pub fn storesz(s: &Ins) -> i32 {
     }
 }
 
-/*
-static Ref
-iins(int cls, int op, Ref a0, Ref a1, Loc *l)
-{
-    Insert *ist;
-
-    vgrow(&ilog, ++nlog);
-    ist = &ilog[nlog-1];
-    ist->isphi = 0;
-    ist->num = inum++;
-    ist->bid = l->blk->id;
-    ist->off = l->off;
-    ist->new.ins = (Ins){op, cls, R, {a0, a1}};
-    return ist->new.ins.to = newtmp("ld", cls, curf);
+fn iins(f: &mut Fn, ilog: &mut Vec<Insert>, cls: KExt, op: O, a0: Ref, a1: Ref, l: &Loc) -> Ref {
+    let ti: TmpIdx = newtmp(b"ld", true, cls, f);
+    let to: Ref = Ref::RTmp(ti);
+    let ins: Ins = Ins::new2(op, cls, to, [a0, a1]);
+    ilog.push(Insert::new(ti, f.blk(l.bi).id, l.off, InsertU::Ins(ins)));
+    to
 }
 
-static void
-cast(Ref *r, int cls, Loc *l)
-{
-    int cls0;
-
-    if (rtype(*r) == RCon)
-        return;
-    assert(rtype(*r) == RTmp);
-    cls0 = curf->tmp[r->val].cls;
-    if (cls0 == cls || (cls == Kw && cls0 == Kl))
-        return;
-    if (KWIDE(cls0) < KWIDE(cls)) {
-        if (cls0 == Ks)
-            *r = iins(Kw, Ocast, *r, R, l);
-        *r = iins(Kl, Oextuw, *r, R, l);
-        if (cls == Kd)
-            *r = iins(Kd, Ocast, *r, R, l);
-    } else {
-        if (cls0 == Kd && cls != Kl)
-            *r = iins(Kl, Ocast, *r, R, l);
-        if (cls0 != Kd || cls != Kw)
-            *r = iins(cls, Ocast, *r, R, l);
+fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: KExt, l: &Loc) {
+    match *r {
+        Ref::RCon(_) => (), /*ok*/
+        Ref::RTmp(ti) => {
+            let cls0: KExt = f.tmp(ti).cls;
+            if cls0 == cls || (cls == KW && cls0 == KL) {
+                return;
+            }
+            if kwide(cls0) < kwide(cls) {
+                if cls0 == KS {
+                    *r = iins(f, ilog, KW, O::Ocast, *r, Ref::R, l);
+                }
+                *r = iins(f, ilog, KL, O::Oextuw, *r, Ref::R, l);
+                if cls == KD {
+                    *r = iins(f, ilog, KD, O::Ocast, *r, Ref::R, l);
+                }
+            } else {
+                if cls0 == KD && cls != KL {
+                    *r = iins(f, ilog, KL, O::Ocast, *r, Ref::R, l);
+                }
+                if cls0 != KD || cls != KW {
+                    *r = iins(f, ilog, cls, O::Ocast, *r, Ref::R, l);
+                }
+            }
+        }
+        _ => assert!(false), // r MUST be RCon or RTmp
     }
 }
 
-static inline void
-mask(int cls, Ref *r, bits msk, Loc *l)
-{
-    cast(r, cls, l);
-    *r = iins(cls, Oand, *r, getcon(msk, curf), l);
+fn mask(f: &mut Fn, ilog: &mut Vec<Insert>, cls: KExt, r: &mut Ref, msk: Bits, l: &Loc) {
+    cast(f, ilog, r, cls, l);
+    let c = getcon(f, msk as i64);
+    *r = iins(f, ilog, cls, O::Oand, *r, c, l);
 }
 
+/*
 static Ref
 load(Slice sl, bits msk, Loc *l)
 {
@@ -225,7 +234,7 @@ fn killsl(f: &Fn, r: Ref, sl: &Slice) -> bool {
 fn def(
     f: &mut Fn,
     ilog: &mut Vec<Insert>,
-    sl: Slice,
+    sl: &Slice,
     msk: Bits,
     bi: BlkIdx,
     mut ii: InsIdx,
@@ -268,7 +277,7 @@ fn def(
         ii = InsIdx(f.blk(bi).ins.len() as u32);
     }
     let cls: KExt = if sl.sz > 4 { KL } else { KW };
-    let msks: Bits = mask(sl.sz as u32);
+    let msks: Bits = genmask(sl.sz as i32);
 
     let mut goto_load: bool = false;
     while ii != InsIdx(0) && !goto_load {
@@ -281,7 +290,7 @@ fn def(
             continue;
         }
         let ld: bool = isload(i.op);
-        let (sz, r1, r) = {
+        let (mut sz, mut r1, mut r) = {
             if ld {
                 (loadsz(&i), i.args[0], i.to)
             } else if isstore(i.op) {
@@ -292,7 +301,7 @@ fn def(
                     ii = InsIdx(ii.0 - 1);
                     i = f.blk(bi).ins[ii.0 as usize];
                     assert!(i.op == O::Oblit0);
-                    (blit1_i.abs(), i.args[1], Ref::R) // Hrmmm, QBE does not set r here
+                    (blit1_i.abs(), i.args[1], Ref::R)
                 } else {
                     // OBlit1 arg MUST be RInt
                     assert!(false);
@@ -302,81 +311,96 @@ fn def(
                 continue;
             }
         };
-        //     switch (alias(sl.ref, sl.off, sl.sz, r1, sz, &off, f)) {
-        //     case MustAlias:
-        //         if (i->op == Oblit0) {
-        //             sl1 = sl;
-        //             sl1.ref = i->arg[0];
-        //             if (off >= 0) {
-        //                 assert(off < sz);
-        //                 sl1.off = off;
-        //                 sz -= off;
-        //                 off = 0;
-        //             } else {
-        //                 sl1.off = 0;
-        //                 sl1.sz += off;
-        //             }
-        //             if (sz > sl1.sz)
-        //                 sz = sl1.sz;
-        //             assert(sz <= 8);
-        //             sl1.sz = sz;
-        //         }
-        //         if (off < 0) {
-        //             off = -off;
-        //             msk1 = (MASK(sz) << 8*off) & msks;
-        //             op = Oshl;
-        //         } else {
-        //             msk1 = (MASK(sz) >> 8*off) & msks;
-        //             op = Oshr;
-        //         }
-        //         if ((msk1 & msk) == 0)
-        //             continue;
-        //         if (i->op == Oblit0) {
-        //             r = def(sl1, MASK(sz), b, i, il);
-        //             if (req(r, R))
-        //                 goto Load;
-        //         }
-        //         if (off) {
-        //             cls1 = cls;
-        //             if (op == Oshr && off + sl.sz > 4)
-        //                 cls1 = Kl;
-        //             cast(&r, cls1, il);
-        //             r1 = getcon(8*off, f);
-        //             r = iins(cls1, op, r, r1, il);
-        //         }
-        //         if ((msk1 & msk) != msk1 || off + sz < sl.sz)
-        //             mask(cls, &r, msk1 & msk, il);
-        //         if ((msk & ~msk1) != 0) {
-        //             r1 = def(sl, msk & ~msk1, b, i, il);
-        //             if (req(r1, R))
-        //                 goto Load;
-        //             r = iins(cls, Oor, r, r1, il);
-        //         }
-        //         if (msk == msks)
-        //             cast(&r, sl.cls, il);
-        //         return r;
-        //     case MayAlias:
-        //         if (ld)
-        //             continue;
-        //         else
-        //             goto Load;
-        //     case NoAlias:
-        //         continue;
-        //     default:
-        //         die("unreachable");
-        //     }
+        let (can_alias, mut off) = alias(f, sl.r, sl.off, sl.sz as i32, r1, sz);
+        match can_alias {
+            CanAlias::Must => {
+                let mut sl1: Slice = sl.clone(); /*for Oblit0 only, ugh!*/
+                if i.op == O::Oblit0 {
+                    //sl1 = sl;
+                    sl1.r = i.args[0];
+                    if off >= 0 {
+                        assert!(off < sz);
+                        sl1.off = off;
+                        sz -= off;
+                        off = 0;
+                    } else {
+                        sl1.off = 0;
+                        sl1.sz += off as i16; // Dodgy
+                    }
+                    if sz > (sl1.sz as i32) {
+                        sz = sl1.sz as i32;
+                    }
+                    assert!(sz <= 8);
+                    sl1.sz = sz as i16; // Dodgy
+                }
+                let (msk1, op) = if off < 0 {
+                    off = -off; // ???
+                    ((genmask(sz) << (8 * off)) & msks, O::Oshl)
+                } else {
+                    ((genmask(sz) >> (8 * off)) & msks, O::Oshr)
+                };
+                if (msk1 & msk) == 0 {
+                    continue;
+                }
+                if i.op == O::Oblit0 {
+                    r = def(f, ilog, &sl1, genmask(sz), bi, ii, il);
+                    if r == Ref::R {
+                        goto_load = true;
+                        continue;
+                    }
+                }
+                if off != 0 {
+                    let cls1: KExt = if op == O::Oshr && off + (sl.sz as i32) > 4 {
+                        KL
+                    } else {
+                        cls
+                    };
+                    cast(f, ilog, &mut r, cls1, il);
+                    r1 = getcon(f, 8 * (off as i64));
+                    r = iins(f, ilog, cls1, op, r, r1, il);
+                }
+                if (msk1 & msk) != msk1 || off + sz < sl.sz as i32 {
+                    mask(f, ilog, cls, &mut r, msk1 & msk, il);
+                }
+                if (msk & !msk1) != 0 {
+                    r1 = def(f, ilog, sl, msk & !msk1, bi, ii, il);
+                    if r1 == Ref::R {
+                        goto_load = true;
+                        continue;
+                    }
+                    r = iins(f, ilog, cls, O::Oor, r, r1, il);
+                }
+                if msk == msks {
+                    cast(f, ilog, &mut r, sl.cls, il);
+                }
+                return r;
+            }
+            CanAlias::May => {
+                if !ld {
+                    goto_load = true;
+                }
+                continue;
+            }
+            CanAlias::No => continue,
+        }
     }
 
     if goto_load {
-        panic!("Implement me");
+        f.tmps.truncate(oldt);
+        ilog.truncate(oldl);
+        return if il.type_ == LLoad {
+            load(sl, msk, il)
+        } else {
+            Ref::R
+        };
     }
 
     // for (ist=ilog; ist<&ilog[nlog]; ++ist)
-    //     if (ist->isphi && ist->bid == b->id)
-    //     if (req(ist->new.phi.m.ref, sl.ref))
-    //     if (ist->new.phi.m.off == sl.off)
-    //     if (ist->new.phi.m.sz == sl.sz) {
-    //         r = ist->new.phi.p->to;
+    //     if (ist.isphi && ist.bid == b.id)
+    //     if (req(ist.new.phi.m.ref, sl.ref))
+    //     if (ist.new.phi.m.off == sl.off)
+    //     if (ist.new.phi.m.sz == sl.sz) {
+    //         r = ist.new.phi.p.to;
     //         if (msk != msks)
     //             mask(cls, &r, msk, il);
     //         else
@@ -384,19 +408,19 @@ fn def(
     //         return r;
     //     }
 
-    // for (p=b->phi; p; p=p->link)
-    //     if (killsl(p->to, sl))
+    // for (p=b.phi; p; p=p.link)
+    //     if (killsl(p.to, sl))
     //         /* scanning predecessors in that
     //          * case would be unsafe */
     //         goto Load;
 
-    // if (b->npred == 0)
+    // if (b.npred == 0)
     //     goto Load;
-    // if (b->npred == 1) {
-    //     bp = b->pred[0];
-    //     assert(bp->loop >= il->blk->loop);
+    // if (b.npred == 1) {
+    //     bp = b.pred[0];
+    //     assert!(bp.loop >= il.blk.loop);
     //     l = *il;
-    //     if (bp->s2)
+    //     if (bp.s2)
     //         l.type = LNoLoad;
     //     r1 = def(sl, msk, bp, 0, &l);
     //     if (req(r1, R))
@@ -408,30 +432,30 @@ fn def(
     // p = alloc(sizeof *p);
     // vgrow(&ilog, ++nlog);
     // ist = &ilog[nlog-1];
-    // ist->isphi = 1;
-    // ist->bid = b->id;
-    // ist->new.phi.m = sl;
-    // ist->new.phi.p = p;
-    // p->to = r;
-    // p->cls = sl.cls;
-    // p->narg = b->npred;
-    // p->arg = vnew(p->narg, sizeof p->arg[0], PFn);
-    // p->blk = vnew(p->narg, sizeof p->blk[0], PFn);
-    // for (np=0; np<b->npred; ++np) {
-    //     bp = b->pred[np];
-    //     if (!bp->s2
-    //     && il->type != LNoLoad
-    //     && bp->loop < il->blk->loop)
+    // ist.isphi = 1;
+    // ist.bid = b.id;
+    // ist.new.phi.m = sl;
+    // ist.new.phi.p = p;
+    // p.to = r;
+    // p.cls = sl.cls;
+    // p.narg = b.npred;
+    // p.arg = vnew(p.narg, sizeof p.arg[0], PFn);
+    // p.blk = vnew(p.narg, sizeof p.blk[0], PFn);
+    // for (np=0; np<b.npred; ++np) {
+    //     bp = b.pred[np];
+    //     if (!bp.s2
+    //     && il.type != LNoLoad
+    //     && bp.loop < il.blk.loop)
     //         l.type = LLoad;
     //     else
     //         l.type = LNoLoad;
     //     l.blk = bp;
-    //     l.off = bp->nins;
+    //     l.off = bp.nins;
     //     r1 = def(sl, msks, bp, 0, &l);
     //     if (req(r1, R))
     //         goto Load;
-    //     p->arg[np] = r1;
-    //     p->blk[np] = bp;
+    //     p.arg[np] = r1;
+    //     p.blk[np] = bp;
     // }
     // if (msk != msks)
     //     mask(cls, &r, msk, il);
@@ -447,17 +471,17 @@ icmp(const void *pa, const void *pb)
 
     a = (Insert *)pa;
     b = (Insert *)pb;
-    if ((c = a->bid - b->bid))
+    if ((c = a.bid - b.bid))
         return c;
-    if (a->isphi && b->isphi)
+    if (a.isphi && b.isphi)
         return 0;
-    if (a->isphi)
+    if (a.isphi)
         return -1;
-    if (b->isphi)
+    if (b.isphi)
         return +1;
-    if ((c = a->off - b->off))
+    if ((c = a.off - b.off))
         return c;
-    return a->num - b->num;
+    return a.num - b.num;
 }
  */
 /* require rpo ssa alias */
@@ -496,7 +520,7 @@ pub fn loadopt(f: &mut Fn) {
                     off: ii,
                     bi,
                 };
-                def(f, &mut ilog, sl, mask(sz as u32), bi, ii, &l)
+                def(f, &mut ilog, &sl, genmask(sz), bi, ii, &l)
             };
             f.blk_mut(bi).ins[iii].args[1] = i_arg1;
         }

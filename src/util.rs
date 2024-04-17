@@ -519,13 +519,13 @@ newcon(Con *c0, Fn *fn)
 }
  */
 
-pub fn newcon(c0: Con, fn_: &mut Fn) -> Ref {
-    for i in 1..fn_.cons.len() {
-        if c0 == fn_.cons[i] {
+pub fn newcon(f: &mut Fn, c0: Con) -> Ref {
+    for i in 1..f.cons.len() {
+        if c0 == f.cons[i] {
             return Ref::RCon(ConIdx(i as u32));
         }
     }
-    let ci = fn_.add_con(c0);
+    let ci = f.add_con(c0);
 
     Ref::RCon(ci)
 }
@@ -544,7 +544,13 @@ getcon(int64_t val, Fn *fn)
     fn->con[c] = (Con){.type = CBits, .bits.i = val};
     return CON(c);
 }
+ */
 
+pub fn getcon(f: &mut Fn, i: i64) -> Ref {
+    newcon(f, Con::new_bits(crate::all::ConBits::I(i)))
+}
+
+/*
 int
 addcon(Con *c0, Con *c1)
 {

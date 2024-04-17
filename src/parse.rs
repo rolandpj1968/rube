@@ -815,7 +815,7 @@ impl Parser<'_> {
             _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
         };
 
-        Ok(newcon(c, curf))
+        Ok(newcon(curf, c))
     }
 
     fn findtyp(&self, name: &[u8]) -> RubeResult<TypIdx> {
