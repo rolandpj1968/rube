@@ -52,6 +52,10 @@ fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
         }
         Ref::RCon(ci) => {
             let c: &Con = f.con(ci);
+            // println!(
+            //     "                                           getalias() RCon {:?}",
+            //     c
+            // );
             match c.type_ {
                 ConT::CAddr => {
                     a_out.type_ = AliasT::ASym;
@@ -64,7 +68,9 @@ fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
             if let ConBits::I(i) = c.bits {
                 a_out.offset = i;
             } else {
-                assert!(false);
+                // Needed for CAddr where c.bits is None; ropy!
+                a_out.offset = 0;
+                //assert!(false);
             }
             a_out.slot = AliasIdx::NONE;
         }
@@ -186,7 +192,7 @@ fn store(f: &mut Fn, r: Ref, sz: i32) {
 }
 
 pub fn fillalias(f: &mut Fn) {
-    //println!("        fillalias:      function ${}", to_s(&f.name));
+    // println!("        fillalias:      function ${}", to_s(&f.name));
 
     for ti in 0..f.tmps.len() {
         let ai = f.add_alias(Alias {
@@ -220,7 +226,7 @@ pub fn fillalias(f: &mut Fn) {
         for ii in 0..f.blk(bi).ins.len() {
             let (i_to, i_op, i_arg0, i_arg1) = {
                 let i: &Ins = &f.blk(bi).ins[ii];
-                //println!("        fillalias:          ins ${:?}", i);
+                // println!("        fillalias:          ins ${:?}", i);
                 (i.to, i.op, i.args[0], i.args[1])
             };
 
