@@ -677,13 +677,13 @@ pub fn astack(t: AliasT) -> u8 {
     (t as u8) & 1
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct AliasLoc {
     pub sz: i32, /* -1 if > NBit */
     pub m: Bits,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 // TODO - this is partially redundant with AliasT
 pub enum AliasU {
@@ -691,7 +691,7 @@ pub enum AliasU {
     ALoc(AliasLoc),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Alias {
     pub type_: AliasT,
     pub base: TmpIdx,
@@ -829,8 +829,9 @@ pub struct Con {
 
 impl Con {
     // TODO - merge bits and sym into same enum, unless sym actual const is imported later...
-    pub fn new_sym(sym: Sym) -> Con {
-        Con::new(ConT::CAddr, sym, ConBits::None)
+    // TODO - add bits (maybe default to 0?)
+    pub fn new_sym(sym: Sym, bits: ConBits) -> Con {
+        Con::new(ConT::CAddr, sym, bits)
     }
 
     pub fn new_bits(bits: ConBits) -> Con {

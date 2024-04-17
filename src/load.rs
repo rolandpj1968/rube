@@ -2,11 +2,11 @@ use derive_new::new;
 
 use crate::alias::{alias, escapes};
 use crate::all::{
-    bit, isload, isstore, kwide, Alias, AliasIdx, AliasT, Bits, BlkIdx, CanAlias, Fn, Ins, InsIdx,
-    KExt, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, O,
+    bit, isload, isstore, kwide, Alias, AliasIdx, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn,
+    Ins, InsIdx, KExt, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, O,
 };
 use crate::cfg::dom;
-use crate::util::{getcon, newtmp};
+use crate::util::{getcon, newcon, newtmp};
 
 /*
 #include "all.h"
@@ -18,7 +18,7 @@ fn genmask(w: i32) -> Bits {
     bit((8 * w - 1) as u32) * 2 - 1 /* must work when w==8 */
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
 enum LocT {
     LRoot,   /* right above the original load */
@@ -147,64 +147,65 @@ fn mask(f: &mut Fn, ilog: &mut Vec<Insert>, cls: KExt, r: &mut Ref, msk: Bits, l
     *r = iins(f, ilog, cls, O::Oand, *r, c, l);
 }
 
-/*
-static Ref
-load(Slice sl, bits msk, Loc *l)
-{
-    Alias *a;
-    Ref r, r1;
-    int ld, cls, all;
-    Con c;
-
-    ld = (int[]){
-        [1] = Oloadub,
-        [2] = Oloaduh,
-        [4] = Oloaduw,
-        [8] = Oload
-    }[sl.sz];
-    all = msk == MASK(sl.sz);
-    if (all)
-        cls = sl.cls;
-    else
-        cls = sl.sz > 4 ? Kl : Kw;
-    r = sl.ref;
+fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> Ref {
+    let ld: O = match sl.sz {
+        1 => O::Oloadub,
+        2 => O::Oloaduh,
+        4 => O::Oloaduw,
+        8 => O::Oload,
+        _ => {
+            assert!(false);
+            O::Oxxx
+        }
+    };
+    let all: bool = msk == genmask(sl.sz as i32);
+    let cls: KExt = if all {
+        sl.cls
+    } else {
+        if sl.sz > 4 {
+            KL
+        } else {
+            KW
+        }
+    };
+    let mut r: Ref = sl.r;
     /* sl.ref might not be live here,
      * but its alias base ref will be
      * (see killsl() below) */
-    if (rtype(r) == RTmp) {
-        a = &curf->tmp[r.val].alias;
-        switch (a->type) {
-        default:
-            die("unreachable");
-        case ALoc:
-        case AEsc:
-        case AUnk:
-            r = TMP(a->base);
-            if (!a->offset)
-                break;
-            r1 = getcon(a->offset, curf);
-            r = iins(Kl, Oadd, r, r1, l);
-            break;
-        case ACon:
-        case ASym:
-            memset(&c, 0, sizeof c);
-            c.type = CAddr;
-            c.sym = a->u.sym;
-            c.bits.i = a->offset;
-            r = newcon(&c, curf);
-            break;
+    if let Ref::RTmp(ti) = r {
+        let ai = f.tmp(ti).alias;
+        let a: Alias = *f.alias(ai); // Note - copy!
+        match a.type_ {
+            AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => {
+                r = Ref::RTmp(a.base);
+                if a.offset != 0 {
+                    let r1: Ref = getcon(f, a.offset);
+                    r = iins(f, ilog, KL, O::Oadd, r, r1, l);
+                }
+            }
+            AliasT::ACon | AliasT::ASym => {
+                if let AliasU::ASym(sym) = a.u {
+                    r = newcon(f, Con::new_sym(sym, crate::all::ConBits::I(a.offset)));
+                } else {
+                    assert!(false);
+                    r = Ref::R; // Ugh, TODO
+                }
+            }
+            _ => {
+                // unreachable
+                assert!(false);
+                r = Ref::R;
+            }
         }
     }
-    r = iins(cls, ld, r, R, l);
-    if (!all)
-        mask(cls, &r, msk, l);
-    return r;
+    r = iins(f, ilog, cls, ld, r, Ref::R, l);
+    if !all {
+        mask(f, ilog, cls, &mut r, msk, l);
+    }
+    r
 }
- */
 
 fn killsl(f: &Fn, r: Ref, sl: &Slice) -> bool {
-    //Alias *a;
-
     if let Ref::RTmp(_ti) = r {
         if let Ref::RTmp(slti) = sl.r {
             let ai: AliasIdx = f.tmp(slti).alias;
@@ -263,14 +264,6 @@ fn def(
     assert!(dom(f, bi, il.bi));
     let oldl: usize = ilog.len();
     let oldt: usize = f.tmps.len();
-    // if (0) {
-    // Load:
-    //     f->ntmp = oldt;
-    //     nlog = oldl;
-    //     if (il->type != LLoad)
-    //         return R;
-    //     return load(sl, msk, il);
-    // }
 
     if ii == InsIdx::NONE {
         // Bit naughty - this is out of range
@@ -281,8 +274,6 @@ fn def(
 
     let mut goto_load: bool = false;
     while ii != InsIdx(0) && !goto_load {
-        // Hrmm
-        // while (i > b->ins) {
         ii = InsIdx(ii.0 - 1);
         let mut i: Ins = f.blk(bi).ins[ii.0 as usize]; /* Note: copy! */
         if killsl(f, i.to, &sl) || (i.op == O::Ocall && escapes(f, sl.r)) {
@@ -388,25 +379,29 @@ fn def(
     if goto_load {
         f.tmps.truncate(oldt);
         ilog.truncate(oldl);
-        return if il.type_ == LLoad {
-            load(sl, msk, il)
-        } else {
-            Ref::R
-        };
+        if il.type_ != LocT::LLoad {
+            return Ref::R;
+        }
+        return load(f, ilog, sl, msk, il);
     }
 
-    // for (ist=ilog; ist<&ilog[nlog]; ++ist)
-    //     if (ist.isphi && ist.bid == b.id)
-    //     if (req(ist.new.phi.m.ref, sl.ref))
-    //     if (ist.new.phi.m.off == sl.off)
-    //     if (ist.new.phi.m.sz == sl.sz) {
-    //         r = ist.new.phi.p.to;
-    //         if (msk != msks)
-    //             mask(cls, &r, msk, il);
-    //         else
-    //             cast(&r, sl.cls, il);
-    //         return r;
-    //     }
+    let bid = f.blk(bi).id;
+
+    // &mut ilog is used inside the loop so iterate on the index
+    for isti in 0..ilog.len() {
+        let ist: &Insert = &ilog[isti];
+        if let InsertU::Phi(uphi) = &ist.new {
+            if ist.bid == bid && uphi.m.r == sl.r && uphi.m.off == sl.off && uphi.m.sz == sl.sz {
+                let mut r = f.phi(uphi.pi).to;
+                if msk != msks {
+                    mask(f, ilog, cls, &mut r, msk, il);
+                } else {
+                    cast(f, ilog, &mut r, sl.cls, il);
+                }
+                return r;
+            }
+        }
+    }
 
     // for (p=b.phi; p; p=p.link)
     //     if (killsl(p.to, sl))

@@ -809,9 +809,15 @@ impl Parser<'_> {
             Token::Tfltd => Con::new_bits(ConBits::D(tv.as_d())), // c.flt = 2;
             Token::Tthread => {
                 let name = self.expect(Token::Tglo)?;
-                Con::new_sym(Sym::new(SymT::SThr, intern(&name.as_str(), self)))
+                Con::new_sym(
+                    Sym::new(SymT::SThr, intern(&name.as_str(), self)),
+                    ConBits::I(0),
+                )
             }
-            Token::Tglo => Con::new_sym(Sym::new(SymT::SGlo, intern(&tv.as_str(), self))), // Ugh
+            Token::Tglo => Con::new_sym(
+                Sym::new(SymT::SGlo, intern(&tv.as_str(), self)),
+                ConBits::I(0),
+            ), // Ugh
             _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
         };
 
