@@ -1950,7 +1950,8 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
     }
 }
 
-fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) {
+// TODO - remove pub
+pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) {
     match r {
         Ref::R => assert!(false),
         Ref::RTmp(ti) => {
