@@ -26,7 +26,6 @@ use std::fs::File;
 use std::io::stdout;
 use std::path::Path;
 
-use abi::elimsb;
 use alias::fillalias;
 use all::{Dat, Fn, Target, Typ};
 use amd64::targ::T_AMD64_SYSV;
@@ -54,7 +53,7 @@ fn dump_data(dat: &Dat, _typ: &[Typ]) {
 fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     println!("Got fn {:?}:", String::from_utf8_lossy(&f.name));
     println!();
-    elimsb(f); // TODO targ.abi0()
+    (targ.abi0)(f);
     fillrpo(f);
     filluse(f);
     promote(f).unwrap();
@@ -64,6 +63,8 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     ssacheck(f).unwrap();
     fillalias(f);
     loadopt(f /*, typ, itbl*/);
+    filluse(f);
+    fillalias(f);
 
     printfn(&mut stdout(), f, typ, itbl);
 }
