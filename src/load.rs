@@ -259,11 +259,11 @@ fn def(
     // Insert *ist;
     // Loc l;
 
-    println!(
-        "                         def - for @{} ins {}",
-        to_s(&f.blk(bi).name),
-        ii.0
-    );
+    // println!(
+    //     "                         def - for @{} ins {}",
+    //     to_s(&f.blk(bi).name),
+    //     ii.0
+    // );
     /* invariants:
      * -1- Blk bi dominates Blk il.bi; so we can use
      *     temporaries of Blk bi in Blk il.bi
@@ -288,14 +288,14 @@ fn def(
     let mut goto_load: bool = false;
     while ii != InsIdx(0) && !goto_load {
         ii = InsIdx(ii.0 - 1);
-        println!(
-            "                         def -    looking at @{} ins {}",
-            to_s(&f.blk(bi).name),
-            ii.0
-        );
+        // println!(
+        //     "                         def -    looking at @{} ins {}",
+        //     to_s(&f.blk(bi).name),
+        //     ii.0
+        // );
         let mut i: Ins = f.blk(bi).ins[ii.0 as usize]; /* Note: copy! */
         if killsl(f, i.to, &sl) || (i.op == O::Ocall && escapes(f, sl.r)) {
-            println!("                              killsl or escaping call");
+            // println!("                              killsl or escaping call");
             goto_load = true;
             continue;
         }
@@ -324,7 +324,7 @@ fn def(
         let (can_alias, mut off) = alias(f, sl.r, sl.off, sl.sz as i32, r1, sz);
         match can_alias {
             CanAlias::Must => {
-                println!("                                     MUST alias");
+                // println!("                                     MUST alias");
                 let mut sl1: Slice = sl.clone(); /*for Oblit0 only, ugh!*/
                 if i.op == O::Oblit0 {
                     //sl1 = sl;
@@ -387,7 +387,7 @@ fn def(
                 return r;
             }
             CanAlias::May => {
-                println!("                                     may alias");
+                // println!("                                     may alias");
                 if !ld {
                     // println!("                                         ... and not a load");
                     goto_load = true;
@@ -395,7 +395,7 @@ fn def(
                 continue;
             }
             CanAlias::No => {
-                println!("                                     no alias");
+                // println!("                                     no alias");
                 continue;
             }
         }
@@ -411,10 +411,10 @@ fn def(
     // }
 
     if !goto_load {
-        println!(
-            "                         def - got through preceding instructions of @{}",
-            to_s(&f.blk(bi).name)
-        );
+        // println!(
+        //     "                         def - got through preceding instructions of @{}",
+        //     to_s(&f.blk(bi).name)
+        // );
     }
 
     if !goto_load {
@@ -607,18 +607,18 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 def(f, &mut ilog, &sl, genmask(sz), bi, ii, &l)
             };
             f.blk_mut(bi).ins[iii].args[1] = i_arg1;
-            print!(
-                "                     loadopt: @{} ins {} {} - arg1 is now ",
-                to_s(&f.blk(bi).name),
-                iii,
-                to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
-            );
-            if i_arg1 == Ref::R {
-                print!("R");
-            } else {
-                printref(&mut stdout(), f, typ, itbl, &i_arg1);
-            }
-            println!();
+            // print!(
+            //     "                     loadopt: @{} ins {} {} - arg1 is now ",
+            //     to_s(&f.blk(bi).name),
+            //     iii,
+            //     to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
+            // );
+            // if i_arg1 == Ref::R {
+            //     print!("R");
+            // } else {
+            //     printref(&mut stdout(), f, typ, itbl, &i_arg1);
+            // }
+            // println!();
         }
         bi = f.blk(bi).link;
     }

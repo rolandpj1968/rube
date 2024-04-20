@@ -51,10 +51,10 @@ fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
 pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i32) {
     let mut ap: Alias = getalias(f, &Alias::default(), p);
     let aq: Alias = getalias(f, &Alias::default(), q);
-    println!(
-        "                        alias: p {:?} ap {:?} : q {:?} aq {:?}",
-        p, ap, q, aq
-    );
+    // println!(
+    //     "                        alias: p {:?} ap {:?} : q {:?} aq {:?}",
+    //     p, ap, q, aq
+    // );
     ap.offset += op as i64;
     /* when delta is meaningful (ovlap == 1),
      * we do not overflow int because sp and
@@ -73,10 +73,10 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
                 CanAlias::No
             }
         } else if ap.type_ == AliasT::ASym && aq.type_ == AliasT::ASym {
-            println!(
-                "                                both ASym - ovlap is {}",
-                ovlap
-            );
+            // println!(
+            //     "                                both ASym - ovlap is {}",
+            //     ovlap
+            // );
             /* they conservatively alias if the
              * symbols are different, or they
              * alias for sure if they overlap */
