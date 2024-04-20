@@ -63,7 +63,7 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     filluse(f);
     ssacheck(f).unwrap();
     fillalias(f);
-    loadopt(f, typ, itbl);
+    loadopt(f /*, typ, itbl*/);
 
     printfn(&mut stdout(), f, typ, itbl);
 }

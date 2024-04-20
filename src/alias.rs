@@ -1,6 +1,6 @@
 use crate::all::{
-    astack, bit, isload, isstore, to_s, Alias, AliasIdx, AliasLoc, AliasT, AliasU, Bits, BlkIdx,
-    CanAlias, Con, ConBits, ConT, Fn, Ins, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
+    astack, bit, isload, isstore, Alias, AliasIdx, AliasLoc, AliasT, AliasU, Bits, BlkIdx,
+    CanAlias, Con, ConBits, ConT, Fn, Ins, PhiIdx, Ref, Tmp, J, NBIT, O, OALLOC, OALLOC1,
 };
 
 use crate::load::storesz;

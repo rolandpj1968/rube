@@ -10,11 +10,11 @@ use crate::cfg::dom;
 use crate::util::{getcon, newcon, newtmp, newtmpref};
 
 // TODO remove
-use crate::all::{to_s, Typ};
-use crate::optab::OPTAB;
-use crate::parse::printref;
-use crate::util::Bucket;
-use std::io::stdout;
+// use crate::all::{to_s, Typ};
+// use crate::optab::OPTAB;
+// use crate::parse::printref;
+// use crate::util::Bucket;
+// use std::io::stdout;
 
 /*
 #include "all.h"
@@ -233,11 +233,11 @@ fn killsl(f: &Fn, r: Ref, sl: &Slice) -> bool {
     false
 }
 
-fn prindent(indent: usize) {
-    for n in 0..indent {
-        print!("  ");
-    }
-}
+// fn prindent(indent: usize) {
+//     for n in 0..indent {
+//         print!("  ");
+//     }
+// }
 
 /* returns a ref containing the contents of the slice
  * passed as argument, all the bits set to 0 in the
@@ -254,8 +254,8 @@ fn def(
     bi: BlkIdx,
     mut ii: InsIdx,
     il: &Loc,
-    indent: usize,
-    debug: bool,
+    // indent: usize,
+    // debug: bool,
 ) -> Ref {
     // Slice sl1;
     // Blk *bp;
@@ -267,18 +267,18 @@ fn def(
     // Insert *ist;
     // Loc l;
 
-    if debug {
-        prindent(indent);
-        println!(
-            "                         def - for @{} ins {}",
-            to_s(&f.blk(bi).name),
-            ii.0
-        );
-    }
+    // if debug {
+    //     prindent(indent);
+    //     println!(
+    //         "                         def - for @{} ins {}",
+    //         to_s(&f.blk(bi).name),
+    //         ii.0
+    //     );
+    // }
 
-    if indent > 32 {
-        panic!("Gone too deep");
-    }
+    // if indent > 32 {
+    //     panic!("Gone too deep");
+    // }
 
     /* invariants:
      * -1- Blk bi dominates Blk il.bi; so we can use
@@ -304,14 +304,14 @@ fn def(
     let mut goto_load: bool = false;
     while ii != InsIdx(0) && !goto_load {
         ii = InsIdx(ii.0 - 1);
-        if debug {
-            prindent(indent);
-            println!(
-                "                         def -    looking at @{} ins {}",
-                to_s(&f.blk(bi).name),
-                ii.0
-            );
-        }
+        // if debug {
+        //     prindent(indent);
+        //     println!(
+        //         "                         def -    looking at @{} ins {}",
+        //         to_s(&f.blk(bi).name),
+        //         ii.0
+        //     );
+        // }
         let mut i: Ins = f.blk(bi).ins[ii.0 as usize]; /* Note: copy! */
         if killsl(f, i.to, &sl) || (i.op == O::Ocall && escapes(f, sl.r)) {
             // println!("                              killsl or escaping call");
@@ -343,10 +343,10 @@ fn def(
         let (can_alias, mut off) = alias(f, sl.r, sl.off, sl.sz as i32, r1, sz);
         match can_alias {
             CanAlias::Must => {
-                if debug {
-                    prindent(indent);
-                    println!("                                     MUST alias");
-                }
+                // if debug {
+                //     prindent(indent);
+                //     println!("                                     MUST alias");
+                // }
                 let mut sl1: Slice = sl.clone(); /*for Oblit0 only, ugh!*/
                 if i.op == O::Oblit0 {
                     //sl1 = sl;
@@ -376,7 +376,15 @@ fn def(
                     continue;
                 }
                 if i.op == O::Oblit0 {
-                    r = def(f, ilog, &sl1, genmask(sz), bi, ii, il, indent + 1, debug);
+                    r = def(
+                        f,
+                        ilog,
+                        &sl1,
+                        genmask(sz),
+                        bi,
+                        ii,
+                        il, /*, indent + 1, debug*/
+                    );
                     if r == Ref::R {
                         goto_load = true;
                         continue;
@@ -396,7 +404,15 @@ fn def(
                     mask(f, ilog, cls, &mut r, msk1 & msk, il);
                 }
                 if (msk & !msk1) != 0 {
-                    r1 = def(f, ilog, sl, msk & !msk1, bi, ii, il, indent + 1, debug);
+                    r1 = def(
+                        f,
+                        ilog,
+                        sl,
+                        msk & !msk1,
+                        bi,
+                        ii,
+                        il, /*, indent + 1, debug*/
+                    );
                     if r1 == Ref::R {
                         goto_load = true;
                         continue;
@@ -409,10 +425,10 @@ fn def(
                 return r;
             }
             CanAlias::May => {
-                if debug {
-                    prindent(indent);
-                    println!("                                     may alias");
-                }
+                // if debug {
+                //     prindent(indent);
+                //     println!("                                     may alias");
+                // }
                 if !ld {
                     // println!("                                         ... and not a load");
                     goto_load = true;
@@ -420,10 +436,10 @@ fn def(
                 continue;
             }
             CanAlias::No => {
-                if debug {
-                    prindent(indent);
-                    println!("                                     no alias");
-                }
+                // if debug {
+                //     prindent(indent);
+                //     println!("                                     no alias");
+                // }
                 continue;
             }
         }
@@ -439,13 +455,13 @@ fn def(
     // }
 
     if !goto_load {
-        if debug {
-            prindent(indent);
-            println!(
-                "                         def - got through preceding instructions of @{}",
-                to_s(&f.blk(bi).name)
-            );
-        }
+        // if debug {
+        //     prindent(indent);
+        //     println!(
+        //         "                         def - got through preceding instructions of @{}",
+        //         to_s(&f.blk(bi).name)
+        //     );
+        // }
     }
 
     if !goto_load {
@@ -453,13 +469,13 @@ fn def(
 
         for isti in 0..ilog.len() {
             if !goto_load {
-                if debug {
-                    prindent(indent);
-                    println!(
-                        "                                         checking Insert {}\n",
-                        isti
-                    );
-                }
+                // if debug {
+                //     prindent(indent);
+                //     println!(
+                //         "                                         checking Insert {}\n",
+                //         isti
+                //     );
+                // }
             }
             let ist: &Insert = &ilog[isti];
             if let InsertU::Phi(uphi) = &ist.new {
@@ -503,7 +519,15 @@ fn def(
             if f.blk(bpi).s2 != BlkIdx::NONE {
                 l.type_ = LocT::LNoLoad;
             }
-            let r1: Ref = def(f, ilog, &sl, msk, bpi, InsIdx::NONE, &l, indent + 1, debug);
+            let r1: Ref = def(
+                f,
+                ilog,
+                &sl,
+                msk,
+                bpi,
+                InsIdx::NONE,
+                &l, /*, indent + 1, debug*/
+            );
             if r1 == Ref::R {
                 goto_load = true;
             } else {
@@ -549,7 +573,15 @@ fn def(
                 bi: bpi,
                 off: InsIdx(f.blk(bpi).ins.len() as u32),
             };
-            let r1: Ref = def(f, ilog, &sl, msks, bpi, InsIdx::NONE, &l, indent + 1, debug);
+            let r1: Ref = def(
+                f,
+                ilog,
+                &sl,
+                msks,
+                bpi,
+                InsIdx::NONE,
+                &l, /*, indent + 1, debug*/
+            );
             if r1 == Ref::R {
                 goto_load = true;
                 break;
@@ -607,7 +639,7 @@ fn icmp(a: &Insert, b: &Insert) -> Ordering {
 
 /* require rpo ssa alias */
 // TODO remove type, itbl - just for debug
-pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
+pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
     // Ins *i, *ib;
     // Blk *b;
     // int sz;
@@ -624,14 +656,14 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
         for iii in 0..f.blk(bi).ins.len() {
-            println!(
-                "                     loadopt: bi {} bid {} @{} ins {} {}",
-                bi.0,
-                f.blk(bi).id,
-                to_s(&f.blk(bi).name),
-                iii,
-                to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
-            );
+            // println!(
+            //     "                     loadopt: bi {} bid {} @{} ins {} {}",
+            //     bi.0,
+            //     f.blk(bi).id,
+            //     to_s(&f.blk(bi).name),
+            //     iii,
+            //     to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
+            // );
             let i_arg1 = {
                 let i: &Ins = &f.blk(bi).ins[iii];
                 if !isload(i.op) {
@@ -650,8 +682,16 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     off: ii,
                     bi,
                 };
-                let debug: bool = bi.0 == 183 && iii == 1;
-                def(f, &mut ilog, &sl, genmask(sz), bi, ii, &l, 0, debug)
+                // let debug: bool = bi.0 == 183 && iii == 1;
+                def(
+                    f,
+                    &mut ilog,
+                    &sl,
+                    genmask(sz),
+                    bi,
+                    ii,
+                    &l, /*, 0, debug*/
+                )
             };
             f.blk_mut(bi).ins[iii].args[1] = i_arg1;
             // print!(
