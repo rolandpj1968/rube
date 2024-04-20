@@ -633,7 +633,7 @@ pub fn loadopt(f: &mut Fn) {
                             i.op = ext;
                         }
                         O::Oloadsw | O::Oloaduw => {
-                            if (i.cls == KL) {
+                            if i.cls == KL {
                                 i.op = ext;
                             } else {
                                 i.op = O::Ocopy;

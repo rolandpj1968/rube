@@ -1921,7 +1921,9 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
             }
             let _ = write!(f, "${}", to_s(str_(&c.sym.id, itbl)));
             if let ConBits::I(i) = c.bits {
-                let _ = write!(f, "{}", i);
+                if i != 0 {
+                    let _ = write!(f, "{:+}", i);
+                }
             }
         }
         ConT::CBits => match c.bits {
