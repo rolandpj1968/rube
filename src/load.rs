@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use crate::alias::{alias, escapes};
 use crate::all::{
     bit, isload, isstore, kwide, Alias, AliasIdx, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn,
-    Ins, InsIdx, KExt, Phi, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, O,
+    Ins, InsIdx, KExt, Phi, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, KX, O,
 };
 use crate::cfg::dom;
 use crate::util::{getcon, newcon, newtmp, newtmpref};
@@ -506,11 +506,6 @@ fn def(
 }
 
 fn icmp(a: &Insert, b: &Insert) -> Ordering {
-    // Insert *a, *b;
-    // int c;
-
-    // a = (Insert *)pa;
-    // b = (Insert *)pb;
     let bid_cmp = a.bid.cmp(&b.bid);
     if bid_cmp != Ordering::Equal {
         return bid_cmp;
@@ -583,64 +578,87 @@ pub fn loadopt(f: &mut Fn) {
         }
         bi = f.blk(bi).link;
     }
-    /*
-        qsort(ilog, nlog, sizeof ilog[0], icmp);
-        vgrow(&ilog, nlog+1);
-        ilog[nlog].bid = fn->nblk; /* add a sentinel */
-        ib = vnew(0, sizeof(Ins), PHeap);
-        for (ist=ilog, n=0; n<fn->nblk; ++n) {
-            b = fn->rpo[n];
-            for (; ist->bid == n && ist->isphi; ++ist) {
-                ist->new.phi.p->link = b->phi;
-                b->phi = ist->new.phi.p;
+    ilog.sort_by(icmp);
+    let sentinal_ins = Ins::new0(O::Oxxx, KX, Ref::R);
+    /* add a sentinel */
+    ilog.push(Insert::new(
+        TmpIdx::NONE,
+        f.nblk,
+        InsIdx::NONE,
+        InsertU::Ins(sentinal_ins),
+    ));
+    let mut isti: usize = 0;
+    let mut n: u32 = 0;
+    while n < f.nblk {
+        let mut ist: &mut Insert = &mut ilog[isti];
+        let bi: BlkIdx = f.rpo[n as usize];
+        while ist.bid == n {
+            if let InsertU::Phi(uphi) = &mut ist.new {
+                f.phi_mut(uphi.pi).link = f.blk(bi).phi;
+                f.blk_mut(bi).phi = uphi.pi;
+            } else {
+                break;
             }
-            ni = 0;
-            nt = 0;
-            for (;;) {
-                if (ist->bid == n && ist->off == ni)
-                    i = &ist++->new.ins;
-                else {
-                    if (ni == b->nins)
-                        break;
-                    i = &b->ins[ni++];
-                    if (isload(i->op)
-                    && !req(i->arg[1], R)) {
-                        ext = Oextsb + i->op - Oloadsb;
-                        switch (i->op) {
-                        default:
-                            die("unreachable");
-                        case Oloadsb:
-                        case Oloadub:
-                        case Oloadsh:
-                        case Oloaduh:
-                            i->op = ext;
-                            break;
-                        case Oloadsw:
-                        case Oloaduw:
-                            if (i->cls == Kl) {
-                                i->op = ext;
-                                break;
-                            }
-                            /* fall through */
-                        case Oload:
-                            i->op = Ocopy;
-                            break;
-                        }
-                        i->arg[0] = i->arg[1];
-                        i->arg[1] = R;
-                    }
+            isti += 1;
+            ist = &mut ilog[isti];
+        }
+        let mut ni: InsIdx = InsIdx(0);
+        // nt = 0; ??? what's this
+        let mut ib: Vec<Ins> = vec![];
+        loop {
+            let i: Ins;
+            if ist.bid == n && ist.off == ni {
+                if let InsertU::Ins(i0) = &ist.new {
+                    i = *i0; // Copy
+                } else {
+                    // MUST be InsertU::Ins
+                    assert!(false);
+                    i = Ins::new0(O::Oxxx, KX, Ref::R);
                 }
-                vgrow(&ib, ++nt);
-                ib[nt-1] = *i;
+                isti += 1;
+                ist = &mut ilog[isti];
+            } else {
+                if ni == InsIdx(f.blk(bi).ins.len() as u32) {
+                    break;
+                }
+                i = f.blk(bi).ins[ni.0 as usize];
+                ni = InsIdx(ni.0 + 1);
+                //             if (isload(i.op)
+                //                 && !req(i.arg[1], R)) {
+                //                 ext = Oextsb + i.op - Oloadsb;
+                //                 switch (i.op) {
+                //                     default:
+                //                     die("unreachable");
+                //                     case Oloadsb:
+                //                     case Oloadub:
+                //                     case Oloadsh:
+                //                     case Oloaduh:
+                //                     i.op = ext;
+                //                     break;
+                //                     case Oloadsw:
+                //                     case Oloaduw:
+                //                     if (i.cls == Kl) {
+                //                         i.op = ext;
+                //                         break;
+                //                     }
+                //                     /* fall through */
+                //                     case Oload:
+                //                     i.op = Ocopy;
+                //                     break;
+                //                 }
+                //                 i.arg[0] = i.arg[1];
+                //                 i.arg[1] = R;
+                //             }
             }
-            b->nins = nt;
-            idup(&b->ins, ib, nt);
+            ib.push(i);
         }
-        vfree(ib);
-        vfree(ilog);
-        if (debug['M']) {
-            fprintf(stderr, "\n> After load elimination:\n");
-            printfn(fn, stderr);
-        }
-    */
+        f.blk_mut(bi).ins = ib;
+        n += 1;
+    }
+    // vfree(ib);
+    // vfree(ilog);
+    // if (debug['M']) {
+    //     fprintf(stderr, "\n> After load elimination:\n");
+    //     printfn(fn, stderr);
+    // }
 }
