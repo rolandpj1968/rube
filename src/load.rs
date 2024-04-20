@@ -606,7 +606,7 @@ pub fn loadopt(f: &mut Fn) {
         // nt = 0; ??? what's this
         let mut ib: Vec<Ins> = vec![];
         loop {
-            let i: Ins;
+            let mut i: Ins;
             if ist.bid == n && ist.off == ni {
                 if let InsertU::Ins(i0) = &ist.new {
                     i = *i0; // Copy
@@ -623,40 +623,41 @@ pub fn loadopt(f: &mut Fn) {
                 }
                 i = f.blk(bi).ins[ni.0 as usize];
                 ni = InsIdx(ni.0 + 1);
-                //             if (isload(i.op)
-                //                 && !req(i.arg[1], R)) {
-                //                 ext = Oextsb + i.op - Oloadsb;
-                //                 switch (i.op) {
-                //                     default:
-                //                     die("unreachable");
-                //                     case Oloadsb:
-                //                     case Oloadub:
-                //                     case Oloadsh:
-                //                     case Oloaduh:
-                //                     i.op = ext;
-                //                     break;
-                //                     case Oloadsw:
-                //                     case Oloaduw:
-                //                     if (i.cls == Kl) {
-                //                         i.op = ext;
-                //                         break;
-                //                     }
-                //                     /* fall through */
-                //                     case Oload:
-                //                     i.op = Ocopy;
-                //                     break;
-                //                 }
-                //                 i.arg[0] = i.arg[1];
-                //                 i.arg[1] = R;
-                //             }
+                if isload(i.op) && i.args[1] != Ref::R {
+                    // TODO same code in mem.rs
+                    let ext: O =
+                        O::from_repr((O::Oextsb as u8) + ((i.op as u8) - (O::Oloadsb as u8)))
+                            .unwrap();
+                    match i.op {
+                        O::Oloadsb | O::Oloadub | O::Oloadsh | O::Oloaduh => {
+                            i.op = ext;
+                        }
+                        O::Oloadsw | O::Oloaduw => {
+                            if (i.cls == KL) {
+                                i.op = ext;
+                            } else {
+                                i.op = O::Ocopy;
+                            }
+                        }
+                        O::Oload => {
+                            i.op = O::Ocopy;
+                        }
+                        _ => {
+                            // unreachable
+                            assert!(false);
+                            i.op = O::Oxxx;
+                        }
+                    }
+                    i.args[0] = i.args[1];
+                    i.args[1] = Ref::R;
+                }
             }
             ib.push(i);
         }
         f.blk_mut(bi).ins = ib;
         n += 1;
     }
-    // vfree(ib);
-    // vfree(ilog);
+    // TODO
     // if (debug['M']) {
     //     fprintf(stderr, "\n> After load elimination:\n");
     //     printfn(fn, stderr);
