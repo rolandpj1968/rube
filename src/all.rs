@@ -773,7 +773,7 @@ pub struct Tmp {
     pub phi: TmpIdx,
     pub alias: AliasIdx,
     pub width: TmpWdth,
-    pub visit: TmpIdx, /*u32*/ // bool??? TmpIdx??
+    pub visit: TmpIdx, /*u32*/ // bool??? TmpIdx?? It's a slot index in mem::coalesce :(
 }
 
 impl Tmp {

@@ -254,36 +254,41 @@ pub fn fillfron(f: &mut Fn) {
     }
 }
 
-/*
-static void
-loopmark(Blk *hd, Blk *b, void f(Blk *, Blk *))
-{
-    uint p;
-
-    if (b->id < hd->id || b->visit == hd->id)
-        return;
-    b->visit = hd->id;
-    f(hd, b);
-    for (p=0; p<b->npred; ++p)
-        loopmark(hd, b->pred[p], f);
-}
-
-void
-loopiter(Fn *fn, void f(Blk *, Blk *))
-{
-    uint n, p;
-    Blk *b;
-
-    for (b=fn->start; b; b=b->link)
-        b->visit = -1u;
-    for (n=0; n<fn->nblk; ++n) {
-        b = fn->rpo[n];
-        for (p=0; p<b->npred; ++p)
-            if (b->pred[p]->id >= n)
-                loopmark(b, b->pred[p], f);
+fn loopmark(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx, func: fn(&mut Fn, BlkIdx, BlkIdx)) {
+    {
+        let hd: &Blk = f.blk(hdi);
+        let b: &Blk = f.blk(bi);
+        if b.id < hd.id || b.visit == hd.id {
+            return;
+        }
+    }
+    f.blk_mut(bi).visit = f.blk(hdi).id;
+    func(f, hdi, bi);
+    for p in 0..f.blk(bi).preds.len() {
+        let predi: BlkIdx = f.blk(bi).preds[p];
+        loopmark(f, hdi, predi, func);
     }
 }
 
+pub fn loopiter(f: &mut Fn, func: fn(&mut Fn, BlkIdx, BlkIdx)) {
+    let mut bi: BlkIdx = f.start;
+    while bi != BlkIdx::NONE {
+        let b: &mut Blk = f.blk_mut(bi);
+        b.visit = u32::MAX;
+        bi = b.link;
+    }
+
+    for n in 0..f.rpo.len() {
+        let bi: BlkIdx = f.rpo[n];
+        for p in 0..f.blk(bi).preds.len() {
+            let predi: BlkIdx = f.blk(bi).preds[p];
+            if f.blk(predi).id >= n as u32 {
+                loopmark(f, bi, predi, func);
+            }
+        }
+    }
+}
+/*
 void
 multloop(Blk *hd, Blk *b)
 {
