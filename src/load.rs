@@ -1,4 +1,5 @@
 use derive_new::new;
+use std::cmp::Ordering;
 
 use crate::alias::{alias, escapes};
 use crate::all::{
@@ -503,28 +504,43 @@ fn def(
         r
     }
 }
-/*
-static int
-icmp(const void *pa, const void *pb)
-{
-    Insert *a, *b;
-    int c;
 
-    a = (Insert *)pa;
-    b = (Insert *)pb;
-    if ((c = a.bid - b.bid))
-        return c;
-    if (a.isphi && b.isphi)
-        return 0;
-    if (a.isphi)
-        return -1;
-    if (b.isphi)
-        return +1;
-    if ((c = a.off - b.off))
-        return c;
-    return a.num - b.num;
+fn icmp(a: &Insert, b: &Insert) -> Ordering {
+    // Insert *a, *b;
+    // int c;
+
+    // a = (Insert *)pa;
+    // b = (Insert *)pb;
+    let bid_cmp = a.bid.cmp(&b.bid);
+    if bid_cmp != Ordering::Equal {
+        return bid_cmp;
+    }
+    let a_isphi: bool = if let InsertU::Phi(_) = a.new {
+        true
+    } else {
+        false
+    };
+    let b_isphi: bool = if let InsertU::Phi(_) = b.new {
+        true
+    } else {
+        false
+    };
+    if a_isphi && b_isphi {
+        return Ordering::Equal;
+    }
+    if a_isphi {
+        return Ordering::Less;
+    }
+    if b_isphi {
+        return Ordering::Greater;
+    }
+    let off_cmp = a.off.0.cmp(&b.off.0);
+    if off_cmp != Ordering::Equal {
+        return off_cmp;
+    }
+    a.num.0.cmp(&b.num.0)
 }
- */
+
 /* require rpo ssa alias */
 pub fn loadopt(f: &mut Fn) {
     // Ins *i, *ib;
