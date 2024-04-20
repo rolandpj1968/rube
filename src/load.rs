@@ -3,10 +3,10 @@ use derive_new::new;
 use crate::alias::{alias, escapes};
 use crate::all::{
     bit, isload, isstore, kwide, Alias, AliasIdx, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn,
-    Ins, InsIdx, KExt, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, O,
+    Ins, InsIdx, KExt, Phi, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, O,
 };
 use crate::cfg::dom;
-use crate::util::{getcon, newcon, newtmp};
+use crate::util::{getcon, newcon, newtmp, newtmpref};
 
 /*
 #include "all.h"
@@ -26,14 +26,14 @@ enum LocT {
     LNoLoad, /* only scalar operations allowed */
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 struct Loc {
     type_: LocT,
     off: InsIdx,
     bi: BlkIdx,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 struct Slice {
     r: Ref,
     off: i32,
@@ -385,77 +385,123 @@ fn def(
         return load(f, ilog, sl, msk, il);
     }
 
-    let bid = f.blk(bi).id;
+    if !goto_load {
+        let bid = f.blk(bi).id;
 
-    // &mut ilog is used inside the loop so iterate on the index
-    for isti in 0..ilog.len() {
-        let ist: &Insert = &ilog[isti];
-        if let InsertU::Phi(uphi) = &ist.new {
-            if ist.bid == bid && uphi.m.r == sl.r && uphi.m.off == sl.off && uphi.m.sz == sl.sz {
-                let mut r = f.phi(uphi.pi).to;
-                if msk != msks {
-                    mask(f, ilog, cls, &mut r, msk, il);
-                } else {
-                    cast(f, ilog, &mut r, sl.cls, il);
+        for isti in 0..ilog.len() {
+            let ist: &Insert = &ilog[isti];
+            if let InsertU::Phi(uphi) = &ist.new {
+                if ist.bid == bid && uphi.m.r == sl.r && uphi.m.off == sl.off && uphi.m.sz == sl.sz
+                {
+                    let mut r = f.phi(uphi.pi).to;
+                    if msk != msks {
+                        mask(f, ilog, cls, &mut r, msk, il);
+                    } else {
+                        cast(f, ilog, &mut r, sl.cls, il);
+                    }
+                    return r;
                 }
-                return r;
+            }
+        }
+
+        let mut pi = f.blk(bi).phi;
+        while pi != PhiIdx::NONE {
+            let p_to: Ref = f.phi(pi).to;
+            if killsl(f, p_to, &sl) {
+                /* scanning predecessors in that
+                 * case would be unsafe */
+                goto_load = true;
+                break;
+            }
+            pi = f.phi(pi).link;
+        }
+    }
+
+    if !goto_load {
+        if f.blk(bi).preds.is_empty() {
+            goto_load = true;
+        }
+    }
+
+    if !goto_load {
+        if f.blk(bi).preds.len() == 1 {
+            let bpi = f.blk(bi).preds[0];
+            assert!(f.blk(bpi).loop_ >= f.blk(il.bi).loop_);
+            let mut l: Loc = *il;
+            if f.blk(bpi).s2 != BlkIdx::NONE {
+                l.type_ = LocT::LNoLoad;
+            }
+            let r1: Ref = def(f, ilog, &sl, msk, bpi, InsIdx(0), &l);
+            if r1 == Ref::R {
+                goto_load = true;
+            } else {
+                return r1;
             }
         }
     }
 
-    // for (p=b.phi; p; p=p.link)
-    //     if (killsl(p.to, sl))
-    //         /* scanning predecessors in that
-    //          * case would be unsafe */
-    //         goto Load;
+    let mut r: Ref = Ref::R;
+    if !goto_load {
+        r = newtmpref(b"ld", true, sl.cls, f); // TODO - this needs to be outside the if
+                                               // p = alloc(sizeof *p);
+                                               // vgrow(&ilog, ++nlog);
+                                               // ist = &ilog[nlog-1];
+                                               // ist.isphi = 1;
+                                               // ist.bid = b.id;
+                                               // ist.new.phi.m = sl;
+                                               // ist.new.phi.p = p;
+        let mut p_args: Vec<Ref> = vec![];
+        let mut p_blks: Vec<BlkIdx> = vec![];
+        for np in 0..f.blk(bi).preds.len() {
+            let bpi: BlkIdx = f.blk(bi).preds[np];
+            let l_type: LocT;
+            if f.blk(bpi).s2 == BlkIdx::NONE
+                && il.type_ != LocT::LNoLoad
+                && f.blk(bpi).loop_ < f.blk(il.bi).loop_
+            {
+                l_type = LocT::LLoad;
+            } else {
+                l_type = LocT::LNoLoad;
+            }
+            let l: Loc = Loc {
+                type_: l_type,
+                bi: bpi,
+                off: InsIdx(f.blk(bpi).ins.len() as u32),
+            };
+            let r1: Ref = def(f, ilog, &sl, msks, bpi, InsIdx(0), &l);
+            if r1 == Ref::R {
+                goto_load = true;
+                break;
+            }
+            p_args.push(r1);
+            p_blks.push(bpi);
+        }
+        let p: Phi = Phi::new(r, p_args, p_blks, sl.cls, PhiIdx::NONE);
+        let pi: PhiIdx = f.add_phi(p);
+        // TODO - notify QBE? QBE doesn't seem to set ist.num (i.e. ti). Nor off
+        // I suspect to should be r's ti, not 0???
+        // Maybe for phi's, QBE gets "to" from UPhi(p.to)
+        ilog.push(Insert::new(
+            TmpIdx(0), /*TODO*/
+            f.blk(bi).id,
+            InsIdx(0),
+            InsertU::Phi(UPhi { m: *sl, pi }),
+        ));
+    }
 
-    // if (b.npred == 0)
-    //     goto Load;
-    // if (b.npred == 1) {
-    //     bp = b.pred[0];
-    //     assert!(bp.loop >= il.blk.loop);
-    //     l = *il;
-    //     if (bp.s2)
-    //         l.type = LNoLoad;
-    //     r1 = def(sl, msk, bp, 0, &l);
-    //     if (req(r1, R))
-    //         goto Load;
-    //     return r1;
-    // }
-
-    // r = newtmp("ld", sl.cls, f);
-    // p = alloc(sizeof *p);
-    // vgrow(&ilog, ++nlog);
-    // ist = &ilog[nlog-1];
-    // ist.isphi = 1;
-    // ist.bid = b.id;
-    // ist.new.phi.m = sl;
-    // ist.new.phi.p = p;
-    // p.to = r;
-    // p.cls = sl.cls;
-    // p.narg = b.npred;
-    // p.arg = vnew(p.narg, sizeof p.arg[0], PFn);
-    // p.blk = vnew(p.narg, sizeof p.blk[0], PFn);
-    // for (np=0; np<b.npred; ++np) {
-    //     bp = b.pred[np];
-    //     if (!bp.s2
-    //     && il.type != LNoLoad
-    //     && bp.loop < il.blk.loop)
-    //         l.type = LLoad;
-    //     else
-    //         l.type = LNoLoad;
-    //     l.blk = bp;
-    //     l.off = bp.nins;
-    //     r1 = def(sl, msks, bp, 0, &l);
-    //     if (req(r1, R))
-    //         goto Load;
-    //     p.arg[np] = r1;
-    //     p.blk[np] = bp;
-    // }
-    // if (msk != msks)
-    //     mask(cls, &r, msk, il);
-    // return r;
-    Ref::R // for now...
+    if goto_load {
+        f.tmps.truncate(oldt);
+        ilog.truncate(oldl);
+        if il.type_ != LocT::LLoad {
+            return Ref::R;
+        }
+        load(f, ilog, sl, msk, il)
+    } else {
+        if msk != msks {
+            mask(f, ilog, cls, &mut r, msk, il);
+        }
+        r
+    }
 }
 /*
 static int
