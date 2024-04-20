@@ -233,6 +233,12 @@ fn killsl(f: &Fn, r: Ref, sl: &Slice) -> bool {
     false
 }
 
+fn prindent(indent: usize) {
+    for n in 0..indent {
+        print!("  ");
+    }
+}
+
 /* returns a ref containing the contents of the slice
  * passed as argument, all the bits set to 0 in the
  * mask argument are zeroed in the result;
@@ -248,6 +254,8 @@ fn def(
     bi: BlkIdx,
     mut ii: InsIdx,
     il: &Loc,
+    indent: usize,
+    debug: bool,
 ) -> Ref {
     // Slice sl1;
     // Blk *bp;
@@ -259,11 +267,19 @@ fn def(
     // Insert *ist;
     // Loc l;
 
-    // println!(
-    //     "                         def - for @{} ins {}",
-    //     to_s(&f.blk(bi).name),
-    //     ii.0
-    // );
+    if debug {
+        prindent(indent);
+        println!(
+            "                         def - for @{} ins {}",
+            to_s(&f.blk(bi).name),
+            ii.0
+        );
+    }
+
+    if indent > 32 {
+        panic!("Gone too deep");
+    }
+
     /* invariants:
      * -1- Blk bi dominates Blk il.bi; so we can use
      *     temporaries of Blk bi in Blk il.bi
@@ -288,11 +304,14 @@ fn def(
     let mut goto_load: bool = false;
     while ii != InsIdx(0) && !goto_load {
         ii = InsIdx(ii.0 - 1);
-        // println!(
-        //     "                         def -    looking at @{} ins {}",
-        //     to_s(&f.blk(bi).name),
-        //     ii.0
-        // );
+        if debug {
+            prindent(indent);
+            println!(
+                "                         def -    looking at @{} ins {}",
+                to_s(&f.blk(bi).name),
+                ii.0
+            );
+        }
         let mut i: Ins = f.blk(bi).ins[ii.0 as usize]; /* Note: copy! */
         if killsl(f, i.to, &sl) || (i.op == O::Ocall && escapes(f, sl.r)) {
             // println!("                              killsl or escaping call");
@@ -324,7 +343,10 @@ fn def(
         let (can_alias, mut off) = alias(f, sl.r, sl.off, sl.sz as i32, r1, sz);
         match can_alias {
             CanAlias::Must => {
-                // println!("                                     MUST alias");
+                if debug {
+                    prindent(indent);
+                    println!("                                     MUST alias");
+                }
                 let mut sl1: Slice = sl.clone(); /*for Oblit0 only, ugh!*/
                 if i.op == O::Oblit0 {
                     //sl1 = sl;
@@ -354,7 +376,7 @@ fn def(
                     continue;
                 }
                 if i.op == O::Oblit0 {
-                    r = def(f, ilog, &sl1, genmask(sz), bi, ii, il);
+                    r = def(f, ilog, &sl1, genmask(sz), bi, ii, il, indent + 1, debug);
                     if r == Ref::R {
                         goto_load = true;
                         continue;
@@ -374,7 +396,7 @@ fn def(
                     mask(f, ilog, cls, &mut r, msk1 & msk, il);
                 }
                 if (msk & !msk1) != 0 {
-                    r1 = def(f, ilog, sl, msk & !msk1, bi, ii, il);
+                    r1 = def(f, ilog, sl, msk & !msk1, bi, ii, il, indent + 1, debug);
                     if r1 == Ref::R {
                         goto_load = true;
                         continue;
@@ -387,7 +409,10 @@ fn def(
                 return r;
             }
             CanAlias::May => {
-                // println!("                                     may alias");
+                if debug {
+                    prindent(indent);
+                    println!("                                     may alias");
+                }
                 if !ld {
                     // println!("                                         ... and not a load");
                     goto_load = true;
@@ -395,7 +420,10 @@ fn def(
                 continue;
             }
             CanAlias::No => {
-                // println!("                                     no alias");
+                if debug {
+                    prindent(indent);
+                    println!("                                     no alias");
+                }
                 continue;
             }
         }
@@ -411,16 +439,28 @@ fn def(
     // }
 
     if !goto_load {
-        // println!(
-        //     "                         def - got through preceding instructions of @{}",
-        //     to_s(&f.blk(bi).name)
-        // );
+        if debug {
+            prindent(indent);
+            println!(
+                "                         def - got through preceding instructions of @{}",
+                to_s(&f.blk(bi).name)
+            );
+        }
     }
 
     if !goto_load {
         let bid = f.blk(bi).id;
 
         for isti in 0..ilog.len() {
+            if !goto_load {
+                if debug {
+                    prindent(indent);
+                    println!(
+                        "                                         checking Insert {}\n",
+                        isti
+                    );
+                }
+            }
             let ist: &Insert = &ilog[isti];
             if let InsertU::Phi(uphi) = &ist.new {
                 if ist.bid == bid && uphi.m.r == sl.r && uphi.m.off == sl.off && uphi.m.sz == sl.sz
@@ -463,7 +503,7 @@ fn def(
             if f.blk(bpi).s2 != BlkIdx::NONE {
                 l.type_ = LocT::LNoLoad;
             }
-            let r1: Ref = def(f, ilog, &sl, msk, bpi, InsIdx::NONE, &l);
+            let r1: Ref = def(f, ilog, &sl, msk, bpi, InsIdx::NONE, &l, indent + 1, debug);
             if r1 == Ref::R {
                 goto_load = true;
             } else {
@@ -482,8 +522,17 @@ fn def(
                                                // ist.bid = b.id;
                                                // ist.new.phi.m = sl;
                                                // ist.new.phi.p = p;
-        let mut p_args: Vec<Ref> = vec![];
-        let mut p_blks: Vec<BlkIdx> = vec![];
+        let p: Phi = Phi::new(r, vec![], vec![], sl.cls, PhiIdx::NONE);
+        let pi: PhiIdx = f.add_phi(p);
+        // TODO - notify QBE? QBE doesn't seem to set ist.num (i.e. ti). Nor off
+        // I suspect to should be r's ti, not 0???
+        // Maybe for phi's, QBE gets "to" from UPhi(p.to)
+        ilog.push(Insert::new(
+            TmpIdx(0), /*TODO*/
+            f.blk(bi).id,
+            InsIdx(0),
+            InsertU::Phi(UPhi { m: *sl, pi }),
+        ));
         for np in 0..f.blk(bi).preds.len() {
             let bpi: BlkIdx = f.blk(bi).preds[np];
             let l_type: LocT;
@@ -500,25 +549,14 @@ fn def(
                 bi: bpi,
                 off: InsIdx(f.blk(bpi).ins.len() as u32),
             };
-            let r1: Ref = def(f, ilog, &sl, msks, bpi, InsIdx::NONE, &l);
+            let r1: Ref = def(f, ilog, &sl, msks, bpi, InsIdx::NONE, &l, indent + 1, debug);
             if r1 == Ref::R {
                 goto_load = true;
                 break;
             }
-            p_args.push(r1);
-            p_blks.push(bpi);
+            f.phi_mut(pi).args.push(r1);
+            f.phi_mut(pi).blks.push(bpi);
         }
-        let p: Phi = Phi::new(r, p_args, p_blks, sl.cls, PhiIdx::NONE);
-        let pi: PhiIdx = f.add_phi(p);
-        // TODO - notify QBE? QBE doesn't seem to set ist.num (i.e. ti). Nor off
-        // I suspect to should be r's ti, not 0???
-        // Maybe for phi's, QBE gets "to" from UPhi(p.to)
-        ilog.push(Insert::new(
-            TmpIdx(0), /*TODO*/
-            f.blk(bi).id,
-            InsIdx(0),
-            InsertU::Phi(UPhi { m: *sl, pi }),
-        ));
     }
 
     if goto_load {
@@ -586,6 +624,14 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
         for iii in 0..f.blk(bi).ins.len() {
+            println!(
+                "                     loadopt: bi {} bid {} @{} ins {} {}",
+                bi.0,
+                f.blk(bi).id,
+                to_s(&f.blk(bi).name),
+                iii,
+                to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
+            );
             let i_arg1 = {
                 let i: &Ins = &f.blk(bi).ins[iii];
                 if !isload(i.op) {
@@ -604,7 +650,8 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     off: ii,
                     bi,
                 };
-                def(f, &mut ilog, &sl, genmask(sz), bi, ii, &l)
+                let debug: bool = bi.0 == 183 && iii == 1;
+                def(f, &mut ilog, &sl, genmask(sz), bi, ii, &l, 0, debug)
             };
             f.blk_mut(bi).ins[iii].args[1] = i_arg1;
             // print!(

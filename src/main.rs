@@ -93,3 +93,18 @@ fn main() {
         }
     }
 }
+
+// use std::thread;
+
+// fn main_to_thread() {
+//     const STACK_SIZE: usize = 32 * 1024 * 1024;
+
+//     // Spawn thread with explicit stack size
+//     let child = thread::Builder::new()
+//         .stack_size(STACK_SIZE)
+//         .spawn(main_real)
+//         .unwrap();
+
+//     // Wait for thread to join
+//     child.join().unwrap();
+// }
