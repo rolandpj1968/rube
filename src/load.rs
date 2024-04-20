@@ -389,7 +389,7 @@ fn def(
             CanAlias::May => {
                 println!("                                     may alias");
                 if !ld {
-                    println!("                                         ... and not a load");
+                    // println!("                                         ... and not a load");
                     goto_load = true;
                 }
                 continue;
@@ -411,7 +411,10 @@ fn def(
     // }
 
     if !goto_load {
-        println!("                         def - got through preceding instructions");
+        println!(
+            "                         def - got through preceding instructions of @{}",
+            to_s(&f.blk(bi).name)
+        );
     }
 
     if !goto_load {
