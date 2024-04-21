@@ -1,9 +1,11 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::alias::getalias;
 use crate::all::{
-    isload, isstore, kbase, to_s, Alias, AliasIdx, AliasT, AliasU, Bits, Blk, BlkIdx, Fn, Ins,
-    InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, KL, KW, KX, O, OALLOC, OALLOC1, TMP0,
+    bit, isload, isstore, kbase, to_s, Alias, AliasIdx, AliasT, AliasU, Bits, Blk, BlkIdx, Fn, Ins,
+    InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, J, KL, KW, KX, NBIT, O, OALLOC, OALLOC1,
+    TMP0,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
@@ -166,9 +168,8 @@ struct Range {
 }
 
 struct Store {
-    // TODO
-    // int ip;
-    // Ins *i;
+    ip: i32,
+    ii: InsIdx,
 }
 
 struct Slot {
@@ -177,9 +178,17 @@ struct Slot {
     m: Bits,
     l: Bits,
     r: Range,
-    // Slot *s; // TODO
-    // Store *st; // TODO
-    nst: i32,
+    si: SlotIdx,
+    st: Vec<Store>,
+    //nst: i32,
+}
+
+// Index into coalesce::sl vector
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SlotIdx(pub u32);
+
+impl SlotIdx {
+    pub const NONE: SlotIdx = SlotIdx(u32::MAX);
 }
 
 fn rin(r: &Range, n: i32) -> bool {
@@ -201,56 +210,49 @@ fn radd(r: &mut Range, n: i32) {
         r.b = n + 1;
     }
 }
-/*
-static int
-slot(Slot **ps, int64_t *off, Ref r, Fn *fn, Slot *sl)
-{
-    Alias a;
-    Tmp *t;
 
-    getalias(&a, r, fn);
-    if (a.type != ALoc)
-        return 0;
-    t = &fn->tmp[a.base];
-    if (t->visit < 0)
-        return 0;
-    *off = a.offset;
-    *ps = &sl[t->visit];
-    return 1;
-}
- */
+// Return maybe slot-idx, off
+fn slot(f: &Fn, r: Ref) -> Option<(SlotIdx, i64)> {
+    // Alias a;
+    // Tmp *t;
 
-fn load(r: Ref, x: Bits, ip: i32, f: &Fn, sl: &Slot) {
-    // int64_t off;
-    // Slot *s;
-
-    if (slot(&s, &off, r, fn, sl)) {
-        s->l |= x << off;
-        s->l &= s->m;
-        if (s->l)
-            radd(&s->r, ip);
+    let a: Alias = getalias(f, &Alias::default(), r);
+    if a.type_ != AliasT::ALoc {
+        return None;
     }
+    let ti: TmpIdx = a.base;
+    let vi: TmpIdx = f.tmp(ti).visit; // TODO should be SlotIdx here
+    if f.tmp(ti).visit == TmpIdx::NONE {
+        return None;
+    }
+
+    Some((SlotIdx(vi.0), a.offset))
 }
 
-/*
-static void
-store(Ref r, bits x, int ip, Ins *i, Fn *fn, Slot *sl)
-{
-    int64_t off;
-    Slot *s;
-
-    if (slot(&s, &off, r, fn, sl)) {
-        if (s->l) {
-            radd(&s->r, ip);
-            s->l &= ~(x << off);
-        } else {
-            vgrow(&s->st, ++s->nst);
-            s->st[s->nst-1].ip = ip;
-            s->st[s->nst-1].i = i;
+fn load(f: &Fn, r: Ref, x: Bits, ip: i32, sl: &mut [Slot]) {
+    if let Some((si, off)) = slot(f, r) {
+        let s: &mut Slot = &mut sl[si.0 as usize];
+        s.l |= x << off;
+        s.l &= s.m;
+        if s.l != 0 {
+            radd(&mut s.r, ip);
         }
     }
 }
 
+fn store(f: &Fn, r: Ref, x: Bits, ip: i32, ii: InsIdx, sl: &mut [Slot]) {
+    if let Some((si, off)) = slot(f, r) {
+        let s: &mut Slot = &mut sl[si.0 as usize];
+        if s.l != 0 {
+            radd(&mut s.r, ip);
+            s.l &= !(x << off);
+        } else {
+            s.st.push(Store { ip, ii });
+        }
+    }
+}
+
+/*
 static int
 scmp(const void *pa, const void *pb)
 {
@@ -304,9 +306,8 @@ pub fn coalesce(f: &mut Fn) {
                         m: aloc.m,
                         l: 0,
                         r: Range { a: 0, b: 0 },
-                        // TODO s.s = 0,
-                        // TODO s.st = vnew(0, sizeof s.st[0], PHeap),
-                        nst: 0,
+                        si: SlotIdx::NONE,
+                        st: vec![],
                     });
                 }
             }
@@ -344,44 +345,59 @@ pub fn coalesce(f: &mut Fn) {
                 }
             }
         }
-        //     if (b.jmp.type == Jretc)
-        //         load(b.jmp.arg, -1, --ip, f, sl);
-        //     for (i=&b.ins[b.nins]; i!=b.ins;) {
-        //         --i;
-        //         arg = i.arg;
-        //         if (i.op == Oargc) {
-        //             load(arg[1], -1, --ip, f, sl);
-        //         }
-        //         if (isload(i.op)) {
-        //             x = BIT(loadsz(i)) - 1;
-        //             load(arg[0], x, --ip, f, sl);
-        //         }
-        //         if (isstore(i.op)) {
-        //             x = BIT(storesz(i)) - 1;
-        //             store(arg[1], x, ip--, i, f, sl);
-        //         }
-        //         if (i.op == Oblit0) {
-        //             assert((i+1).op == Oblit1);
-        //             assert(rtype((i+1).arg[0]) == RInt);
-        //             sz = abs(rsval((i+1).arg[0]));
-        //             x = sz >= NBit ? (bits)-1 : BIT(sz) - 1;
-        //             store(arg[1], x, ip--, i, f, sl);
-        //             load(arg[0], x, ip, f, sl);
-        //             vgrow(&bl, ++nbl);
-        //             bl[nbl-1] = i;
-        //         }
-        //     }
-        //     for (s=sl; s<&sl[nsl]; s++)
-        //         if (s.l) {
-        //             radd(&s.r, ip);
-        //             if (b.loop != -1) {
-        //                 assert(b.loop > n);
-        //                 radd(&s.r, br[b.loop].b - 1);
-        //             }
-        //         }
-        //     br[n].a = ip;
+        if f.blk(bi).jmp.type_ == J::Jretc {
+            ip -= 1;
+            load(f, f.blk(bi).jmp.arg, u64::MAX, ip, &mut sl);
+        }
+        for iii in (0..f.blk(bi).ins.len()).rev() {
+            let i: Ins = f.blk(bi).ins[iii]; // note copy
+            let ii: InsIdx = InsIdx(iii as u32);
+            if i.op == O::Oargc {
+                ip -= 1;
+                load(f, i.args[1], u64::MAX, ip, &mut sl);
+            }
+            if isload(i.op) {
+                let x: Bits = bit(loadsz(&i) as u32) - 1;
+                ip -= 1;
+                load(f, i.args[0], x, ip, &mut sl);
+            }
+            if isstore(i.op) {
+                let x: Bits = bit(storesz(&i) as u32) - 1;
+                store(f, i.args[1], x, ip, ii, &mut sl);
+                ip -= 1;
+            }
+            if i.op == O::Oblit0 {
+                assert!(f.blk(bi).ins[iii + 1].op == O::Oblit1); // TODO bounds check
+                if let Ref::RInt(rsval) = f.blk(bi).ins[iii + 1].args[0] {
+                    let sz: i32 = rsval.abs();
+                    let x: Bits = if sz as u32 >= NBIT {
+                        u64::MAX
+                    } else {
+                        bit(sz as u32) - 1
+                    };
+                    store(f, i.args[1], x, ip, ii, &mut sl);
+                    ip -= 1;
+                    load(f, i.args[0], x, ip, &mut sl);
+                    bl.push(ii);
+                } else {
+                    // Oblit1 arg0 MUST be an RInt
+                    assert!(false);
+                }
+            }
+        }
+        let bloop = f.blk(bi).loop_;
+        for s in &mut sl {
+            if s.l != 0 {
+                radd(&mut s.r, ip);
+                if bloop != u32::MAX {
+                    assert!(bloop > n);
+                    radd(&mut s.r, br[bloop as usize].b - 1);
+                }
+            }
+        }
+        br[n as usize].a = ip;
     }
-    // free(br);
+    br.truncate(0); // Not needed any more
 
     // /* kill dead stores */
     // for (s=sl; s<&sl[nsl]; s++)

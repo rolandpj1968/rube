@@ -5,7 +5,7 @@ use crate::all::{
 
 use crate::load::storesz;
 
-fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
+pub fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
     let mut a_out: Alias = a_in.clone();
     match r {
         Ref::RTmp(ti) => {
