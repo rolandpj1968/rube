@@ -1,6 +1,9 @@
 // TODO remove eventually
 #![allow(dead_code, unused_variables)]
 
+use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
+
 // TODO - use this more prevalently...
 use derive_new::new;
 use strum_macros::FromRepr;
@@ -14,6 +17,46 @@ pub type RubeResult<T> = Result<T, RubeError>;
 // Helper for displaying byte slice
 pub fn to_s(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).to_string()
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Idx<T>(pub u32, PhantomData<T>);
+
+impl <T> Idx<T> {
+    pub const NONE: Idx<T> = Idx::<T>(u32::MAX, PhantomData);
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BlkTag {}
+
+impl Index<Idx<BlkTag>> for [Blk] {
+    type Output = Blk;
+    fn index(&self, index: Idx<BlkTag>) -> &Self::Output {
+        self.index(index.0 as usize)
+    }
+}
+
+impl Index<Idx<BlkTag>> for Vec<Blk> {
+    type Output = Blk;
+    fn index(&self, index: Idx<BlkTag>) -> &Self::Output {
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<Idx<BlkTag>> for Vec<Blk> {
+    fn index_mut(&mut self, index: Idx<BlkTag>) -> &mut Self::Output {
+        self.index_mut(index.0 as usize)
+    }
+}
+
+const BLKIDX0: Idx<BlkTag> = Idx::<BlkTag>(0, PhantomData);
+const TMPIDX0: Idx<Tmp> = Idx::<Tmp>(0, PhantomData);
+// const BBB: bool = BLKIDX0 == TMPIDX0;
+
+fn test(f: &mut Fn) {
+    let (blks, tmps) = (&mut f.blks, &mut f.tmps);
+    let bid0 = blks[BLKIDX0].id;
+    blks[BLKIDX0].id = 0;
 }
 
 pub type Bits = u64;
@@ -595,12 +638,14 @@ impl Blk {
 }
 
 // Index into Fn::blks
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct BlkIdx(pub u32);
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// pub struct BlkIdx(pub u32);
 
-impl BlkIdx {
-    pub const NONE: BlkIdx = BlkIdx(u32::MAX);
-}
+// impl BlkIdx {
+//     pub const NONE: BlkIdx = BlkIdx(u32::MAX);
+// }
+
+pub type BlkIdx = Idx<BlkTag>;
 
 /*
 struct Use {
@@ -933,7 +978,7 @@ impl Fn {
     }
 
     pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
-        let bi: BlkIdx = BlkIdx(self.blks.len() as u32);
+        let bi: BlkIdx = Idx::<BlkTag>(self.blks.len() as u32, PhantomData);
         self.blks.push(b);
         bi
     }
