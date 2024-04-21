@@ -1,11 +1,12 @@
+use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
 
 use crate::alias::getalias;
 use crate::all::{
-    bit, isload, isstore, kbase, to_s, Alias, AliasIdx, AliasT, AliasU, Bits, Blk, BlkIdx, Fn, Ins,
-    InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, J, KL, KW, KX, NBIT, O, OALLOC, OALLOC1,
-    TMP0,
+    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasIdx, AliasT, AliasU, Bits, Blk,
+    BlkIdx, Fn, Ins, InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, KL, KW, KX,
+    NBIT, O, OALLOC, OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
@@ -167,11 +168,14 @@ struct Range {
     b: i32,
 }
 
+#[derive(Clone, Debug)]
 struct Store {
     ip: i32,
+    bi: BlkIdx,
     ii: InsIdx,
 }
 
+#[derive(Clone, Debug)]
 struct Slot {
     ti: TmpIdx,
     sz: i32,
@@ -194,13 +198,11 @@ impl SlotIdx {
 fn rin(r: &Range, n: i32) -> bool {
     r.a <= n && n < r.b
 }
-/*
-static inline int
-rovlap(Range r0, Range r1)
-{
-    return r0.b && r1.b && r0.a < r1.b && r1.a < r0.b;
+
+fn rovlap(r0: &Range, r1: &Range) -> bool {
+    r0.b != 0 && r1.b != 0 && r0.a < r1.b && r1.a < r0.b
 }
-*/
+
 fn radd(r: &mut Range, n: i32) {
     if r.b == 0 {
         *r = Range { a: n, b: n + 1 };
@@ -240,30 +242,25 @@ fn load(f: &Fn, r: Ref, x: Bits, ip: i32, sl: &mut [Slot]) {
     }
 }
 
-fn store(f: &Fn, r: Ref, x: Bits, ip: i32, ii: InsIdx, sl: &mut [Slot]) {
+fn store(f: &Fn, r: Ref, x: Bits, ip: i32, bi: BlkIdx, ii: InsIdx, sl: &mut [Slot]) {
     if let Some((si, off)) = slot(f, r) {
         let s: &mut Slot = &mut sl[si.0 as usize];
         if s.l != 0 {
             radd(&mut s.r, ip);
             s.l &= !(x << off);
         } else {
-            s.st.push(Store { ip, ii });
+            s.st.push(Store { ip, bi, ii });
         }
     }
 }
 
-/*
-static int
-scmp(const void *pa, const void *pb)
-{
-    Slot *a, *b;
-
-    a = (Slot *)pa, b = (Slot *)pb;
-    if (a->sz != b->sz)
-        return b->sz - a->sz;
-    return a->r.a - b->r.a;
+fn scmp(a: &Slot, b: &Slot) -> Ordering {
+    if a.sz != b.sz {
+        return b.sz.cmp(&a.sz);
+    }
+    a.r.a.cmp(&b.r.a)
 }
- */
+
 fn maxrpo(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx) {
     let bid = f.blk(bi).id;
     let hd: &mut Blk = f.blk_mut(hdi);
@@ -314,227 +311,293 @@ pub fn coalesce(f: &mut Fn) {
         }
     }
 
-    // /* one-pass liveness analysis */
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
-        let b: &mut Blk = f.blk_mut(bi);
-        b.loop_ = u32::MAX;
-        bi = b.link;
+    /* one-pass liveness analysis */
+    {
+        let mut bi: BlkIdx = f.start;
+        while bi != BlkIdx::NONE {
+            let b: &mut Blk = f.blk_mut(bi);
+            b.loop_ = u32::MAX;
+            bi = b.link;
+        }
     }
     loopiter(f, maxrpo);
-    // nbl = 0;
-    let mut bl: Vec<InsIdx> = vec![]; // Mmm
-    let mut br: Vec<Range> = vec![Range { a: 0, b: 0 }; f.nblk as usize];
-    let mut ip: i32 = i32::MAX - 1; // ???
-    for n in (0..f.nblk).rev() {
-        let bi: BlkIdx = f.rpo[n as usize];
-        let (s1, s2) = f.blk(bi).s1_s2();
-        let succ: [BlkIdx; 3] = [s1, s2, BlkIdx::NONE];
-        br[n as usize].b = ip;
-        ip -= 1;
-        for s in &mut sl {
-            s.l = 0;
-            for psi in succ {
-                if psi == BlkIdx::NONE {
-                    break;
-                }
-                let m = f.blk(psi).id;
-                if m > n && rin(&s.r, br[m as usize].a) {
-                    s.l = s.m;
-                    radd(&mut s.r, ip);
-                }
-            }
-        }
-        if f.blk(bi).jmp.type_ == J::Jretc {
+    let mut bl: Vec<(BlkIdx, InsIdx)> = vec![]; // Mmm
+    {
+        let mut br: Vec<Range> = vec![Range { a: 0, b: 0 }; f.nblk as usize];
+        let mut ip: i32 = i32::MAX - 1; // ???
+        for n in (0..f.nblk).rev() {
+            let bi: BlkIdx = f.rpo[n as usize];
+            let (s1, s2) = f.blk(bi).s1_s2();
+            let succ: [BlkIdx; 3] = [s1, s2, BlkIdx::NONE];
+            br[n as usize].b = ip;
             ip -= 1;
-            load(f, f.blk(bi).jmp.arg, u64::MAX, ip, &mut sl);
-        }
-        for iii in (0..f.blk(bi).ins.len()).rev() {
-            let i: Ins = f.blk(bi).ins[iii]; // note copy
-            let ii: InsIdx = InsIdx(iii as u32);
-            if i.op == O::Oargc {
-                ip -= 1;
-                load(f, i.args[1], u64::MAX, ip, &mut sl);
+            for s in &mut sl {
+                s.l = 0;
+                for psi in succ {
+                    if psi == BlkIdx::NONE {
+                        break;
+                    }
+                    let m = f.blk(psi).id;
+                    if m > n && rin(&s.r, br[m as usize].a) {
+                        s.l = s.m;
+                        radd(&mut s.r, ip);
+                    }
+                }
             }
-            if isload(i.op) {
-                let x: Bits = bit(loadsz(&i) as u32) - 1;
+            if f.blk(bi).jmp.type_ == J::Jretc {
                 ip -= 1;
-                load(f, i.args[0], x, ip, &mut sl);
+                load(f, f.blk(bi).jmp.arg, u64::MAX, ip, &mut sl);
             }
-            if isstore(i.op) {
-                let x: Bits = bit(storesz(&i) as u32) - 1;
-                store(f, i.args[1], x, ip, ii, &mut sl);
-                ip -= 1;
-            }
-            if i.op == O::Oblit0 {
-                assert!(f.blk(bi).ins[iii + 1].op == O::Oblit1); // TODO bounds check
-                if let Ref::RInt(rsval) = f.blk(bi).ins[iii + 1].args[0] {
-                    let sz: i32 = rsval.abs();
-                    let x: Bits = if sz as u32 >= NBIT {
-                        u64::MAX
-                    } else {
-                        bit(sz as u32) - 1
-                    };
-                    store(f, i.args[1], x, ip, ii, &mut sl);
+            for iii in (0..f.blk(bi).ins.len()).rev() {
+                let i: Ins = f.blk(bi).ins[iii]; // note copy
+                let ii: InsIdx = InsIdx(iii as u32);
+                if i.op == O::Oargc {
+                    ip -= 1;
+                    load(f, i.args[1], u64::MAX, ip, &mut sl);
+                }
+                if isload(i.op) {
+                    let x: Bits = bit(loadsz(&i) as u32) - 1;
                     ip -= 1;
                     load(f, i.args[0], x, ip, &mut sl);
-                    bl.push(ii);
-                } else {
-                    // Oblit1 arg0 MUST be an RInt
+                }
+                if isstore(i.op) {
+                    let x: Bits = bit(storesz(&i) as u32) - 1;
+                    store(f, i.args[1], x, ip, bi, ii, &mut sl);
+                    ip -= 1;
+                }
+                if i.op == O::Oblit0 {
+                    assert!(f.blk(bi).ins[iii + 1].op == O::Oblit1); // TODO bounds check
+                    if let Ref::RInt(rsval) = f.blk(bi).ins[iii + 1].args[0] {
+                        let sz: i32 = rsval.abs();
+                        let x: Bits = if sz as u32 >= NBIT {
+                            u64::MAX
+                        } else {
+                            bit(sz as u32) - 1
+                        };
+                        store(f, i.args[1], x, ip, bi, ii, &mut sl);
+                        ip -= 1;
+                        load(f, i.args[0], x, ip, &mut sl);
+                        bl.push((bi, ii));
+                    } else {
+                        // Oblit1 arg0 MUST be an RInt
+                        assert!(false);
+                    }
+                }
+            }
+            let bloop = f.blk(bi).loop_;
+            for s in &mut sl {
+                if s.l != 0 {
+                    radd(&mut s.r, ip);
+                    if bloop != u32::MAX {
+                        assert!(bloop > n);
+                        radd(&mut s.r, br[bloop as usize].b - 1);
+                    }
+                }
+            }
+            br[n as usize].a = ip;
+        }
+    }
+
+    /* kill dead stores */
+    for s in &mut sl {
+        for n in 0..s.st.len() {
+            if !rin(&s.r, s.st[n].ip) {
+                let bi: BlkIdx = s.st[n].bi;
+                let ii: InsIdx = s.st[n].ii;
+                if f.blk(bi).ins[ii.0 as usize].op == O::Oblit0 {
+                    f.blk_mut(bi).ins[(ii.0 as usize) + 1] = Ins::new0(O::Onop, KX, Ref::R);
+                }
+                f.blk_mut(bi).ins[ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+            }
+        }
+    }
+
+    /* kill slots with an empty live range */
+    let mut total: i32 = 0;
+    let mut freed: i32 = 0;
+    let mut stk: Vec<TmpIdx> = vec![];
+    //let n: usize = 0;
+    let mut s0: usize = 0;
+    // TODO - use retain_mut()
+    for s in 0..sl.len() {
+        total += sl[s].sz;
+        if sl[s].r.b == 0 {
+            stk.push(sl[s].ti);
+            freed += sl[s].sz;
+        } else {
+            sl[s0] = sl[s].clone(); // Ugh, cloning for vec st
+            s0 += 1;
+        }
+    }
+
+    // TODO
+    if true
+    /*debug['M']*/
+    {
+        /*e*/
+        println!("\n> Slot coalescing:");
+        if !stk.is_empty() {
+            /*e*/
+            print!("\tkill [");
+            for ti in &stk {
+                /*e*/
+                print!(" %{}", to_s(&f.tmp(*ti).name));
+            }
+            /*e*/
+            println!(" ]");
+        }
+    }
+
+    loop {
+        match stk.pop() {
+            None => break,
+            Some(ti) => {
+                let (t_def_ii, t_def_bi) = {
+                    let t: &Tmp = f.tmp(ti);
+                    assert!(t.ndef == 1 && t.def != InsIdx::NONE);
+                    (t.def, f.rpo[t.bid as usize])
+                };
+                let i: Ins = f.blk(t_def_bi).ins[t_def_ii.0 as usize]; /* Note - copy */
+                if isload(i.op) {
+                    f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] =
+                        Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
+                    continue;
+                }
+                f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+                for ui in 0..f.tmp(ti).uses.len() {
+                    let u: Use = f.tmp(ti).uses[ui]; // Note - copy
+                    match u.type_ {
+                        UseT::UJmp => {
+                            let bi: BlkIdx = f.rpo[u.bid as usize];
+                            let b: &mut Blk = f.blk_mut(bi);
+                            assert!(isret(b.jmp.type_));
+                            b.jmp.type_ = J::Jret0;
+                            b.jmp.arg = Ref::R;
+                        }
+                        UseT::UIns(ii) => {
+                            let bi: BlkIdx = f.rpo[u.bid as usize];
+                            let b: &mut Blk = f.blk_mut(bi);
+                            let i: Ins = b.ins[ii.0 as usize]; // Note - copy
+                            match i.to {
+                                Ref::R => {
+                                    if isarg(i.op) {
+                                        assert!(i.op == O::Oargc);
+                                        b.ins[ii.0 as usize].args[1] = CON_Z; /* crash */
+                                    } else {
+                                        if i.op == O::Oblit0 {
+                                            b.ins[(ii.0 + 1) as usize] =
+                                                Ins::new0(O::Onop, KX, Ref::R);
+                                        }
+                                        b.ins[ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+                                    }
+                                }
+                                Ref::RTmp(ti) => {
+                                    stk.push(ti);
+                                }
+                                _ => {
+                                    assert!(false);
+                                }
+                            }
+                        }
+                        _ => {
+                            assert!(false);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // /* fuse slots by decreasing size */
+    sl.sort_by(scmp);
+    // qsort(sl, nsl, sizeof *sl, scmp);
+    let mut fused: i32 = 0;
+    'outer: for s0i in 0..sl.len() {
+        if sl[s0i].si != SlotIdx::NONE {
+            continue;
+        }
+        sl[s0i].si = SlotIdx(s0i as u32);
+        let mut r: Range = sl[s0i].r;
+        for si in (s0i + 1)..sl.len() {
+            if sl[si].si != SlotIdx::NONE || sl[si].r.b == 0 {
+                continue 'outer;
+            }
+            if rovlap(&r, &sl[si].r) {
+                /* O(n); can be approximated
+                 * by 'goto Skip;' if need be
+                 */
+                for mi in s0i..si {
+                    if sl[mi].si == SlotIdx(s0i as u32) && rovlap(&sl[mi].r, &sl[si].r) {
+                        continue 'outer;
+                    }
+                }
+            }
+            radd(&mut r, sl[si].r.a);
+            radd(&mut r, sl[si].r.b - 1);
+            sl[si].si = SlotIdx(s0i as u32);
+            fused += sl[si].sz;
+        }
+    }
+
+    // /* substitute fused slots */
+    for si in 0..sl.len() {
+        // for (s=sl; s<&sl[nsl]; s++) {
+        let sti: TmpIdx = sl[si].ti;
+        let (t_def_ii, t_bid) = {
+            let t: &mut Tmp = f.tmp_mut(sti);
+            /* the visit link is stale,
+             * reset it before the slot()
+             * calls below
+             */
+            t.visit = TmpIdx(si as u32); // Not actually a TmpIdx here :(
+            assert!(t.ndef == 1 && t.def != InsIdx::NONE);
+            (t.def, t.bid)
+        };
+        let t_def_bi: BlkIdx = f.rpo[t_bid as usize];
+        if sl[si].si == SlotIdx(si as u32) {
+            continue;
+        }
+        f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+        let ssi: SlotIdx = sl[si].si;
+        let ssti: TmpIdx = sl[ssi.0 as usize].ti;
+        let (ts_def_ii, ts_bid) = {
+            let ts: &Tmp = f.tmp(ssti);
+            (ts.def, ts.bid)
+        };
+        assert!(t_bid == ts_bid);
+        if t_def_ii < ts_def_ii {
+            /* make sure the slot we
+             * selected has a def that
+             * dominates its new uses
+             */
+            let tsi: Ins = f.blk(t_def_bi).ins[ts_def_ii.0 as usize]; // Note copy
+            f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = tsi;
+            f.blk_mut(t_def_bi).ins[ts_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+            f.tmp_mut(ssti).def = t_def_ii;
+        }
+        for ui in 0..f.tmp(sti).uses.len() {
+            let u: Use = f.tmp(sti).uses[ui]; // Note - copy
+            match u.type_ {
+                UseT::UJmp => {
+                    let bi: BlkIdx = f.rpo[u.bid as usize];
+                    f.blk_mut(bi).jmp.arg = Ref::RTmp(ssti);
+                }
+                UseT::UIns(ii) => {
+                    let bi: BlkIdx = f.rpo[u.bid as usize];
+                    let args: &mut [Ref; 2] = &mut f.blk_mut(bi).ins[ii.0 as usize].args;
+                    for arg in args {
+                        //         for (n=0; n<2; n++)
+                        if *arg == Ref::RTmp(sti) {
+                            *arg = Ref::RTmp(ssti);
+                        }
+                    }
+                }
+                _ => {
                     assert!(false);
                 }
             }
         }
-        let bloop = f.blk(bi).loop_;
-        for s in &mut sl {
-            if s.l != 0 {
-                radd(&mut s.r, ip);
-                if bloop != u32::MAX {
-                    assert!(bloop > n);
-                    radd(&mut s.r, br[bloop as usize].b - 1);
-                }
-            }
-        }
-        br[n as usize].a = ip;
     }
-    br.truncate(0); // Not needed any more
-
-    // /* kill dead stores */
-    // for (s=sl; s<&sl[nsl]; s++)
-    //     for (n=0; n<s.nst; n++)
-    //         if (!rin(s.r, s.st[n].ip)) {
-    //             i = s.st[n].i;
-    //             if (i.op == Oblit0)
-    //                 *(i+1) = (Ins){.op = Onop};
-    //             *i = (Ins){.op = Onop};
-    //         }
-
-    // /* kill slots with an empty live range */
-    // total = 0;
-    // freed = 0;
-    // stk = vnew(0, sizeof stk[0], PHeap);
-    // n = 0;
-    // for (s=s0=sl; s<&sl[nsl]; s++) {
-    //     total += s.sz;
-    //     if (!s.r.b) {
-    //         vfree(s.st);
-    //         vgrow(&stk, ++n);
-    //         stk[n-1] = s.t;
-    //         freed += s.sz;
-    //     } else
-    //         *s0++ = *s;
-    // }
-    // nsl = s0-sl;
-    // if (debug['M']) {
-    //     fputs("\n> Slot coalescing:\n", stderr);
-    //     if (n) {
-    //         fputs("\tkill [", stderr);
-    //         for (m=0; m<n; m++)
-    //             fprintf(stderr, " %%%s",
-    //                 f.tmp[stk[m]].name);
-    //         fputs(" ]\n", stderr);
-    //     }
-    // }
-    // while (n--) {
-    //     t = &f.tmp[stk[n]];
-    //     assert(t.ndef == 1 && t.def);
-    //     i = t.def;
-    //     if (isload(i.op)) {
-    //         i.op = Ocopy;
-    //         i.arg[0] = UNDEF;
-    //         continue;
-    //     }
-    //     *i = (Ins){.op = Onop};
-    //     for (u=t.use; u<&t.use[t.nuse]; u++) {
-    //         if (u.type == UJmp) {
-    //             b = f.rpo[u.bid];
-    //             assert(isret(b.jmp.type));
-    //             b.jmp.type = Jret0;
-    //             b.jmp.arg = R;
-    //             continue;
-    //         }
-    //         assert(u.type == UIns);
-    //         i = u.u.ins;
-    //         if (!req(i.to, R)) {
-    //             assert(rtype(i.to) == RTmp);
-    //             vgrow(&stk, ++n);
-    //             stk[n-1] = i.to.val;
-    //         } else if (isarg(i.op)) {
-    //             assert(i.op == Oargc);
-    //             i.arg[1] = CON_Z;  /* crash */
-    //         } else {
-    //             if (i.op == Oblit0)
-    //                 *(i+1) = (Ins){.op = Onop};
-    //             *i = (Ins){.op = Onop};
-    //         }
-    //     }
-    // }
-    // vfree(stk);
-
-    // /* fuse slots by decreasing size */
-    // qsort(sl, nsl, sizeof *sl, scmp);
-    // fused = 0;
-    // for (n=0; n<nsl; n++) {
-    //     s0 = &sl[n];
-    //     if (s0.s)
-    //         continue;
-    //     s0.s = s0;
-    //     r = s0.r;
-    //     for (s=s0+1; s<&sl[nsl]; s++) {
-    //         if (s.s || !s.r.b)
-    //             goto Skip;
-    //         if (rovlap(r, s.r))
-    //             /* O(n); can be approximated
-    //              * by 'goto Skip;' if need be
-    //              */
-    //             for (m=n; &sl[m]<s; m++)
-    //                 if (sl[m].s == s0)
-    //                 if (rovlap(sl[m].r, s.r))
-    //                     goto Skip;
-    //         radd(&r, s.r.a);
-    //         radd(&r, s.r.b - 1);
-    //         s.s = s0;
-    //         fused += s.sz;
-    //     Skip:;
-    //     }
-    // }
-
-    // /* substitute fused slots */
-    // for (s=sl; s<&sl[nsl]; s++) {
-    //     t = &f.tmp[s.t];
-    //     /* the visit link is stale,
-    //      * reset it before the slot()
-    //      * calls below
-    //      */
-    //     t.visit = s-sl;
-    //     assert(t.ndef == 1 && t.def);
-    //     if (s.s == s)
-    //         continue;
-    //     *t.def = (Ins){.op = Onop};
-    //     ts = &f.tmp[s.s.t];
-    //     assert(t.bid == ts.bid);
-    //     if (t.def < ts.def) {
-    //         /* make sure the slot we
-    //          * selected has a def that
-    //          * dominates its new uses
-    //          */
-    //         *t.def = *ts.def;
-    //         *ts.def = (Ins){.op = Onop};
-    //         ts.def = t.def;
-    //     }
-    //     for (u=t.use; u<&t.use[t.nuse]; u++) {
-    //         if (u.type == UJmp) {
-    //             b = f.rpo[u.bid];
-    //             b.jmp.arg = TMP(s.s.t);
-    //             continue;
-    //         }
-    //         assert(u.type == UIns);
-    //         arg = u.u.ins.arg;
-    //         for (n=0; n<2; n++)
-    //             if (req(arg[n], TMP(s.t)))
-    //                 arg[n] = TMP(s.s.t);
-    //     }
-    // }
 
     // /* fix newly overlapping blits */
     // for (n=0; n<nbl; n++) {

@@ -78,6 +78,7 @@ pub enum Ref {
 }
 
 pub const UNDEF: Ref = Ref::RCon(ConIdx::UNDEF); /* represents uninitialized data */
+pub const CON_Z: Ref = Ref::RCon(ConIdx::CON_Z); /* represents uninitialized data */
 
 /*
 enum CmpI {
@@ -499,7 +500,7 @@ impl Ins {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct InsIdx(pub u32); // Index into Blk::ins
 
 impl InsIdx {
@@ -627,7 +628,7 @@ pub enum UseT {
     UJmp,
 }
 
-#[derive(new, Debug)]
+#[derive(new, Clone, Copy, Debug)]
 pub struct Use {
     pub type_: UseT,
     pub bi: BlkIdx, // TODO - need this to access type_ PhiIdx or InsIdx, but now bid is redundant
@@ -845,6 +846,7 @@ pub struct ConIdx(pub u32);
 
 impl ConIdx {
     pub const UNDEF: ConIdx = ConIdx(0); /* represents uninitialized data */
+    pub const CON_Z: ConIdx = ConIdx(1);
     pub const NONE: ConIdx = ConIdx(u32::MAX);
 }
 
