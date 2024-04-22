@@ -38,11 +38,14 @@ impl Error for MemError {
 }
 
 pub fn promote(f: &mut Fn) -> RubeResult<()> {
+    let blks: &mut [Blk] = &mut f.blks;
+    let tmps: &mut [Tmp] = &mut f.tmps;
+
     /* promote uniform stack slots to temporaries */
     let bi: BlkIdx = f.start;
-    'ins_loop: for ii in 0..f.blk(bi).ins.len() {
+    'ins_loop: for ii in 0..blks[bi].ins.len() {
         let (i_op, i_to) = {
-            let i: &Ins = &f.blk(bi).ins[ii];
+            let i: &Ins = &blks[bi].ins[ii];
             (i.op, i.to)
         };
         if OALLOC > i_op || i_op > OALLOC1 {
@@ -57,15 +60,15 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
             continue 'ins_loop;
         };
 
-        if f.tmp(ti).ndef != 1 {
+        if tmps[ti].ndef != 1 {
             continue 'ins_loop;
         }
         let mut k: KExt = KX;
         let mut s: i32 = -1; // TODO - what is this actually?
 
-        for u in &f.tmp(ti).uses {
+        for u in &tmps[ti].uses {
             if let UseT::UIns(li) = u.type_ {
-                let l: &Ins = &f.blk(u.bi).ins[li.0 as usize];
+                let l: &Ins = &blks[u.bi].ins[li.0 as usize];
                 if isload(l.op) {
                     if s == -1 || s == loadsz(l) {
                         s = loadsz(l);
@@ -89,12 +92,12 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
         }
 
         /* get rid of the alloc and replace uses */
-        f.blk_mut(bi).ins[ii] = Ins::new0(O::Onop, KW, Ref::R);
-        f.tmp_mut(ti).ndef -= 1;
+        blks[bi].ins[ii] = Ins::new0(O::Onop, KW, Ref::R);
+        tmps[ti].ndef -= 1;
 
-        for ui in 0..f.tmp(ti).uses.len() {
+        for ui in 0..tmps[ti].uses.len() {
             let (utype_, ubi) = {
-                let u: &Use = &f.tmp(ti).uses[ui];
+                let u: &Use = &tmps[ti].uses[ui];
                 (u.type_, u.bi)
             };
             let li = if let UseT::UIns(li0) = utype_ {
@@ -105,15 +108,14 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                 continue;
             };
             let (l_op, l_cls, l_arg0, l_arg1) = {
-                let l: &Ins = &f.blk(ubi).ins[li.0 as usize];
+                let l: &Ins = &blks[ubi].ins[li.0 as usize];
                 (l.op, l.cls, l.args[0], l.args[1])
             };
             //         l = u->u.ins;
             if isstore(l_op) {
-                f.blk_mut(ubi).ins[li.0 as usize] = Ins::new1(O::Ocopy, k, l_arg1, [l_arg0]);
-                let t: &mut Tmp = f.tmp_mut(ti);
-                //t.nuse -= 1; // Hrmmm... TODO
-                t.ndef += 1;
+                blks[ubi].ins[li.0 as usize] = Ins::new1(O::Ocopy, k, l_arg1, [l_arg0]);
+                //t.nuse -= 1; // Hrmmm... TODO TODO TODO
+                tmps[ti].ndef += 1;
             } else {
                 // Skipped all instruction other than load/store above
                 assert!(isload(l_op));
@@ -121,7 +123,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                 if k == KX {
                     let t_name: &[u8] = {
                         if let Ref::RTmp(l_arg0_ti) = l_arg0 {
-                            &f.tmp(l_arg0_ti).name
+                            &tmps[l_arg0_ti].name
                         } else {
                             b"<unknown>"
                         }
@@ -138,7 +140,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                     O::Oload => false,
                     _ => true,
                 };
-                f.blk_mut(ubi).ins[li.0 as usize].op = {
+                blks[ubi].ins[li.0 as usize].op = {
                     if use_extend {
                         O::from_repr((O::Oextsb as u8) + ((l_op as u8) - (O::Oloadsb as u8)))
                             .unwrap()
