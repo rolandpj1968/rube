@@ -772,7 +772,7 @@ pub fn bsiter(bs: &BSet, elt: &mut u32) -> bool {
 
 pub fn dumpts(bs: &BSet, tmps: &[Tmp], f: &mut dyn Write) {
     let _ = write!(f, "[");
-    let mut t: u32 = TMP0;
+    let mut t: u32 = TMP0 as u32;
     while bsiter(bs, &mut t) {
         let _ = write!(f, " {}", to_s(&tmps[t as usize].name));
         t += 1;

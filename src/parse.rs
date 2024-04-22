@@ -13,7 +13,7 @@ use crate::all::{
     bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT,
     Dat, DatT, DatU, Fn, Ins, KExt, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target,
     Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW,
-    KX, NPUBOP, O, TMP0,
+    KX, NPUBOP, O, TMP0, TMP0IDX,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -789,9 +789,9 @@ impl Parser<'_> {
             if curf.tmp(ti).name == name {
                 return Ref::RTmp(ti);
             }
-            for ti in (TMP0..(curf.tmps.len() as u32)).rev() {
-                if curf.tmps[ti as usize].name == name {
-                    return Ref::RTmp(TmpIdx::new(ti as usize));
+            for ti in (TMP0..curf.tmps.len()).rev() {
+                if curf.tmps[ti].name == name {
+                    return Ref::RTmp(TmpIdx::new(ti));
                 }
             }
         }
@@ -1482,7 +1482,8 @@ impl Parser<'_> {
         self.cur_bi = BlkIdx::NONE;
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
         let mut curf = Fn::new(lnk.clone());
-        for i in 0..TMP0 {
+        for i in 0..(TMP0 as u32) {
+            /* TODO jus use usize for targ.fpr0 etc. */
             if self.targ.fpr0 <= i && i < self.targ.fpr0 + self.targ.nfpr {
                 // Ugh, returns Ref
                 let _ = newtmpref(b"", false, KD, &mut curf);
@@ -1951,14 +1952,14 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
 }
 
 // TODO - remove pub
-pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &Ref) {
+pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Ref) {
     match r {
         Ref::R => assert!(false),
         Ref::RTmp(ti) => {
-            if ti.0 < TMP0 {
+            if ti < TMP0IDX {
                 let _ = write!(f, "R{}", ti.0);
             } else {
-                let _ = write!(f, "%{}", to_s(&fn_.tmp(*ti).name));
+                let _ = write!(f, "%{}", to_s(&fn_.tmp(ti).name));
             }
         }
         Ref::RCon(ci) => {
@@ -1966,11 +1967,11 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &R
                 //(req(r, UNDEF)) { TODO - this seems missing
                 let _ = write!(f, "UNDEF");
             } else {
-                printcon(f, itbl, fn_.con(*ci));
+                printcon(f, itbl, fn_.con(ci));
             }
         }
         Ref::RSlot(i) => {
-            let _ = write!(f, "S{}", *i);
+            let _ = write!(f, "S{}", i);
         }
         Ref::RCall(n) => {
             let _ = write!(f, "{:04x}", n);
@@ -1980,7 +1981,7 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &R
         }
         Ref::RMem(mi) => {
             let mut i: bool = false;
-            let m: &Mem = fn_.mem(*mi);
+            let m: &Mem = fn_.mem(mi);
             let _ = write!(f, "[");
             if m.offset.type_ != ConT::CUndef {
                 printcon(f, itbl, &m.offset);
@@ -1990,7 +1991,7 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &R
                 if i {
                     let _ = write!(f, " + ");
                 }
-                printref(f, fn_, typ, itbl, &m.base);
+                printref(f, fn_, typ, itbl, m.base);
                 i = true;
             }
             if m.index != Ref::R {
@@ -1998,12 +1999,12 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: &R
                     let _ = write!(f, " + ");
                 }
                 let _ = write!(f, "{} * ", m.scale);
-                printref(f, fn_, typ, itbl, &m.index);
+                printref(f, fn_, typ, itbl, m.index);
             }
             let _ = write!(f, "]");
         }
         Ref::RInt(i) => {
-            let _ = write!(f, "{}", *i);
+            let _ = write!(f, "{}", i);
         }
     }
 }
@@ -2057,7 +2058,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
         while pi != PhiIdx::NONE {
             let p: &Phi = fn_.phi(pi);
             let _ = write!(f, "\t");
-            printref(f, fn_, typ, itbl, &p.to);
+            printref(f, fn_, typ, itbl, p.to);
             let _ = write!(f, " ={} phi ", KTOC[p.cls as usize]);
             assert!(!p.args.is_empty());
             assert!(p.args.len() == p.blks.len());
@@ -2065,7 +2066,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 let bi: BlkIdx = p.blks[n];
                 let pb = fn_.blk(bi);
                 let _ = write!(f, "@{} ", to_s(&pb.name));
-                printref(f, fn_, typ, itbl, &p.args[n]);
+                printref(f, fn_, typ, itbl, p.args[n]);
                 if n != p.args.len() - 1 {
                     let _ = write!(f, ", ");
                 }
@@ -2076,7 +2077,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
         for i in &b.ins {
             let _ = write!(f, "\t");
             if i.to != Ref::R {
-                printref(f, fn_, typ, itbl, &i.to);
+                printref(f, fn_, typ, itbl, i.to);
                 let _ = write!(f, " ={} ", KTOC[i.cls as usize]);
             }
             assert!(!OPTAB[i.op as usize].name.is_empty());
@@ -2099,11 +2100,11 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             if i.args[0] != Ref::R {
                 let _ = write!(f, " ");
-                printref(f, fn_, typ, itbl, &i.args[0]);
+                printref(f, fn_, typ, itbl, i.args[0]);
             }
             if i.args[1] != Ref::R {
                 let _ = write!(f, ", ");
-                printref(f, fn_, typ, itbl, &i.args[1]);
+                printref(f, fn_, typ, itbl, i.args[1]);
             }
             let _ = writeln!(f);
         }
@@ -2122,7 +2123,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 let _ = write!(f, "\t{}", JTOA[b.jmp.type_ as usize]);
                 if b.jmp.type_ != J::Jret0 || b.jmp.arg != Ref::R {
                     let _ = write!(f, " ");
-                    printref(f, fn_, typ, itbl, &b.jmp.arg);
+                    printref(f, fn_, typ, itbl, b.jmp.arg);
                 }
                 if b.jmp.type_ == J::Jretc {
                     let _ = write!(f, ", :{}", to_s(&typ[fn_.retty.0 as usize].name));
@@ -2141,7 +2142,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             _ => {
                 let _ = write!(f, "\t{} ", JTOA[b.jmp.type_ as usize]);
                 if b.jmp.type_ == J::Jjnz {
-                    printref(f, fn_, typ, itbl, &b.jmp.arg);
+                    printref(f, fn_, typ, itbl, b.jmp.arg);
                     let _ = write!(f, ", ");
                 }
                 assert!(b.s1 != BlkIdx::NONE && b.s2 != BlkIdx::NONE);

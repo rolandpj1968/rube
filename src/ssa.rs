@@ -145,9 +145,9 @@ fn refindex(f: &mut Fn, ti: TmpIdx) -> Ref {
 fn phiins(f: &mut Fn) -> RubeResult<()> {
     let mut blist: Vec<BlkIdx> = vec![BlkIdx::NONE; f.blks.len()];
     let be: usize = f.blks.len();
-    let nt: u32 = f.tmps.len() as u32;
+    let nt: usize = f.tmps.len();
     for tii in TMP0..nt {
-        let ti: TmpIdx = TmpIdx::new(tii as usize);
+        let ti: TmpIdx = TmpIdx::new(tii);
         f.tmp_mut(ti).visit = TmpIdx::NONE;
         if f.tmp(ti).phi != TmpIdx::NONE {
             continue;
@@ -185,7 +185,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                     }
                 }
                 if to == rt {
-                    if !bshas(&f.blk(bi).out, tii) {
+                    if !bshas(&f.blk(bi).out, tii as u32) {
                         r = refindex(f, ti);
                         f.blk_mut(bi).ins[ii].to = r;
                     } else {

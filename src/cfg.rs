@@ -60,6 +60,7 @@ fn rporec(blks: &mut [Blk], bi: BlkIdx, mut x: u32) -> u32 {
 
     let swap_s1_s2: bool = {
         let b: &Blk = &blks[bi];
+        // TODO - check signedness of .loop_ - might need u32::MAX < 0
         b.s1 != BlkIdx::NONE && b.s2 != BlkIdx::NONE && blks[b.s1].loop_ > blks[b.s2].loop_
     };
     if swap_s1_s2 {

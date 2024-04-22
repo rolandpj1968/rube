@@ -288,7 +288,7 @@ pub fn coalesce(f: &mut Fn) {
      */
     // nsl = 0;
     let mut sl: Vec<Slot> = vec![];
-    for n in TMP0..(f.tmps.len() as u32) {
+    for n in TMP0..f.tmps.len() {
         let ti: TmpIdx = TmpIdx::new(n as usize);
         f.tmp_mut(ti).visit = TmpIdx::NONE; // Ugh, this is a slot index in sl here
         let ai: AliasIdx = f.tmp(ti).alias;

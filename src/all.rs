@@ -83,7 +83,8 @@ pub const fn bit(n: u32) -> Bits {
 }
 
 pub const RXX: u32 = 0;
-pub const TMP0: u32 = NBIT;
+pub const TMP0: usize = NBIT as usize;
+pub const TMP0IDX: TmpIdx = TmpIdx::new(TMP0);
 
 // TODO - just use BitSet
 pub type BSet = Vec<Bits>;
