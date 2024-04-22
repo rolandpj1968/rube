@@ -435,7 +435,7 @@ phicls(int t, Tmp *tmp)
 }
  */
 // TODO - what is this doing?
-pub fn phicls(ti: TmpIdx, tmps: &mut Vec<Tmp>) -> TmpIdx {
+pub fn phicls(ti: TmpIdx, tmps: &mut [Tmp]) -> TmpIdx {
     //int t1;
 
     let mut ti1: TmpIdx = tmps[ti.0 as usize].phi;

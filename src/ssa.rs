@@ -45,8 +45,12 @@ fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: u32) {
  * must not change .visit fields
  */
 pub fn filluse(f: &mut Fn) {
+    let blks: &mut [Blk] = &mut f.blks;
+    let phis: &mut [Phi] = &mut f.phis;
+    let tmps: &mut [Tmp] = &mut f.tmps;
+
     /* todo, is this the correct file? */
-    for tmp in f.tmps.iter_mut().skip(TMP0 as usize) {
+    for tmp in tmps.iter_mut().skip(TMP0 as usize) {
         // TODO - Tmp::clear()???
         tmp.def = InsIdx::NONE; // QBE initialises with 0
         tmp.bid = u32::MAX;
@@ -59,26 +63,28 @@ pub fn filluse(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let (bid, mut pi) = {
-            let b: &Blk = f.blk(bi);
-            (b.id, b.phi)
-        };
+        // let (bid, mut pi) = {
+        //     let b: &Blk = f.blk(bi);
+        //     (b.id, b.phi)
+        // };
+        let bid: u32 = blks[bi].id;
+        let mut pi: PhiIdx = blks[bi].phi;
         while pi != PhiIdx::NONE {
-            let cls = f.phi(pi).cls;
-            if let Ref::RTmp(mut tip) = f.phi(pi).to {
+            let cls = phis[pi].cls;
+            if let Ref::RTmp(mut tip) = phis[pi].to {
                 {
-                    let tmp: &mut Tmp = f.tmp_mut(tip);
+                    let tmp: &mut Tmp = &mut tmps[tip];
                     tmp.bid = bid;
                     tmp.ndef += 1;
                     tmp.cls = cls;
                 }
-                tip = phicls(tip, &mut f.tmps);
-                for a in 0..f.phi(pi).args.len() {
-                    if let Ref::RTmp(mut ti) = f.phi(pi).args[a] {
-                        adduse(f.tmp_mut(ti), UseT::UPhi(pi), bi, bid);
-                        ti = phicls(ti, &mut f.tmps);
+                tip = phicls(tip, tmps);
+                for a in 0..phis[pi].args.len() {
+                    if let Ref::RTmp(mut ti) = phis[pi].args[a] {
+                        adduse(&mut tmps[ti], UseT::UPhi(pi), bi, bid);
+                        ti = phicls(ti, tmps);
                         if ti != tip {
-                            f.tmp_mut(ti).phi = tip;
+                            tmps[ti].phi = tip;
                         }
                     }
                 }
@@ -87,12 +93,12 @@ pub fn filluse(f: &mut Fn) {
                 assert!(false);
             }
 
-            pi = f.phi(pi).link;
+            pi = phis[pi].link;
         }
 
-        for ii in 0..f.blk(bi).ins.len() {
+        for ii in 0..blks[bi].ins.len() {
             let (to, op, cls) = {
-                let i: &Ins = &f.blk(bi).ins[ii];
+                let i: &Ins = &blks[bi].ins[ii];
                 (i.to, i.op, i.cls)
             };
             if to != Ref::R {
@@ -110,7 +116,7 @@ pub fn filluse(f: &mut Fn) {
                             w = TmpWdth::WFull;
                         }
                     }
-                    let tmp: &mut Tmp = f.tmp_mut(ti);
+                    let tmp: &mut Tmp = &mut tmps[ti];
                     tmp.width = w;
                     tmp.def = InsIdx(ii as u32);
                     tmp.bid = bid;
@@ -121,18 +127,18 @@ pub fn filluse(f: &mut Fn) {
                     assert!(false);
                 }
             }
-            for arg in f.blk(bi).ins[ii].args {
+            for arg in blks[bi].ins[ii].args {
                 if let Ref::RTmp(ti) = arg {
-                    adduse(f.tmp_mut(ti), UseT::UIns(InsIdx(ii as u32)), bi, bid);
+                    adduse(&mut tmps[ti], UseT::UIns(InsIdx(ii as u32)), bi, bid);
                 }
             }
         }
 
-        if let Ref::RTmp(ti) = f.blk(bi).jmp.arg {
-            adduse(f.tmp_mut(ti), UseT::UJmp, bi, bid);
+        if let Ref::RTmp(ti) = blks[bi].jmp.arg {
+            adduse(&mut tmps[ti], UseT::UJmp, bi, bid);
         }
 
-        bi = f.blk(bi).link;
+        bi = blks[bi].link;
     }
 }
 
