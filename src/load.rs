@@ -552,7 +552,7 @@ fn def(
         // I suspect to should be r's ti, not 0???
         // Maybe for phi's, QBE gets "to" from UPhi(p.to)
         ilog.push(Insert::new(
-            TmpIdx(0), /*TODO*/
+            TmpIdx::new(0), /*TODO*/
             f.blk(bi).id,
             InsIdx(0),
             InsertU::Phi(UPhi { m: *sl, pi }),

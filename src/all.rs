@@ -22,31 +22,12 @@ pub fn to_s(raw: &[u8]) -> String {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Idx<T>(pub u32, PhantomData<T>);
 
-impl <T> Idx<T> {
+impl<T> Idx<T> {
+    pub const fn new(i: usize) -> Idx<T> {
+        debug_assert!(i < u32::MAX as usize);
+        Idx::<T>(i as u32, PhantomData)
+    }
     pub const NONE: Idx<T> = Idx::<T>(u32::MAX, PhantomData);
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BlkTag {}
-
-impl Index<Idx<BlkTag>> for [Blk] {
-    type Output = Blk;
-    fn index(&self, index: Idx<BlkTag>) -> &Self::Output {
-        self.index(index.0 as usize)
-    }
-}
-
-impl Index<Idx<BlkTag>> for Vec<Blk> {
-    type Output = Blk;
-    fn index(&self, index: Idx<BlkTag>) -> &Self::Output {
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<Idx<BlkTag>> for Vec<Blk> {
-    fn index_mut(&mut self, index: Idx<BlkTag>) -> &mut Self::Output {
-        self.index_mut(index.0 as usize)
-    }
 }
 
 const BLKIDX0: Idx<BlkTag> = Idx::<BlkTag>(0, PhantomData);
@@ -645,7 +626,42 @@ impl Blk {
 //     pub const NONE: BlkIdx = BlkIdx(u32::MAX);
 // }
 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Tag<T>(PhantomData<T>);
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BlkTag();
+// Index into Fn::blks
 pub type BlkIdx = Idx<BlkTag>;
+
+impl Index<BlkIdx> for [Blk] {
+    type Output = Blk;
+    fn index(&self, index: BlkIdx) -> &Self::Output {
+        debug_assert!(index != BlkIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<BlkIdx> for [Blk] {
+    fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
+        debug_assert!(index != BlkIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+impl Index<BlkIdx> for Vec<Blk> {
+    type Output = Blk;
+    fn index(&self, index: BlkIdx) -> &Self::Output {
+        debug_assert!(index != BlkIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<BlkIdx> for Vec<Blk> {
+    fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
+        debug_assert!(index != BlkIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
 
 /*
 struct Use {
@@ -841,13 +857,48 @@ impl Tmp {
     }
 }
 
-// Index in Fn::tmps
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct TmpIdx(pub u32);
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TmpTag();
+// Index into Fn::tmps
+pub type TmpIdx = Idx<TmpTag>;
 
-impl TmpIdx {
-    pub const NONE: TmpIdx = TmpIdx(u32::MAX);
+impl Index<TmpIdx> for [Tmp] {
+    type Output = Tmp;
+    fn index(&self, index: TmpIdx) -> &Self::Output {
+        debug_assert!(index != TmpIdx::NONE);
+        self.index(index.0 as usize)
+    }
 }
+
+impl IndexMut<TmpIdx> for [Tmp] {
+    fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {
+        debug_assert!(index != TmpIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+impl Index<TmpIdx> for Vec<Tmp> {
+    type Output = Tmp;
+    fn index(&self, index: TmpIdx) -> &Self::Output {
+        debug_assert!(index != TmpIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<TmpIdx> for Vec<Tmp> {
+    fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {
+        debug_assert!(index != TmpIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+// Index in Fn::tmps
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// pub struct TmpIdx(pub u32);
+
+// impl TmpIdx {
+//     pub const NONE: TmpIdx = TmpIdx(u32::MAX);
+// }
 
 #[derive(Debug, PartialEq)]
 #[repr(u8)]
@@ -978,7 +1029,7 @@ impl Fn {
     }
 
     pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
-        let bi: BlkIdx = Idx::<BlkTag>(self.blks.len() as u32, PhantomData);
+        let bi: BlkIdx = BlkIdx::new(self.blks.len());
         self.blks.push(b);
         bi
     }
@@ -1034,7 +1085,7 @@ impl Fn {
     }
 
     pub fn add_tmp(&mut self, t: Tmp) -> TmpIdx {
-        let ti: TmpIdx = TmpIdx(self.tmps.len() as u32);
+        let ti: TmpIdx = TmpIdx::new(self.tmps.len());
         self.tmps.push(t);
         ti
     }

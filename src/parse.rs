@@ -791,7 +791,7 @@ impl Parser<'_> {
             }
             for ti in (TMP0..(curf.tmps.len() as u32)).rev() {
                 if curf.tmps[ti as usize].name == name {
-                    return Ref::RTmp(TmpIdx(ti));
+                    return Ref::RTmp(TmpIdx::new(ti as usize));
                 }
             }
         }

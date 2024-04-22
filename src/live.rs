@@ -91,7 +91,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             {
                 let mut ti: u32 = 0;
                 while bsiter(&f.blk(bi).in_, &mut ti) {
-                    nlv[kbase(f.tmp(TmpIdx(ti)).cls) as usize] += 1;
+                    nlv[kbase(f.tmp(TmpIdx::new(ti as usize)).cls) as usize] += 1;
                     ti += 1;
                 }
             }

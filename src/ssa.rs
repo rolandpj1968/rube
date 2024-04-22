@@ -147,7 +147,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     let be: usize = f.blks.len();
     let nt: u32 = f.tmps.len() as u32;
     for tii in TMP0..nt {
-        let ti: TmpIdx = TmpIdx(tii);
+        let ti: TmpIdx = TmpIdx::new(tii as usize);
         f.tmp_mut(ti).visit = TmpIdx::NONE;
         if f.tmp(ti).phi != TmpIdx::NONE {
             continue;

@@ -289,14 +289,14 @@ pub fn coalesce(f: &mut Fn) {
     // nsl = 0;
     let mut sl: Vec<Slot> = vec![];
     for n in TMP0..(f.tmps.len() as u32) {
-        let ti: TmpIdx = TmpIdx(n);
+        let ti: TmpIdx = TmpIdx::new(n as usize);
         f.tmp_mut(ti).visit = TmpIdx::NONE; // Ugh, this is a slot index in sl here
         let ai: AliasIdx = f.tmp(ti).alias;
         let a: &Alias = f.alias(ai);
         if a.type_ == AliasT::ALoc && a.slot == ai && f.tmp(ti).bid == f.blk(f.start).id {
             if let AliasU::ALoc(aloc) = a.u {
                 if aloc.sz != -1 {
-                    f.tmp_mut(ti).visit = TmpIdx(sl.len() as u32); // TODO - this is NOT a TmpIdx
+                    f.tmp_mut(ti).visit = TmpIdx::new(sl.len()); // TODO - this is NOT a TmpIdx
                     sl.push(Slot {
                         ti,
                         sz: aloc.sz,
@@ -549,7 +549,7 @@ pub fn coalesce(f: &mut Fn) {
              * reset it before the slot()
              * calls below
              */
-            t.visit = TmpIdx(si as u32); // Not actually a TmpIdx here :(
+            t.visit = TmpIdx::new(si); // Not actually a TmpIdx here :(
             assert!(t.ndef == 1 && t.def != InsIdx::NONE);
             (t.def, t.bid)
         };
