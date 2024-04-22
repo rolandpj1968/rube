@@ -32,14 +32,20 @@ fn liveon(blks: &mut [Blk], phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) 
     }
 }
 
-fn bset(/*blks: &mut [Blk],*/ tmps: &[Tmp], r: Ref, b: &mut Blk, nlv: &mut [u32; 2]) {
-    //let b: &mut Blk = &mut blks[bi];
+fn bset(tmps: &[Tmp], r: Ref, b: &mut Blk, nlv: &mut [u32; 2]) {
     if let Ref::RTmp(ti) = r {
         bsset(&mut b.gen, ti.usize());
         if !bshas(&b.in_, ti.usize()) {
             nlv[kbase(tmps[ti].cls) as usize] += 1;
             bsset(&mut b.in_, ti.usize());
         }
+    }
+}
+
+fn add_liveon_succ_out(blks: &mut [Blk], phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
+    if si != BlkIdx::NONE {
+        liveon(blks, phis, v, bi, si);
+        bsunion(&mut blks[bi].out, v);
     }
 }
 
@@ -74,15 +80,9 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
         for n in (0..f.rpo.len()).rev() {
             let bi: BlkIdx = f.rpo[n];
             bscopy(&mut u, &blks[bi].out);
-            let (s1, s2) = blks[bi].s1_s2();
-            if s1 != BlkIdx::NONE {
-                liveon(blks, phis, &mut v, bi, blks[bi].s1);
-                bsunion(&mut blks[bi].out, &v);
-            }
-            if s2 != BlkIdx::NONE {
-                liveon(blks, phis, &mut v, bi, blks[bi].s2);
-                bsunion(&mut blks[bi].out, &v);
-            }
+            // Ugh, crying for succs iter
+            add_liveon_succ_out(blks, phis, &mut v, bi, blks[bi].s1);
+            add_liveon_succ_out(blks, phis, &mut v, bi, blks[bi].s2);
             chg = chg || !bsequal(&blks[bi].out, &u);
 
             let mut nlv: [u32; 2] = [0; 2];
@@ -107,7 +107,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                     assert!(bscount(&b.in_) == targ.nrglob && b.in_[0] == targ.rglob);
                     b.in_[0] |= (targ.retregs)(jmp_arg, &nlv); // TODO not implemented
                 } else {
-                    bset(/*blks,*/ tmps, jmp_arg, &mut blks[bi], &mut nlv);
+                    bset(tmps, jmp_arg, &mut blks[bi], &mut nlv);
                 }
             }
 
@@ -163,11 +163,11 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                                 let mem: &Mem = &mems[ma];
                                 (mem.base, mem.index)
                             };
-                            bset(/*blks,*/ tmps, base, &mut blks[bi], &mut nlv);
-                            bset(/*blks,*/ tmps, index, &mut blks[bi], &mut nlv);
+                            bset(tmps, base, &mut blks[bi], &mut nlv);
+                            bset(tmps, index, &mut blks[bi], &mut nlv);
                         }
                         _ => {
-                            bset(/*blks,*/ tmps, argk, &mut blks[bi], &mut nlv);
+                            bset(tmps, argk, &mut blks[bi], &mut nlv);
                         }
                     }
                 }
