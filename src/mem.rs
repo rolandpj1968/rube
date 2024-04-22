@@ -350,7 +350,7 @@ pub fn coalesce(f: &mut Fn) {
             }
             for iii in (0..f.blk(bi).ins.len()).rev() {
                 let i: Ins = f.blk(bi).ins[iii]; // note copy
-                let ii: InsIdx = InsIdx(iii as u32);
+                let ii: InsIdx = InsIdx::new(iii);
                 if i.op == O::Oargc {
                     ip -= 1;
                     load(f, i.args[1], u64::MAX, ip, &mut sl);

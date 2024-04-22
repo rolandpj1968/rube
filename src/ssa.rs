@@ -110,7 +110,7 @@ pub fn filluse(f: &mut Fn) {
                 }
                 let tmp: &mut Tmp = &mut tmps[ti];
                 tmp.width = w;
-                tmp.def = InsIdx(ii as u32);
+                tmp.def = InsIdx::new(ii);
                 tmp.bid = bid;
                 tmp.ndef += 1;
                 tmp.cls = i.cls;
@@ -120,7 +120,7 @@ pub fn filluse(f: &mut Fn) {
             }
             for arg in /*blks[bi].ins[ii]*/ i.args {
                 if let Ref::RTmp(ti) = arg {
-                    adduse(&mut tmps[ti], UseT::UIns(InsIdx(ii as u32)), bi, bid);
+                    adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, bid);
                 }
             }
         }

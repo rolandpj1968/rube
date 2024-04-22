@@ -296,14 +296,14 @@ fn def(
 
     if ii == InsIdx::NONE {
         // Bit naughty - this is out of range
-        ii = InsIdx(f.blk(bi).ins.len() as u32);
+        ii = InsIdx::new(f.blk(bi).ins.len());
     }
     let cls: KExt = if sl.sz > 4 { KL } else { KW };
     let msks: Bits = genmask(sl.sz as i32);
 
     let mut goto_load: bool = false;
-    while ii != InsIdx(0) && !goto_load {
-        ii = InsIdx(ii.0 - 1);
+    while ii != InsIdx::new(0) && !goto_load {
+        ii = InsIdx::new(ii.usize() - 1);
         // if debug {
         //     prindent(indent);
         //     println!(
@@ -326,8 +326,8 @@ fn def(
                 (storesz(&i), i.args[1], i.args[0])
             } else if i.op == O::Oblit1 {
                 if let Ref::RInt(blit1_i) = i.args[0] {
-                    assert!(ii != InsIdx(0));
-                    ii = InsIdx(ii.0 - 1);
+                    assert!(ii != InsIdx::new(0));
+                    ii = InsIdx::new(ii.usize() - 1);
                     i = f.blk(bi).ins[ii.0 as usize];
                     assert!(i.op == O::Oblit0);
                     (blit1_i.abs(), i.args[1], Ref::R)
@@ -554,7 +554,7 @@ fn def(
         ilog.push(Insert::new(
             TmpIdx::new(0), /*TODO*/
             f.blk(bi).id,
-            InsIdx(0),
+            InsIdx::new(0), // NONE???
             InsertU::Phi(UPhi { m: *sl, pi }),
         ));
         for np in 0..f.blk(bi).preds.len() {
@@ -571,7 +571,7 @@ fn def(
             let l: Loc = Loc {
                 type_: l_type,
                 bi: bpi,
-                off: InsIdx(f.blk(bpi).ins.len() as u32),
+                off: InsIdx::new(f.blk(bpi).ins.len()),
             };
             let r1: Ref = def(
                 f,
@@ -676,7 +676,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                     sz: sz as i16,
                     cls: i.cls,
                 };
-                let ii: InsIdx = InsIdx(iii as u32);
+                let ii: InsIdx = InsIdx::new(iii);
                 let l: Loc = Loc {
                     type_: LocT::LRoot,
                     off: ii,
@@ -733,7 +733,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             isti += 1;
             ist = &mut ilog[isti];
         }
-        let mut ni: InsIdx = InsIdx(0);
+        let mut ni: InsIdx = InsIdx::new(0);
         // nt = 0; ??? what's this
         let mut ib: Vec<Ins> = vec![];
         loop {
@@ -749,11 +749,11 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 isti += 1;
                 ist = &mut ilog[isti];
             } else {
-                if ni == InsIdx(f.blk(bi).ins.len() as u32) {
+                if ni == InsIdx::new(f.blk(bi).ins.len()) {
                     break;
                 }
                 i = f.blk(bi).ins[ni.0 as usize];
-                ni = InsIdx(ni.0 + 1);
+                ni = InsIdx::new(ni.usize() + 1);
                 if isload(i.op) && i.args[1] != Ref::R {
                     // TODO same code in mem.rs
                     let ext: O =
