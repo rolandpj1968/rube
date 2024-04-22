@@ -159,10 +159,10 @@ fn store(f: &mut Fn, r: Ref, sz: i32) {
         if a_slot != AliasIdx::NONE {
             assert!(astack(a_type) != 0);
             let m: Bits = {
-                if (sz as u32) >= NBIT || (a_offset < 0 || a_offset >= NBIT as i64) {
+                if sz >= (NBIT as i32) || (a_offset < 0 || a_offset >= (NBIT as i64)) {
                     u64::MAX
                 } else {
-                    (bit(sz as u32) - 1) << a_offset
+                    (bit(sz as usize) - 1) << a_offset
                 }
             };
             let aslot: &mut Alias = f.alias_mut(a_slot);

@@ -625,8 +625,8 @@ fn popcnt(mut b: Bits) -> u32 {
     (b & 0xff) as u32
 }
 
-fn firstbit(mut b: Bits) -> u32 {
-    let mut n: u32 = 0;
+fn firstbit(mut b: Bits) -> usize {
+    let mut n: usize = 0;
     if (b & 0xffffffff) == 0 {
         n += 32;
         b >>= 32;
@@ -643,7 +643,7 @@ fn firstbit(mut b: Bits) -> u32 {
         n += 4;
         b >>= 4;
     }
-    static FIRST_BIT: [u32; 16] = [4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0];
+    static FIRST_BIT: [usize; 16] = [4, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0];
     n + FIRST_BIT[(b & 0xf) as usize]
 }
 
@@ -662,8 +662,8 @@ bsmax(BSet *bs)
     return bs->nt * NBit;
 }
  */
-fn bsmax(bs: &BSet) -> u32 {
-    (bs.len() as u32) * NBIT
+fn bsmax(bs: &BSet) -> usize {
+    bs.len() * NBIT
 }
 
 /*
@@ -675,14 +675,14 @@ bsset(BSet *bs, uint elt)
 }
  */
 
-pub fn bsset(bs: &mut BSet, elt: u32) {
+pub fn bsset(bs: &mut BSet, elt: usize) {
     assert!(elt < bsmax(bs));
     bs[(elt / NBIT) as usize] |= bit(elt % NBIT);
 }
 
-pub fn bsclr(bs: &mut BSet, elt: u32) {
+pub fn bsclr(bs: &mut BSet, elt: usize) {
     assert!(elt < bsmax(bs));
-    bs[(elt / NBIT) as usize] &= !bit(elt % NBIT);
+    bs[elt / NBIT] &= !bit(elt % NBIT);
 }
 
 /*
@@ -751,20 +751,20 @@ bszero(BSet *bs)
  *
  */
 // TODO - maybe elt: &mut TmpIdx???
-pub fn bsiter(bs: &BSet, elt: &mut u32) -> bool {
-    let i: u32 = *elt;
-    let mut t: u32 = i / NBIT;
-    if (t as usize) >= bs.len() {
+pub fn bsiter(bs: &BSet, elt: &mut usize) -> bool {
+    let i: usize = *elt;
+    let mut t: usize = i / NBIT;
+    if t >= bs.len() {
         return false;
     }
-    let mut b: Bits = bs[t as usize];
+    let mut b: Bits = bs[t];
     b &= !(bit(i % NBIT) - 1);
     while b == 0 {
         t += 1;
-        if (t as usize) >= bs.len() {
+        if t >= bs.len() {
             return false;
         }
-        b = bs[t as usize];
+        b = bs[t];
     }
     *elt = NBIT * t + firstbit(b);
     true
@@ -772,7 +772,7 @@ pub fn bsiter(bs: &BSet, elt: &mut u32) -> bool {
 
 pub fn dumpts(bs: &BSet, tmps: &[Tmp], f: &mut dyn Write) {
     let _ = write!(f, "[");
-    let mut t: u32 = TMP0 as u32;
+    let mut t: usize = TMP0;
     while bsiter(bs, &mut t) {
         let _ = write!(f, " {}", to_s(&tmps[t as usize].name));
         t += 1;

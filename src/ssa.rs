@@ -185,12 +185,12 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                     }
                 }
                 if to == rt {
-                    if !bshas(&f.blk(bi).out, tii as u32) {
+                    if !bshas(&f.blk(bi).out, tii) {
                         r = refindex(f, ti);
                         f.blk_mut(bi).ins[ii].to = r;
                     } else {
-                        if !bshas(&u, f.blk(bi).id) {
-                            bsset(&mut u, f.blk(bi).id);
+                        if !bshas(&u, f.blk(bi).id as usize) {
+                            bsset(&mut u, f.blk(bi).id as usize);
                             bp -= 1;
                             blist[bp] = bi;
                         }
@@ -211,18 +211,19 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             f.tmp_mut(ti).visit = ti;
             let bi: BlkIdx = blist[bp];
             bp += 1;
-            bsclr(&mut u, f.blk(bi).id);
+            bsclr(&mut u, f.blk(bi).id as usize);
             for n in 0..f.blk(bi).frons.len() {
                 let ai: BlkIdx = f.blk(bi).frons[n];
                 let a_visit = f.blk(ai).visit;
                 f.blk_mut(ai).visit += 1;
-                if a_visit == 0 && bshas(&f.blk(ai).in_, ti.0) {
+                // TODO TODO TODO - this is deeply dodge - a TmpIndex in a bitset of blk id's???
+                if a_visit == 0 && bshas(&f.blk(ai).in_, ti.usize()) {
                     let a_pi: PhiIdx = f.blk(ai).phi;
                     let pi: PhiIdx = f.add_phi(Phi::new(rt, vec![], vec![], k, a_pi));
                     f.blk_mut(ai).phi = pi;
                     let a_id = f.blk(ai).id;
-                    if !bshas(&defs, a_id) && !bshas(&u, a_id) {
-                        bsset(&mut u, a_id);
+                    if !bshas(&defs, a_id as usize) && !bshas(&u, a_id as usize) {
+                        bsset(&mut u, a_id as usize);
                         bp -= 1;
                         blist[bp] = ai;
                     }

@@ -24,11 +24,15 @@ pub fn to_s(raw: &[u8]) -> String {
 pub struct Idx<T>(pub u32, PhantomData<T>);
 
 impl<T> Idx<T> {
+    pub const NONE: Idx<T> = Idx::<T>::new(u32::MAX as usize);
     pub const fn new(i: usize) -> Idx<T> {
         debug_assert!(i <= u32::MAX as usize);
         Idx::<T>(i as u32, PhantomData)
     }
-    pub const NONE: Idx<T> = Idx::<T>::new(u32::MAX as usize);
+    // Implement cast???
+    pub fn usize(self) -> usize {
+        self.0 as usize
+    }
 }
 
 const BLKIDX0: Idx<BlkTag> = Idx::<BlkTag>(0, PhantomData);
@@ -53,7 +57,7 @@ enum {
 };
  */
 
-pub const NBIT: u32 = 8 * std::mem::size_of::<Bits>() as u32;
+pub const NBIT: usize = 8 * std::mem::size_of::<Bits>();
 
 pub struct Target {
     pub name: &'static [u8],
@@ -78,7 +82,7 @@ pub struct Target {
     pub assym: &'static [u8],
 }
 
-pub const fn bit(n: u32) -> Bits {
+pub const fn bit(n: usize) -> Bits {
     (1 as Bits) << n
 }
 
@@ -1247,7 +1251,7 @@ impl Dat {
     }
 }
 
-pub fn bshas(bs: &BSet, elt: u32) -> bool {
-    assert!(elt < (bs.len() as u32) * NBIT);
-    (bs[(elt / NBIT) as usize] & bit(elt % NBIT)) != 0
+pub fn bshas(bs: &BSet, elt: usize) -> bool {
+    assert!(elt < bs.len() * NBIT);
+    bs[elt / NBIT] & bit(elt % NBIT) != 0
 }

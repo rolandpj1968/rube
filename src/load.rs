@@ -23,7 +23,7 @@ use crate::util::{getcon, newcon, newtmp, newtmpref};
 // TODO i32 is dodgy
 fn genmask(w: i32) -> Bits {
     assert!(0 <= w && w <= 8);
-    bit((8 * w - 1) as u32).wrapping_mul(2).wrapping_sub(1) /* must work when w==8 */
+    bit((8 * w - 1) as usize).wrapping_mul(2).wrapping_sub(1) /* must work when w==8 */
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

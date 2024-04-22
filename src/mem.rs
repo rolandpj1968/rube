@@ -356,12 +356,12 @@ pub fn coalesce(f: &mut Fn) {
                     load(f, i.args[1], u64::MAX, ip, &mut sl);
                 }
                 if isload(i.op) {
-                    let x: Bits = bit(loadsz(&i) as u32) - 1;
+                    let x: Bits = bit(loadsz(&i) as usize) - 1;
                     ip -= 1;
                     load(f, i.args[0], x, ip, &mut sl);
                 }
                 if isstore(i.op) {
-                    let x: Bits = bit(storesz(&i) as u32) - 1;
+                    let x: Bits = bit(storesz(&i) as usize) - 1;
                     store(f, i.args[1], x, ip, bi, ii, &mut sl);
                     ip -= 1;
                 }
@@ -369,10 +369,10 @@ pub fn coalesce(f: &mut Fn) {
                     assert!(f.blk(bi).ins[iii + 1].op == O::Oblit1); // TODO bounds check
                     if let Ref::RInt(rsval) = f.blk(bi).ins[iii + 1].args[0] {
                         let sz: i32 = rsval.abs();
-                        let x: Bits = if sz as u32 >= NBIT {
+                        let x: Bits = if sz >= (NBIT as i32) {
                             u64::MAX
                         } else {
-                            bit(sz as u32) - 1
+                            bit(sz as usize) - 1
                         };
                         store(f, i.args[1], x, ip, bi, ii, &mut sl);
                         ip -= 1;

@@ -1340,7 +1340,7 @@ impl Parser<'_> {
             let mut pb: BSet = bsinit(fn_.blks.len());
 
             for pred_bi in &b.preds {
-                bsset(&mut pb, pred_bi.0);
+                bsset(&mut pb, pred_bi.usize());
             }
             let mut pi = b.phi;
             while pi != PhiIdx::NONE {
@@ -1351,7 +1351,7 @@ impl Parser<'_> {
                     let mut ppb: BSet = bsinit(fn_.blks.len());
                     for n in 0..fn_.phi(pi).args.len() {
                         let pbi: BlkIdx = p.blks[n];
-                        if bshas(&ppb, pbi.0) {
+                        if bshas(&ppb, pbi.usize()) {
                             return Err(self.err(&format!(
                                 "multiple entries for @{} in phi %{}",
                                 to_s(&fn_.blk(pbi).name),
@@ -1371,7 +1371,7 @@ impl Parser<'_> {
                                 assert!(false);
                             }
                         }
-                        bsset(&mut ppb, pbi.0);
+                        bsset(&mut ppb, pbi.usize());
                     }
 
                     if !bsequal(&pb, &ppb) {
@@ -1930,6 +1930,7 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
         ConT::CBits => match c.bits {
             ConBits::None => assert!(false),
             ConBits::F(s) => {
+                // match QBE output of 0.0
                 let _ = if s == 0.0 {
                     write!(f, "0")
                 } else {

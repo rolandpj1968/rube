@@ -12,7 +12,7 @@ pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
     while pi != PhiIdx::NONE {
         let p: &Phi = f.phi(pi);
         if let Ref::RTmp(ti) = p.to {
-            bsclr(v, ti.0);
+            bsclr(v, ti.usize());
         }
         pi = f.phi(pi).link;
     }
@@ -22,8 +22,8 @@ pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
         for a in 0..f.phi(pi).args.len() {
             if f.phi(pi).blks[a] == bi {
                 if let Ref::RTmp(ati) = f.phi(pi).args[a] {
-                    bsset(v, ati.0);
-                    bsset(&mut f.blk_mut(bi).gen, ati.0);
+                    bsset(v, ati.usize());
+                    bsset(&mut f.blk_mut(bi).gen, ati.usize());
                 }
             }
         }
@@ -34,10 +34,10 @@ pub fn liveon(f: &mut Fn, v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
 // Hrmm, tmps is f.tmps???
 fn bset(f: &mut Fn, r: Ref, bi: BlkIdx, nlv: &mut [u32; 2]) {
     if let Ref::RTmp(ti) = r {
-        bsset(&mut f.blk_mut(bi).gen, ti.0);
-        if !bshas(&f.blk(bi).in_, ti.0) {
+        bsset(&mut f.blk_mut(bi).gen, ti.usize());
+        if !bshas(&f.blk(bi).in_, ti.usize()) {
             nlv[kbase(f.tmp(ti).cls) as usize] += 1;
-            bsset(&mut f.blk_mut(bi).in_, ti.0);
+            bsset(&mut f.blk_mut(bi).in_, ti.usize());
         }
     }
 }
@@ -89,7 +89,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             }
 
             {
-                let mut ti: u32 = 0;
+                let mut ti: usize = 0;
                 while bsiter(&f.blk(bi).in_, &mut ti) {
                     nlv[kbase(f.tmp(TmpIdx::new(ti as usize)).cls) as usize] += 1;
                     ti += 1;
@@ -146,11 +146,11 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                         }
                     };
                     //t = i->to.val;
-                    if bshas(&f.blk(bi).in_, ti.0) {
+                    if bshas(&f.blk(bi).in_, ti.usize()) {
                         nlv[kbase(f.tmp(ti).cls) as usize] -= 1;
                     }
-                    bsset(&mut f.blk_mut(bi).gen, ti.0);
-                    bsclr(&mut f.blk_mut(bi).in_, ti.0);
+                    bsset(&mut f.blk_mut(bi).gen, ti.usize());
+                    bsclr(&mut f.blk_mut(bi).in_, ti.usize());
                 }
                 for k in 0..2 {
                     let argk: Ref = [arg0, arg1][k];
