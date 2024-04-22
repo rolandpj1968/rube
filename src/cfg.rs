@@ -1,54 +1,35 @@
 use crate::all::{Blk, BlkIdx, Fn, Phi, PhiIdx};
 
-/*
-#include "all.h"
-
-Blk *
-newblk()
-{
-    static Blk z;
-    Blk *b;
-
-    b = alloc(sizeof *b);
-    *b = z;
-    return b;
+// Not pretty - would be better if s1, s2 were [BlkIndex; 2]
+fn succsdel(b: &mut Blk, bdi: BlkIdx) {
+    let mut succs = [&mut b.s1, &mut b.s2];
+    for si in succs.iter_mut().filter(|si| ***si == bdi) {
+        **si = BlkIdx::NONE;
+    }
 }
- */
 
-fn edgedel(f: &mut Fn, bsi: BlkIdx, bdi: BlkIdx) {
-    if bdi == BlkIdx::NONE {
-        return;
-    }
-    {
-        let b: &mut Blk = f.blk_mut(bsi);
-        if b.s1 == bdi {
-            b.s1 = BlkIdx::NONE;
-        }
-        if b.s2 == bdi {
-            b.s2 = BlkIdx::NONE;
-        }
-    }
-    let mut pi: PhiIdx = f.blk(bdi).phi;
+fn phisdel(phis: &mut [Phi], mut pi: PhiIdx, bsi: BlkIdx) {
     while pi != PhiIdx::NONE {
-        let p: &mut Phi = f.phi_mut(pi);
-        let mut a: usize = 0;
-        while p.blks[a] != bsi {
-            assert!(a + 1 < p.blks.len());
-            a += 1;
+        let p: &mut Phi = &mut phis[pi];
+        if let Some(a) = p.blks.iter().position(|bi| *bi == bsi) {
+            p.blks.remove(a);
+            p.args.remove(a);
         }
-        p.blks.remove(a);
-        p.args.remove(a);
-
         pi = p.link;
     }
-    let bd: &mut Blk = f.blk_mut(bdi);
-    if !bd.preds.is_empty() {
-        let mut a: usize = 0;
-        while bd.preds[a] != bsi {
-            assert!(a + 1 < bd.preds.len());
-            a += 1;
-        }
-        bd.preds.remove(a);
+}
+
+fn preddel(b: &mut Blk, bsi: BlkIdx) {
+    if let Some(a) = b.preds.iter().position(|pbi| *pbi == bsi) {
+        b.preds.remove(a);
+    }
+}
+
+fn edgedel(blks: &mut [Blk], phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
+    if bdi != BlkIdx::NONE {
+        succsdel(&mut blks[bsi], bdi);
+        phisdel(phis, blks[bdi].phi, bsi);
+        preddel(&mut blks[bdi], bsi);
     }
 }
 
@@ -72,23 +53,25 @@ pub fn fillpreds(f: &mut Fn) {
     }
 }
 
-fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
-    if bi == BlkIdx::NONE || f.blk(bi).id != u32::MAX {
+fn rporec(blks: &mut Vec<Blk>, bi: BlkIdx, mut x: u32) -> u32 {
+    if bi == BlkIdx::NONE || blks[bi].id != u32::MAX {
         return x;
     }
 
-    f.blk_mut(bi).id = 1;
-
-    let (mut s1, mut s2) = f.blk(bi).s1_s2();
-    if s1 != BlkIdx::NONE && s2 != BlkIdx::NONE && f.blk(s1).loop_ > f.blk(s2).loop_ {
-        (s1, s2) = (s2, s1);
+    let swap_s1_s2: bool = {
+        let b: &Blk = &blks[bi];
+        b.s1 != BlkIdx::NONE && b.s2 != BlkIdx::NONE && blks[b.s1].loop_ > blks[b.s2].loop_
+    };
+    if swap_s1_s2 {
+        (blks[bi].s1, blks[bi].s2) = (blks[bi].s2, blks[bi].s1);
     }
 
-    x = rporec(f, s1, x);
-    x = rporec(f, s2, x);
+    blks[bi].id = 1;
+    x = rporec(blks, blks[bi].s1, x);
+    x = rporec(blks, blks[bi].s2, x);
     assert!(x != u32::MAX);
 
-    f.blk_mut(bi).id = x;
+    blks[bi].id = x;
 
     // Deliberately wraps to u32:MAX
     x.wrapping_sub(1)
@@ -99,7 +82,7 @@ pub fn fillrpo(f: &mut Fn) {
     f.blks.iter_mut().for_each(|b| b.id = u32::MAX);
 
     // Deliberately wraps from u32::MAX
-    let n: u32 = rporec(f, f.start, f.nblk - 1).wrapping_add(1);
+    let n: u32 = rporec(&mut f.blks, f.start, f.nblk - 1).wrapping_add(1);
     f.nblk -= n;
     f.rpo = vec![BlkIdx::NONE; f.nblk as usize];
     let mut prev_bi = BlkIdx::NONE;
@@ -111,8 +94,10 @@ pub fn fillrpo(f: &mut Fn) {
         };
         if id == u32::MAX {
             // Unreachable Blk
-            edgedel(f, bi, s1);
-            edgedel(f, bi, s2);
+            // edgedel(f, bi, s1);
+            // edgedel(f, bi, s2);
+            edgedel(&mut f.blks, &mut f.phis, bi, s1);
+            edgedel(&mut f.blks, &mut f.phis, bi, s2);
             f.set_blk_link(prev_bi, next_bi);
             bi = next_bi;
         } else {
