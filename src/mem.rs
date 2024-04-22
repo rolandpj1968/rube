@@ -42,33 +42,37 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
     let tmps: &mut [Tmp] = &mut f.tmps;
 
     /* promote uniform stack slots to temporaries */
+    // TODO - ask QBE; only touches first/start Blk
     let bi: BlkIdx = f.start;
     'ins_loop: for ii in 0..blks[bi].ins.len() {
         let (i_op, i_to) = {
             let i: &Ins = &blks[bi].ins[ii];
             (i.op, i.to)
         };
+        // TODO isalloc
         if OALLOC > i_op || i_op > OALLOC1 {
             continue;
         }
         /* specific to NAlign == 3 */
+        /* TODO - what does this comment ^^^ mean */
         let ti = if let Ref::RTmp(ti0) = i_to {
             ti0
         } else {
-            // MUST be an RTmp - TODO - not sure why?
             assert!(false);
             continue 'ins_loop;
         };
 
-        if tmps[ti].ndef != 1 {
+        let t: &mut Tmp = &mut tmps[ti];
+
+        if t.ndef != 1 {
             continue 'ins_loop;
         }
         let mut k: KExt = KX;
         let mut s: i32 = -1; // TODO - what is this actually?
 
-        for u in &tmps[ti].uses {
+        for u in &t.uses {
             if let UseT::UIns(li) = u.type_ {
-                let l: &Ins = &blks[u.bi].ins[li.0 as usize];
+                let l: &Ins = &blks[u.bi].ins[li];
                 if isload(l.op) {
                     if s == -1 || s == loadsz(l) {
                         s = loadsz(l);
@@ -93,13 +97,14 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
 
         /* get rid of the alloc and replace uses */
         blks[bi].ins[ii] = Ins::new0(O::Onop, KW, Ref::R);
-        tmps[ti].ndef -= 1;
+        t.ndef -= 1;
 
-        for ui in 0..tmps[ti].uses.len() {
+        for ui in 0..t.uses.len() {
             let (utype_, ubi) = {
-                let u: &Use = &tmps[ti].uses[ui];
+                let u: &Use = &t.uses[ui];
                 (u.type_, u.bi)
             };
+            let ub: &mut Blk = &mut blks[ubi];
             let li = if let UseT::UIns(li0) = utype_ {
                 li0
             } else {
@@ -107,17 +112,17 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                 assert!(false);
                 continue;
             };
+            let l: &Ins = &ub.ins[li];
             let (l_op, l_cls, l_arg0, l_arg1) = {
-                let l: &Ins = &blks[ubi].ins[li.0 as usize];
+                let l: &Ins = &ub.ins[li];
                 (l.op, l.cls, l.args[0], l.args[1])
             };
-            //         l = u->u.ins;
             if isstore(l_op) {
-                blks[ubi].ins[li.0 as usize] = Ins::new1(O::Ocopy, k, l_arg1, [l_arg0]);
+                ub.ins[li] = Ins::new1(O::Ocopy, k, l_arg1, [l_arg0]);
                 //t.nuse -= 1; // Hrmmm... TODO TODO TODO
-                tmps[ti].ndef += 1;
+                t.ndef += 1;
             } else {
-                // Skipped all instruction other than load/store above
+                // Skipped all instructions other than load/store above
                 assert!(isload(l_op));
 
                 if k == KX {
@@ -140,7 +145,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                     O::Oload => false,
                     _ => true,
                 };
-                blks[ubi].ins[li.0 as usize].op = {
+                ub.ins[li].op = {
                     if use_extend {
                         O::from_repr((O::Oextsb as u8) + ((l_op as u8) - (O::Oloadsb as u8)))
                             .unwrap()
