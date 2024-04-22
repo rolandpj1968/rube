@@ -19,15 +19,16 @@ pub fn to_s(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).to_string()
 }
 
+// Typed index into blks, tmps, etc for type safety
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Idx<T>(pub u32, PhantomData<T>);
 
 impl<T> Idx<T> {
     pub const fn new(i: usize) -> Idx<T> {
-        debug_assert!(i < u32::MAX as usize);
+        debug_assert!(i <= u32::MAX as usize);
         Idx::<T>(i as u32, PhantomData)
     }
-    pub const NONE: Idx<T> = Idx::<T>(u32::MAX, PhantomData);
+    pub const NONE: Idx<T> = Idx::<T>::new(u32::MAX as usize);
 }
 
 const BLKIDX0: Idx<BlkTag> = Idx::<BlkTag>(0, PhantomData);
@@ -540,11 +541,46 @@ pub struct Phi {
     pub link: PhiIdx,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PhiIdx(pub u32); // Index into Fn::phis
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// pub struct PhiIdx(pub u32); // Index into Fn::phis
 
-impl PhiIdx {
-    pub const NONE: PhiIdx = PhiIdx(u32::MAX);
+// impl PhiIdx {
+//     pub const NONE: PhiIdx = PhiIdx(u32::MAX);
+// }
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PhiTag();
+// Index into Fn::phis
+pub type PhiIdx = Idx<PhiTag>;
+
+impl Index<PhiIdx> for [Phi] {
+    type Output = Phi;
+    fn index(&self, index: PhiIdx) -> &Self::Output {
+        debug_assert!(index != PhiIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<PhiIdx> for [Phi] {
+    fn index_mut(&mut self, index: PhiIdx) -> &mut Self::Output {
+        debug_assert!(index != PhiIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+impl Index<PhiIdx> for Vec<Phi> {
+    type Output = Phi;
+    fn index(&self, index: PhiIdx) -> &Self::Output {
+        debug_assert!(index != PhiIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<PhiIdx> for Vec<Phi> {
+    fn index_mut(&mut self, index: PhiIdx) -> &mut Self::Output {
+        debug_assert!(index != PhiIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -626,8 +662,6 @@ impl Blk {
 //     pub const NONE: BlkIdx = BlkIdx(u32::MAX);
 // }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Tag<T>(PhantomData<T>);
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlkTag();
 // Index into Fn::blks
@@ -999,7 +1033,7 @@ impl Fn {
     pub fn new(lnk: Lnk) -> Fn {
         Fn {
             blks: vec![],
-            phis: vec![],
+            phis: vec![], // TODO - should be on Blk
             aliases: vec![],
             start: BlkIdx::NONE,
             tmps: vec![],
@@ -1053,7 +1087,7 @@ impl Fn {
     }
 
     pub fn add_phi(&mut self, p: Phi) -> PhiIdx {
-        let pi: PhiIdx = PhiIdx(self.phis.len() as u32);
+        let pi: PhiIdx = PhiIdx::new(self.phis.len());
         self.phis.push(p);
         pi
     }
