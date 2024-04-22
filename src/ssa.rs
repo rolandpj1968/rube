@@ -63,28 +63,25 @@ pub fn filluse(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        // let (bid, mut pi) = {
-        //     let b: &Blk = f.blk(bi);
-        //     (b.id, b.phi)
-        // };
         let bid: u32 = blks[bi].id;
         let mut pi: PhiIdx = blks[bi].phi;
         while pi != PhiIdx::NONE {
-            let cls = phis[pi].cls;
-            if let Ref::RTmp(mut tip) = phis[pi].to {
+            let p: &Phi = &phis[pi];
+            let cls = p.cls;
+            if let Ref::RTmp(mut pti) = p.to {
                 {
-                    let tmp: &mut Tmp = &mut tmps[tip];
+                    let tmp: &mut Tmp = &mut tmps[pti];
                     tmp.bid = bid;
                     tmp.ndef += 1;
                     tmp.cls = cls;
                 }
-                tip = phicls(tip, tmps);
-                for a in 0..phis[pi].args.len() {
-                    if let Ref::RTmp(mut ti) = phis[pi].args[a] {
-                        adduse(&mut tmps[ti], UseT::UPhi(pi), bi, bid);
-                        ti = phicls(ti, tmps);
-                        if ti != tip {
-                            tmps[ti].phi = tip;
+                pti = phicls(pti, tmps);
+                for a in &p.args {
+                    if let Ref::RTmp(mut ati) = a {
+                        adduse(&mut tmps[ati], UseT::UPhi(pi), bi, bid);
+                        ati = phicls(ati, tmps);
+                        if ati != pti {
+                            tmps[ati].phi = pti;
                         }
                     }
                 }
@@ -93,41 +90,35 @@ pub fn filluse(f: &mut Fn) {
                 assert!(false);
             }
 
-            pi = phis[pi].link;
+            pi = p.link;
         }
 
-        for ii in 0..blks[bi].ins.len() {
-            let (to, op, cls) = {
-                let i: &Ins = &blks[bi].ins[ii];
-                (i.to, i.op, i.cls)
-            };
-            if to != Ref::R {
-                if let Ref::RTmp(ti) = to {
-                    let mut w: TmpWdth = TmpWdth::WFull;
-                    if isparbh(op) {
-                        w = TmpWdth::from_parbh(op);
-                    } else if isload(op) && op != O::Oload {
-                        w = TmpWdth::from_loadbh(op);
-                    } else if isext(op) {
-                        w = TmpWdth::from_ext(op);
-                    }
-                    if w == TmpWdth::Wsw || w == TmpWdth::Wuw {
-                        if cls == KW {
-                            w = TmpWdth::WFull;
-                        }
-                    }
-                    let tmp: &mut Tmp = &mut tmps[ti];
-                    tmp.width = w;
-                    tmp.def = InsIdx(ii as u32);
-                    tmp.bid = bid;
-                    tmp.ndef += 1;
-                    tmp.cls = cls;
-                } else {
-                    // Ins to must be R or RTmp
-                    assert!(false);
+        for (ii, i) in blks[bi].ins.iter().enumerate() {
+            if let Ref::RTmp(ti) = i.to {
+                let mut w: TmpWdth = TmpWdth::WFull;
+                if isparbh(i.op) {
+                    w = TmpWdth::from_parbh(i.op);
+                } else if isload(i.op) && i.op != O::Oload {
+                    w = TmpWdth::from_loadbh(i.op);
+                } else if isext(i.op) {
+                    w = TmpWdth::from_ext(i.op);
                 }
+                if w == TmpWdth::Wsw || w == TmpWdth::Wuw {
+                    if i.cls == KW {
+                        w = TmpWdth::WFull;
+                    }
+                }
+                let tmp: &mut Tmp = &mut tmps[ti];
+                tmp.width = w;
+                tmp.def = InsIdx(ii as u32);
+                tmp.bid = bid;
+                tmp.ndef += 1;
+                tmp.cls = i.cls;
+            } else {
+                // Ins i.to must be R or RTmp
+                assert!(i.to == Ref::R);
             }
-            for arg in blks[bi].ins[ii].args {
+            for arg in /*blks[bi].ins[ii]*/ i.args {
                 if let Ref::RTmp(ti) = arg {
                     adduse(&mut tmps[ti], UseT::UIns(InsIdx(ii as u32)), bi, bid);
                 }
