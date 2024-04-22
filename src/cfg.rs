@@ -96,12 +96,7 @@ fn rporec(f: &mut Fn, bi: BlkIdx, mut x: u32) -> u32 {
 
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
-        let b: &mut Blk = f.blk_mut(bi);
-        b.id = u32::MAX;
-        bi = b.link;
-    }
+    f.blks.iter_mut().for_each(|b| b.id = u32::MAX);
 
     // Deliberately wraps from u32::MAX
     let n: u32 = rporec(f, f.start, f.nblk - 1).wrapping_add(1);
