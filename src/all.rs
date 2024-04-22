@@ -1035,11 +1035,46 @@ pub struct Addr {
 }
 
 pub type Mem = Addr;
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MemIdx(pub u32); // Index into Fn::mem
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// pub struct MemIdx(pub u32); // Index into Fn::mem
 
-impl MemIdx {
-    pub const NONE: MemIdx = MemIdx(u32::MAX);
+// impl MemIdx {
+//     pub const NONE: MemIdx = MemIdx(u32::MAX);
+// }
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MemTag();
+// Index into Fn::mems
+pub type MemIdx = Idx<MemTag>;
+
+impl Index<MemIdx> for [Mem] {
+    type Output = Mem;
+    fn index(&self, index: MemIdx) -> &Self::Output {
+        debug_assert!(index != MemIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl Index<&MemIdx> for [Mem] {
+    type Output = Mem;
+    fn index(&self, index: &MemIdx) -> &Self::Output {
+        debug_assert!(*index != MemIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<MemIdx> for [Mem] {
+    fn index_mut(&mut self, index: MemIdx) -> &mut Self::Output {
+        debug_assert!(index != MemIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+impl IndexMut<&MemIdx> for [Mem] {
+    fn index_mut(&mut self, index: &MemIdx) -> &mut Self::Output {
+        debug_assert!(*index != MemIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
 }
 
 #[derive(Clone)]
