@@ -309,7 +309,7 @@ fn getstk(
     stk: &mut [NameIdx],
 ) -> Ref {
     let mut ni: NameIdx = stk[ti.0 as usize];
-    while ni != NameIdx::INVALID && !dom(f, names[ni.0 as usize].bi, bi) {
+    while ni != NameIdx::INVALID && !dom(&f.blks, names[ni.0 as usize].bi, bi) {
         let ni1: NameIdx = ni;
         ni = names[ni.0 as usize].up;
         nfree(ni1, namel, names);
@@ -436,7 +436,7 @@ fn phicheck(f: &Fn, pi: PhiIdx, bi: BlkIdx, t: Ref) -> bool {
     for n in 0..p.args.len() {
         if p.args[n] == t {
             let bi1 = p.blks[n];
-            if bi1 != bi && !sdom(f, bi, bi1) {
+            if bi1 != bi && !sdom(&f.blks, bi, bi1) {
                 return true;
             }
         }
@@ -489,7 +489,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                         return Err(ssacheck_err(f, t, bui));
                     }
                 } else {
-                    if bui != bi && !sdom(f, bi, bui) {
+                    if bui != bi && !sdom(&f.blks, bi, bui) {
                         return Err(ssacheck_err(f, t, bui));
                     }
                 }
@@ -511,7 +511,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                                 }
                             }
                             _ => {
-                                if bui != bi && !sdom(f, bi, bui) {
+                                if bui != bi && !sdom(&f.blks, bi, bui) {
                                     return Err(ssacheck_err(f, t, bui));
                                 }
                             }

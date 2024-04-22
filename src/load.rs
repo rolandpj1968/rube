@@ -290,7 +290,7 @@ fn def(
      *     postdominates Blk il.bi (and by 2, the
      *     original load)
      */
-    assert!(dom(f, bi, il.bi));
+    assert!(dom(&f.blks, bi, il.bi));
     let oldl: usize = ilog.len();
     let oldt: usize = f.tmps.len();
 

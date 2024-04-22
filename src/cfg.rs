@@ -172,57 +172,61 @@ pub fn filldom(f: &mut Fn) {
     }
 }
 
-pub fn sdom(f: &Fn, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
+pub fn sdom(blks: &[Blk], b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
     assert!(b1i != BlkIdx::NONE && b2i != BlkIdx::NONE);
     if b1i == b2i {
         return false;
     }
-    while f.blk(b2i).id > f.blk(b1i).id {
-        b2i = f.blk(b2i).idom;
+    while blks[b2i].id > blks[b1i].id {
+        b2i = blks[b2i].idom;
     }
     b1i == b2i
 }
 
-pub fn dom(f: &Fn, b1i: BlkIdx, b2i: BlkIdx) -> bool {
-    b1i == b2i || sdom(f, b1i, b2i)
+pub fn dom(blks: &[Blk], b1i: BlkIdx, b2i: BlkIdx) -> bool {
+    b1i == b2i || sdom(blks, b1i, b2i)
 }
 
-pub fn addfron(f: &mut Fn, ai: BlkIdx, bi: BlkIdx) {
-    for froni in &f.blk(ai).frons {
+fn addfron(a: &mut Blk, bi: BlkIdx) {
+    for froni in &a.frons {
         if *froni == bi {
             return;
         }
     }
 
-    f.blk_mut(ai).frons.push(bi);
+    a.frons.push(bi);
 }
 
 /* fill the dominance frontier */
 pub fn fillfron(f: &mut Fn) {
-    let mut bi = f.start;
+    let blks: &mut [Blk] = &mut f.blks;
+
+    // TODO live blks only (but it doesn't matter)
+    blks.iter_mut().for_each(|b| b.frons.clear());
+    // let mut bi = f.start;
+    // while bi != BlkIdx::NONE {
+    //     let b: &mut Blk = f.blk_mut(bi);
+    //     b.frons.clear();
+    //     bi = b.link;
+    // }
+    let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let b: &mut Blk = f.blk_mut(bi);
-        b.frons.clear();
-        bi = b.link;
-    }
-    bi = f.start;
-    while bi != BlkIdx::NONE {
-        let (s1, s2) = f.blk(bi).s1_s2();
+        let (s1, s2) = (blks[bi].s1, blks[bi].s2);
         if s1 != BlkIdx::NONE {
             let mut ai = bi;
-            while !sdom(f, ai, s1) {
-                addfron(f, ai, s1);
-                ai = f.blk(ai).idom;
+            while !sdom(blks, ai, s1) {
+                addfron(&mut blks[ai], s1);
+                ai = blks[ai].idom;
             }
         }
         if s2 != BlkIdx::NONE {
             let mut ai = bi;
-            while !sdom(f, ai, s2) {
-                addfron(f, ai, s2);
-                ai = f.blk(ai).idom;
+            while !sdom(blks, ai, s2) {
+                addfron(&mut blks[ai], s2);
+                ai = blks[ai].idom;
             }
         }
-        bi = f.blk(bi).link;
+        bi = blks[bi].link;
     }
 }
 
