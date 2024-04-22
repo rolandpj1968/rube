@@ -45,17 +45,14 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
     // TODO - ask QBE; only touches first/start Blk
     let bi: BlkIdx = f.start;
     'ins_loop: for ii in 0..blks[bi].ins.len() {
-        let (i_op, i_to) = {
-            let i: &Ins = &blks[bi].ins[ii];
-            (i.op, i.to)
-        };
+        let i: &Ins = &blks[bi].ins[ii];
         // TODO isalloc
-        if OALLOC > i_op || i_op > OALLOC1 {
+        if OALLOC > i.op || i.op > OALLOC1 {
             continue;
         }
         /* specific to NAlign == 3 */
         /* TODO - what does this comment ^^^ mean */
-        let ti = if let Ref::RTmp(ti0) = i_to {
+        let ti = if let Ref::RTmp(ti0) = i.to {
             ti0
         } else {
             assert!(false);
@@ -79,7 +76,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                         continue;
                     }
                 } else if isstore(l.op) {
-                    if (i_to == l.args[1] && i_to != l.args[0])
+                    if (i.to == l.args[1] && i.to != l.args[0])
                         && (s == -1 || s == storesz(l))
                         && (k == KX || k == OPTAB[l.op as usize].argcls[0][0])
                     {
@@ -99,35 +96,28 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
         blks[bi].ins[ii] = Ins::new0(O::Onop, KW, Ref::R);
         t.ndef -= 1;
 
-        for ui in 0..t.uses.len() {
-            let (utype_, ubi) = {
-                let u: &Use = &t.uses[ui];
-                (u.type_, u.bi)
+        for u in &t.uses {
+            let ub: &mut Blk = &mut blks[u.bi];
+            let l: &mut Ins = {
+                if let UseT::UIns(li) = u.type_ {
+                    &mut ub.ins[li]
+                } else {
+                    // Checked above that uses are only UIns
+                    assert!(false);
+                    continue;
+                }
             };
-            let ub: &mut Blk = &mut blks[ubi];
-            let li = if let UseT::UIns(li0) = utype_ {
-                li0
-            } else {
-                // Checked above that uses are only UIns
-                assert!(false);
-                continue;
-            };
-            let l: &Ins = &ub.ins[li];
-            let (l_op, l_cls, l_arg0, l_arg1) = {
-                let l: &Ins = &ub.ins[li];
-                (l.op, l.cls, l.args[0], l.args[1])
-            };
-            if isstore(l_op) {
-                ub.ins[li] = Ins::new1(O::Ocopy, k, l_arg1, [l_arg0]);
+            if isstore(l.op) {
+                *l = Ins::new1(O::Ocopy, k, l.args[1], [l.args[0]]);
                 //t.nuse -= 1; // Hrmmm... TODO TODO TODO
                 t.ndef += 1;
             } else {
                 // Skipped all instructions other than load/store above
-                assert!(isload(l_op));
+                assert!(isload(l.op));
 
                 if k == KX {
                     let t_name: &[u8] = {
-                        if let Ref::RTmp(l_arg0_ti) = l_arg0 {
+                        if let Ref::RTmp(l_arg0_ti) = l.args[0] {
                             &tmps[l_arg0_ti].name
                         } else {
                             b"<unknown>"
@@ -140,17 +130,17 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                     ))));
                 }
 
-                let use_extend: bool = match l_op {
+                let use_extend: bool = match l.op {
                     O::Oloadsw | O::Oloaduw => k == KL,
                     O::Oload => false,
                     _ => true,
                 };
-                ub.ins[li].op = {
+                l.op = {
                     if use_extend {
-                        O::from_repr((O::Oextsb as u8) + ((l_op as u8) - (O::Oloadsb as u8)))
+                        O::from_repr((O::Oextsb as u8) + ((l.op as u8) - (O::Oloadsb as u8)))
                             .unwrap()
                     } else {
-                        if kbase(k) == kbase(l_cls) {
+                        if kbase(k) == kbase(l.cls) {
                             O::Ocopy
                         } else {
                             O::Ocast
