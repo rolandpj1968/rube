@@ -53,7 +53,7 @@ pub fn fillpreds(f: &mut Fn) {
     }
 }
 
-fn rporec(blks: &mut Vec<Blk>, bi: BlkIdx, mut x: u32) -> u32 {
+fn rporec(blks: &mut [Blk], bi: BlkIdx, mut x: u32) -> u32 {
     if bi == BlkIdx::NONE || blks[bi].id != u32::MAX {
         return x;
     }
@@ -79,37 +79,30 @@ fn rporec(blks: &mut Vec<Blk>, bi: BlkIdx, mut x: u32) -> u32 {
 
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
-    f.blks.iter_mut().for_each(|b| b.id = u32::MAX);
+    let blks: &mut [Blk] = &mut f.blks;
+    let phis: &mut [Phi] = &mut f.phis;
+
+    blks.iter_mut().for_each(|b| b.id = u32::MAX);
 
     // Deliberately wraps from u32::MAX
-    let n: u32 = rporec(&mut f.blks, f.start, f.nblk - 1).wrapping_add(1);
+    let n: u32 = rporec(blks, f.start, f.nblk - 1).wrapping_add(1);
     f.nblk -= n;
     f.rpo = vec![BlkIdx::NONE; f.nblk as usize];
     let mut prev_bi = BlkIdx::NONE;
     let mut bi = f.start;
     while bi != BlkIdx::NONE {
-        let (id, s1, s2, next_bi) = {
-            let b: &Blk = f.blk(bi);
-            (b.id, b.s1, b.s2, b.link)
-        };
-        if id == u32::MAX {
+        if blks[bi].id == u32::MAX {
             // Unreachable Blk
-            // edgedel(f, bi, s1);
-            // edgedel(f, bi, s2);
-            edgedel(&mut f.blks, &mut f.phis, bi, s1);
-            edgedel(&mut f.blks, &mut f.phis, bi, s2);
-            f.set_blk_link(prev_bi, next_bi);
-            bi = next_bi;
+            edgedel(blks, phis, bi, blks[bi].s1);
+            edgedel(blks, phis, bi, blks[bi].s2);
+            blks[prev_bi].link = blks[bi].link;
         } else {
-            let (rpo_idx, next_bi) = {
-                let b: &mut Blk = f.blk_mut(bi);
-                b.id -= n;
-                (b.id, b.link)
-            };
-            f.rpo[rpo_idx as usize] = bi;
+            let b: &mut Blk = &mut blks[bi];
+            b.id -= n;
+            f.rpo[b.id as usize] = bi;
             prev_bi = bi;
-            bi = next_bi;
         }
+        bi = blks[bi].link;
     }
 }
 
