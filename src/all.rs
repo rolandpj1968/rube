@@ -705,6 +705,14 @@ impl Index<BlkIdx> for [Blk] {
     }
 }
 
+impl Index<&BlkIdx> for [Blk] {
+    type Output = Blk;
+    fn index(&self, index: &BlkIdx) -> &Self::Output {
+        debug_assert!(*index != BlkIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
 impl IndexMut<BlkIdx> for [Blk] {
     fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
         debug_assert!(index != BlkIdx::NONE);
@@ -712,20 +720,27 @@ impl IndexMut<BlkIdx> for [Blk] {
     }
 }
 
-impl Index<BlkIdx> for Vec<Blk> {
-    type Output = Blk;
-    fn index(&self, index: BlkIdx) -> &Self::Output {
-        debug_assert!(index != BlkIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<BlkIdx> for Vec<Blk> {
-    fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
-        debug_assert!(index != BlkIdx::NONE);
+impl IndexMut<&BlkIdx> for [Blk] {
+    fn index_mut(&mut self, index: &BlkIdx) -> &mut Self::Output {
+        debug_assert!(*index != BlkIdx::NONE);
         self.index_mut(index.0 as usize)
     }
 }
+
+// impl Index<BlkIdx> for Vec<Blk> {
+//     type Output = Blk;
+//     fn index(&self, index: BlkIdx) -> &Self::Output {
+//         debug_assert!(index != BlkIdx::NONE);
+//         self.index(index.0 as usize)
+//     }
+// }
+
+// impl IndexMut<BlkIdx> for Vec<Blk> {
+//     fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
+//         debug_assert!(index != BlkIdx::NONE);
+//         self.index_mut(index.0 as usize)
+//     }
+// }
 
 /*
 struct Use {

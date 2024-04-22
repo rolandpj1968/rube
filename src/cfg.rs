@@ -112,47 +112,45 @@ pub fn fillrpo(f: &mut Fn) {
  * by K. Cooper, T. Harvey, and K. Kennedy.
  */
 
-fn inter(f: &Fn, mut bi1: BlkIdx, mut bi2: BlkIdx) -> BlkIdx {
+fn inter(blks: &[Blk], mut bi1: BlkIdx, mut bi2: BlkIdx) -> BlkIdx {
     if bi1 == BlkIdx::NONE {
         return bi2;
     }
-
     while bi1 != bi2 {
-        if f.blk(bi1).id < f.blk(bi2).id {
+        if blks[bi1].id < blks[bi2].id {
             (bi1, bi2) = (bi2, bi1);
         }
-        while f.blk(bi1).id > f.blk(bi2).id {
-            bi1 = f.blk(bi1).idom;
+        while blks[bi1].id > blks[bi2].id {
+            bi1 = blks[bi1].idom;
             assert!(bi1 != BlkIdx::NONE);
         }
     }
-    return bi1;
+    bi1
 }
 
 pub fn filldom(f: &mut Fn) {
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
-        let b: &mut Blk = f.blk_mut(bi);
+    let blks: &mut [Blk] = &mut f.blks;
+    let rpo: &[BlkIdx] = &f.rpo;
+
+    // TODO - live blocks only
+    for b in blks.iter_mut() {
         b.idom = BlkIdx::NONE;
         b.dom = BlkIdx::NONE;
         b.dlink = BlkIdx::NONE;
-
-        bi = b.link;
     }
     loop {
         let mut ch: u32 = 0;
-        for n in 1..f.rpo.len() {
-            bi = f.rpo[n];
+        for bi in rpo.iter().skip(1) {
+            let b: &Blk = &blks[bi];
             let mut di: BlkIdx = BlkIdx::NONE;
-            for p in 0..f.blk(bi).preds.len() {
-                let b: &Blk = f.blk(bi);
-                if f.blk(b.preds[p]).idom != BlkIdx::NONE || b.preds[p] == f.start {
-                    di = inter(f, di, b.preds[p]);
+            for pi in &b.preds {
+                if blks[pi].idom != BlkIdx::NONE || *pi == f.start {
+                    di = inter(blks, di, *pi);
                 }
             }
-            if di != f.blk(bi).idom {
+            if di != b.idom {
                 ch += 1;
-                f.blk_mut(bi).idom = di;
+                blks[bi].idom = di;
             }
         }
 
@@ -162,15 +160,15 @@ pub fn filldom(f: &mut Fn) {
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let di: BlkIdx = f.blk(bi).idom;
+        let di: BlkIdx = blks[bi].idom;
         if di != BlkIdx::NONE {
             assert!(di != bi);
-            let ddomi = f.blk(di).dom;
-            f.blk_mut(bi).dlink = ddomi;
-            f.blk_mut(di).dom = bi;
+            let ddomi = blks[di].dom;
+            blks[bi].dlink = ddomi;
+            blks[di].dom = bi;
         }
 
-        bi = f.blk(bi).link;
+        bi = blks[bi].link;
     }
 }
 

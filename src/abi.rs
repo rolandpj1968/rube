@@ -7,9 +7,11 @@ use crate::all::{isargbh, isparbh, isretbh, Blk, BlkIdx, Fn, J, O};
  * bits
  */
 pub fn elimsb(f: &mut Fn) {
+    let blks: &mut [Blk] = &mut f.blks;
+
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let b: &mut Blk = &mut f.blks[bi];
+        let b: &mut Blk = &mut blks[bi];
         for i in &mut b.ins {
             if isargbh(i.op) {
                 i.op = O::Oarg;
