@@ -59,26 +59,26 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     let tmps: &[Tmp] = &f.tmps;
     let mems: &[Mem] = &f.mems;
 
-    let ntmps: usize = tmps.len();
-    let mut u: BSet = bsinit(ntmps);
-    let mut v: BSet = bsinit(ntmps);
+    let mut u: BSet = bsinit(tmps.len());
+    let mut v: BSet = bsinit(tmps.len());
 
     // TODO - just iterate over live blks with for_each()
     {
         let mut bi: BlkIdx = f.start;
         while bi != BlkIdx::NONE {
             let b: &mut Blk = &mut blks[bi];
-            b.in_ = bsinit(ntmps);
-            b.out = bsinit(ntmps);
-            b.gen = bsinit(ntmps);
+            b.in_ = bsinit(tmps.len());
+            b.out = bsinit(tmps.len());
+            b.gen = bsinit(tmps.len());
             bi = b.link;
         }
     }
     let mut chg: bool = true;
 
     loop {
-        for n in (0..f.rpo.len()).rev() {
-            let bi: BlkIdx = f.rpo[n];
+        for n in (0..rpo.len()).rev() {
+            let bi: BlkIdx = rpo[n];
+            let b: &mut Blk = &mut blks[bi];
             bscopy(&mut u, &blks[bi].out);
             // Ugh, crying for succs iter
             add_liveon_succ_out(blks, phis, &mut v, bi, blks[bi].s1);
