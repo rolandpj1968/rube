@@ -188,13 +188,19 @@ pub fn dom(blks: &[Blk], b1i: BlkIdx, b2i: BlkIdx) -> bool {
 }
 
 fn addfron(a: &mut Blk, bi: BlkIdx) {
-    for froni in &a.frons {
-        if *froni == bi {
-            return;
+    if !a.frons.contains(&bi) {
+        a.frons.push(bi);
+    }
+}
+
+fn fillfron_for_succ(blks: &mut [Blk], bi: BlkIdx, si: BlkIdx) {
+    if si != BlkIdx::NONE {
+        let mut ai = bi;
+        while !sdom(blks, ai, si) {
+            addfron(&mut blks[ai], si);
+            ai = blks[ai].idom;
         }
     }
-
-    a.frons.push(bi);
 }
 
 /* fill the dominance frontier */
@@ -203,29 +209,11 @@ pub fn fillfron(f: &mut Fn) {
 
     // TODO live blks only (but it doesn't matter)
     blks.iter_mut().for_each(|b| b.frons.clear());
-    // let mut bi = f.start;
-    // while bi != BlkIdx::NONE {
-    //     let b: &mut Blk = f.blk_mut(bi);
-    //     b.frons.clear();
-    //     bi = b.link;
-    // }
+
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let (s1, s2) = (blks[bi].s1, blks[bi].s2);
-        if s1 != BlkIdx::NONE {
-            let mut ai = bi;
-            while !sdom(blks, ai, s1) {
-                addfron(&mut blks[ai], s1);
-                ai = blks[ai].idom;
-            }
-        }
-        if s2 != BlkIdx::NONE {
-            let mut ai = bi;
-            while !sdom(blks, ai, s2) {
-                addfron(&mut blks[ai], s2);
-                ai = blks[ai].idom;
-            }
-        }
+        fillfron_for_succ(blks, bi, blks[bi].s1);
+        fillfron_for_succ(blks, bi, blks[bi].s2);
         bi = blks[bi].link;
     }
 }
