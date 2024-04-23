@@ -175,29 +175,25 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             let mut r: Ref = Ref::R;
             for ii in 0..b.ins.len() {
                 let i: &mut Ins = &mut b.ins[ii];
-                let (to, cls, arg0, arg1) = {
-                    let i: &Ins = &b.ins[ii];
-                    (i.to, i.cls, i.args[0], i.args[1])
-                };
                 if r != Ref::R {
-                    if arg0 == rt {
-                        b.ins[ii].args[0] = r;
+                    if i.args[0] == rt {
+                        i.args[0] = r;
                     }
-                    if arg1 == rt {
-                        b.ins[ii].args[1] = r;
+                    if i.args[1] == rt {
+                        i.args[1] = r;
                     }
                 }
-                if to == rt {
+                if i.to == rt {
                     if !bshas(&b.out, tii) {
                         r = refindex(tmps, ti);
-                        b.ins[ii].to = r;
+                        i.to = r;
                     } else {
                         if !bshas(&u, b.id as usize) {
                             bsset(&mut u, b.id as usize);
                             bp -= 1;
                             blist[bp] = bi;
                         }
-                        if clsmerge(&mut k, cls) {
+                        if clsmerge(&mut k, i.cls) {
                             // TODO - better msg
                             return Err(Box::new(SsaError::new("invalid input")));
                         }
