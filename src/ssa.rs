@@ -154,12 +154,8 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             continue;
         }
         if tmps[ti].ndef == 1 {
-            let mut ok: bool = true;
             let defb: u32 = tmps[ti].bid;
-            //use = f.tmp(ti).use;
-            for usei in (0..tmps[ti].uses.len()).rev() {
-                ok = ok && tmps[ti].uses[usei].bid == defb;
-            }
+            let ok = tmps[ti].uses.iter().all(|u| u.bid == defb);
             if ok || defb == blks[f.start].id {
                 continue;
             }
@@ -173,18 +169,16 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             let b: &mut Blk = &mut blks[bi];
             b.visit = 0;
             let mut r: Ref = Ref::R;
-            for ii in 0..b.ins.len() {
-                let i: &mut Ins = &mut b.ins[ii];
+            for i in &mut b.ins {
                 if r != Ref::R {
-                    if i.args[0] == rt {
-                        i.args[0] = r;
-                    }
-                    if i.args[1] == rt {
-                        i.args[1] = r;
+                    for arg in &mut i.args {
+                        if *arg == rt {
+                            *arg = r;
+                        }
                     }
                 }
                 if i.to == rt {
-                    if !bshas(&b.out, tii) {
+                    if !bshas(&b.out, ti.usize()) {
                         r = refindex(tmps, ti);
                         i.to = r;
                     } else {
