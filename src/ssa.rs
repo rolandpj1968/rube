@@ -328,10 +328,6 @@ fn renblk(
     names: &mut Vec<Name>,
     stk: &mut [NameIdx],
 ) {
-    // let blks: &mut Vec<Blk> = &mut f.blks;
-    // let phis: &mut Vec<Phi> = &mut f.phis;
-    // let tmps: &mut Vec<Tmp> = &mut f.tmps;
-
     let mut pi = blks[bi].phi;
     while pi != PhiIdx::NONE {
         let to: Ref = phis[pi].to;
@@ -370,9 +366,8 @@ fn renblk(
                 let ti: TmpIdx = tmps[to_ti].visit;
                 if ti != TmpIdx::NONE {
                     let arg: Ref = getstk(blks, bi, ti, namel, names, stk);
-                    let p: &mut Phi = &mut phis[pi];
-                    p.args.push(arg);
-                    p.blks.push(bi);
+                    phis[pi].args.push(arg);
+                    phis[pi].blks.push(bi);
                 }
             } else {
                 // phi to MUST be an RTmp (TODO is there a better way?)
