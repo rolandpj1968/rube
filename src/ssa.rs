@@ -10,7 +10,7 @@ use crate::all::{
 use crate::cfg::{dom, filldom, fillfron, sdom};
 use crate::live::filllive;
 use crate::parse::printfn;
-use crate::util::{bsclr, bsinit, bsset, clsmerge, newtmpref, phicls, Bucket};
+use crate::util::{bsclr, bsinit, bsset, clsmerge, newtmpref2, phicls, Bucket};
 
 #[derive(Debug)]
 struct SsaError {
@@ -133,61 +133,67 @@ pub fn filluse(f: &mut Fn) {
     }
 }
 
-fn refindex(f: &mut Fn, ti: TmpIdx) -> Ref {
-    let prfx: Vec<u8> = f.tmp(ti).name.clone();
-    let cls: KExt = f.tmp(ti).cls;
-    newtmpref(&prfx, true, cls, f)
+fn refindex(tmps: &mut Vec<Tmp>, ti: TmpIdx) -> Ref {
+    let prfx: Vec<u8> = tmps[ti].name.clone();
+    let cls: KExt = tmps[ti].cls;
+    newtmpref2(tmps, &prfx, true, cls)
 }
 
 fn phiins(f: &mut Fn) -> RubeResult<()> {
-    let mut blist: Vec<BlkIdx> = vec![BlkIdx::NONE; f.blks.len()];
-    let be: usize = f.blks.len();
-    let nt: usize = f.tmps.len();
+    let blks: &mut [Blk] = &mut f.blks;
+    let phis: &mut Vec<Phi> = &mut f.phis;
+    let tmps: &mut Vec<Tmp> = &mut f.tmps;
+
+    let mut blist: Vec<BlkIdx> = vec![BlkIdx::NONE; blks.len()];
+    let be: usize = blks.len();
+    let nt: usize = tmps.len();
     for tii in TMP0..nt {
         let ti: TmpIdx = TmpIdx::new(tii);
-        f.tmp_mut(ti).visit = TmpIdx::NONE;
-        if f.tmp(ti).phi != TmpIdx::NONE {
+        tmps[ti].visit = TmpIdx::NONE;
+        if tmps[ti].phi != TmpIdx::NONE {
             continue;
         }
-        if f.tmp(ti).ndef == 1 {
+        if tmps[ti].ndef == 1 {
             let mut ok: bool = true;
-            let defb: u32 = f.tmp(ti).bid;
+            let defb: u32 = tmps[ti].bid;
             //use = f.tmp(ti).use;
-            for usei in (0..f.tmp(ti).uses.len()).rev() {
-                ok = ok && f.tmp(ti).uses[usei].bid == defb;
+            for usei in (0..tmps[ti].uses.len()).rev() {
+                ok = ok && tmps[ti].uses[usei].bid == defb;
             }
-            if ok || defb == f.blk(f.start).id {
+            if ok || defb == blks[f.start].id {
                 continue;
             }
         }
-        let mut u: BSet = bsinit(f.blks.len());
+        let mut u: BSet = bsinit(blks.len());
         let mut k: KExt = KX;
         let mut bp: usize = be;
         let rt: Ref = Ref::RTmp(ti);
         let mut bi = f.start;
         while bi != BlkIdx::NONE {
-            f.blk_mut(bi).visit = 0;
+            let b: &mut Blk = &mut blks[bi];
+            b.visit = 0;
             let mut r: Ref = Ref::R;
-            for ii in 0..f.blk(bi).ins.len() {
+            for ii in 0..b.ins.len() {
+                let i: &mut Ins = &mut b.ins[ii];
                 let (to, cls, arg0, arg1) = {
-                    let i: &Ins = &f.blk(bi).ins[ii];
+                    let i: &Ins = &b.ins[ii];
                     (i.to, i.cls, i.args[0], i.args[1])
                 };
                 if r != Ref::R {
                     if arg0 == rt {
-                        f.blk_mut(bi).ins[ii].args[0] = r;
+                        b.ins[ii].args[0] = r;
                     }
                     if arg1 == rt {
-                        f.blk_mut(bi).ins[ii].args[1] = r;
+                        b.ins[ii].args[1] = r;
                     }
                 }
                 if to == rt {
-                    if !bshas(&f.blk(bi).out, tii) {
-                        r = refindex(f, ti);
-                        f.blk_mut(bi).ins[ii].to = r;
+                    if !bshas(&b.out, tii) {
+                        r = refindex(tmps, ti);
+                        b.ins[ii].to = r;
                     } else {
-                        if !bshas(&u, f.blk(bi).id as usize) {
-                            bsset(&mut u, f.blk(bi).id as usize);
+                        if !bshas(&u, b.id as usize) {
+                            bsset(&mut u, b.id as usize);
                             bp -= 1;
                             blist[bp] = bi;
                         }
@@ -198,27 +204,27 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                     }
                 }
             }
-            if r != Ref::R && f.blk(bi).jmp.arg == rt {
-                f.blk_mut(bi).jmp.arg = r;
+            if r != Ref::R && b.jmp.arg == rt {
+                b.jmp.arg = r;
             }
-            bi = f.blk(bi).link;
+            bi = b.link;
         }
         let defs: BSet = u.clone();
         while bp != be {
-            f.tmp_mut(ti).visit = ti;
+            tmps[ti].visit = ti;
             let bi: BlkIdx = blist[bp];
             bp += 1;
-            bsclr(&mut u, f.blk(bi).id as usize);
-            for n in 0..f.blk(bi).frons.len() {
-                let ai: BlkIdx = f.blk(bi).frons[n];
-                let a_visit = f.blk(ai).visit;
-                f.blk_mut(ai).visit += 1;
-                // TODO TODO TODO - this is deeply dodge - a TmpIndex in a bitset of blk id's???
-                if a_visit == 0 && bshas(&f.blk(ai).in_, ti.usize()) {
-                    let a_pi: PhiIdx = f.blk(ai).phi;
-                    let pi: PhiIdx = f.add_phi(Phi::new(rt, vec![], vec![], k, a_pi));
-                    f.blk_mut(ai).phi = pi;
-                    let a_id = f.blk(ai).id;
+            bsclr(&mut u, blks[bi].id as usize);
+            for n in 0..blks[bi].frons.len() {
+                let ai: BlkIdx = blks[bi].frons[n];
+                let a_visit = blks[ai].visit;
+                blks[ai].visit += 1;
+                if a_visit == 0 && bshas(&blks[ai].in_, ti.usize()) {
+                    let a_pi: PhiIdx = blks[ai].phi;
+                    let pi: PhiIdx = PhiIdx::new(phis.len());
+                    phis.push(Phi::new(rt, vec![], vec![], k, a_pi));
+                    blks[ai].phi = pi;
+                    let a_id = blks[ai].id;
                     if !bshas(&defs, a_id as usize) && !bshas(&u, a_id as usize) {
                         bsset(&mut u, a_id as usize);
                         bp -= 1;
@@ -269,7 +275,7 @@ fn nfree(ni: NameIdx, namel: &mut NameIdx, names: &mut Vec<Name>) {
 }
 
 fn rendef(
-    f: &mut Fn,
+    tmps: &mut Vec<Tmp>,
     bi: BlkIdx,
     r: Ref,
     namel: &mut NameIdx,
@@ -280,13 +286,13 @@ fn rendef(
         return r;
     }
     if let Ref::RTmp(ti) = r {
-        if f.tmp(ti).visit == TmpIdx::NONE {
+        if tmps[ti].visit == TmpIdx::NONE {
             return r;
         }
-        let r1: Ref = refindex(f, ti);
+        let r1: Ref = refindex(tmps, ti);
         // TODO - there must be a better way of indicating that refindex() returns Ref::RTmp
         if let Ref::RTmp(t1i) = r1 {
-            f.tmp_mut(t1i).visit = ti;
+            tmps[t1i].visit = ti;
             let ni: NameIdx = nnew(r1, bi, namel, names, stk[ti.0 as usize]);
             stk[ti.0 as usize] = ni;
         } else {
@@ -327,7 +333,7 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
     let mut pi = f.blk(bi).phi;
     while pi != PhiIdx::NONE {
         let to: Ref = f.phi(pi).to;
-        let to_new = rendef(f, bi, to, namel, names, stk);
+        let to_new = rendef(&mut f.tmps, bi, to, namel, names, stk);
         f.phi_mut(pi).to = to_new;
 
         pi = f.phi(pi).link;
@@ -341,7 +347,7 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
             }
         }
         let to: Ref = f.blk(bi).ins[ii].to;
-        let new_to: Ref = rendef(f, bi, to, namel, names, stk);
+        let new_to: Ref = rendef(&mut f.tmps, bi, to, namel, names, stk);
         f.blk_mut(bi).ins[ii].to = new_to;
     }
     let jmp_arg: Ref = f.blk(bi).jmp.arg;

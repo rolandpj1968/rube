@@ -900,7 +900,7 @@ pub struct Tmp {
     pub name: Vec<u8>,
     pub def: InsIdx,
     pub uses: Vec<Use>,
-    pub ndef: u32, // this is not always defs.len() - see filluse() for example
+    pub ndef: u32,
     // pub nuse: u32,
     pub bid: u32, /* id of a defining block - TODO: retread to BlkIdx??? It's not the same number always tho! */
     // uint cost;
@@ -956,20 +956,20 @@ impl IndexMut<TmpIdx> for [Tmp] {
     }
 }
 
-// impl Index<TmpIdx> for Vec<Tmp> {
-//     type Output = Tmp;
-//     fn index(&self, index: TmpIdx) -> &Self::Output {
-//         debug_assert!(index != TmpIdx::NONE);
-//         self.index(index.0 as usize)
-//     }
-// }
+impl Index<TmpIdx> for Vec<Tmp> {
+    type Output = Tmp;
+    fn index(&self, index: TmpIdx) -> &Self::Output {
+        debug_assert!(index != TmpIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
 
-// impl IndexMut<TmpIdx> for Vec<Tmp> {
-//     fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {
-//         debug_assert!(index != TmpIdx::NONE);
-//         self.index_mut(index.0 as usize)
-//     }
-// }
+impl IndexMut<TmpIdx> for Vec<Tmp> {
+    fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {
+        debug_assert!(index != TmpIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
 
 // Index in Fn::tmps
 // #[derive(Clone, Copy, Debug, PartialEq)]
