@@ -598,20 +598,20 @@ impl IndexMut<PhiIdx> for [Phi] {
     }
 }
 
-// impl Index<PhiIdx> for Vec<Phi> {
-//     type Output = Phi;
-//     fn index(&self, index: PhiIdx) -> &Self::Output {
-//         debug_assert!(index != PhiIdx::NONE);
-//         self.index(index.0 as usize)
-//     }
-// }
+impl Index<PhiIdx> for Vec<Phi> {
+    type Output = Phi;
+    fn index(&self, index: PhiIdx) -> &Self::Output {
+        debug_assert!(index != PhiIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
 
-// impl IndexMut<PhiIdx> for Vec<Phi> {
-//     fn index_mut(&mut self, index: PhiIdx) -> &mut Self::Output {
-//         debug_assert!(index != PhiIdx::NONE);
-//         self.index_mut(index.0 as usize)
-//     }
-// }
+impl IndexMut<PhiIdx> for Vec<Phi> {
+    fn index_mut(&mut self, index: PhiIdx) -> &mut Self::Output {
+        debug_assert!(index != PhiIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
 
 #[derive(Clone, Copy)]
 pub struct BlkJmp {
@@ -727,20 +727,20 @@ impl IndexMut<&BlkIdx> for [Blk] {
     }
 }
 
-// impl Index<BlkIdx> for Vec<Blk> {
-//     type Output = Blk;
-//     fn index(&self, index: BlkIdx) -> &Self::Output {
-//         debug_assert!(index != BlkIdx::NONE);
-//         self.index(index.0 as usize)
-//     }
-// }
+impl Index<BlkIdx> for Vec<Blk> {
+    type Output = Blk;
+    fn index(&self, index: BlkIdx) -> &Self::Output {
+        debug_assert!(index != BlkIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
 
-// impl IndexMut<BlkIdx> for Vec<Blk> {
-//     fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
-//         debug_assert!(index != BlkIdx::NONE);
-//         self.index_mut(index.0 as usize)
-//     }
-// }
+impl IndexMut<BlkIdx> for Vec<Blk> {
+    fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
+        debug_assert!(index != BlkIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
 
 /*
 struct Use {

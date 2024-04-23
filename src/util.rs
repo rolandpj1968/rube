@@ -471,16 +471,16 @@ pub fn newtmp(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> TmpIdx {
     return newtmp2(&mut fn_.tmps, prfx, sufx, k);
     // TODO why a globally unique name?
     static mut N: i32 = 0;
-    let mut name: Vec<u8> = prfx.to_vec();
-    if sufx {
-        name.push(b'.');
-        unsafe {
-            N += 1;
-            name.extend_from_slice(&format!("{}", N).as_bytes());
-        }
-    }
+    // let mut name: Vec<u8> = prfx.to_vec();
+    // if sufx {
+    //     name.push(b'.');
+    //     unsafe {
+    //         N += 1;
+    //         name.extend_from_slice(&format!("{}", N).as_bytes());
+    //     }
+    // }
 
-    fn_.add_tmp(Tmp::new(name, /*slot*/ -1, /*cls*/ k))
+    // fn_.add_tmp(Tmp::new(name, /*slot*/ -1, /*cls*/ k))
 }
 
 pub fn newtmpref(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> Ref {

@@ -319,50 +319,58 @@ fn getstk(
     }
 }
 
-fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, stk: &mut [NameIdx]) {
-    let blks: &[Blk] = &f.blks;
-    let phis: &mut Vec<Phi> = &mut f.phis;
-    let tmps: &[Tmp] = &f.tmps;
+fn renblk(
+    blks: &mut Vec<Blk>,
+    phis: &mut Vec<Phi>,
+    tmps: &mut Vec<Tmp>,
+    bi: BlkIdx,
+    namel: &mut NameIdx,
+    names: &mut Vec<Name>,
+    stk: &mut [NameIdx],
+) {
+    // let blks: &mut Vec<Blk> = &mut f.blks;
+    // let phis: &mut Vec<Phi> = &mut f.phis;
+    // let tmps: &mut Vec<Tmp> = &mut f.tmps;
 
-    let mut pi = f.blk(bi).phi;
+    let mut pi = blks[bi].phi;
     while pi != PhiIdx::NONE {
-        let to: Ref = f.phi(pi).to;
-        let to_new = rendef(&mut f.tmps, bi, to, namel, names, stk);
-        f.phi_mut(pi).to = to_new;
+        let to: Ref = phis[pi].to;
+        let to_new = rendef(tmps, bi, to, namel, names, stk);
+        phis[pi].to = to_new;
 
-        pi = f.phi(pi).link;
+        pi = phis[pi].link;
     }
-    for ii in 0..f.blk(bi).ins.len() {
+    for ii in 0..blks[bi].ins.len() {
         for m in 0..2 {
-            if let Ref::RTmp(ti) = f.blk(bi).ins[ii].args[m] {
-                if f.tmp(ti).visit != TmpIdx::NONE {
-                    f.blk_mut(bi).ins[ii].args[m] = getstk(&f.blks, bi, ti, namel, names, stk);
+            if let Ref::RTmp(ti) = blks[bi].ins[ii].args[m] {
+                if tmps[ti].visit != TmpIdx::NONE {
+                    blks[bi].ins[ii].args[m] = getstk(blks, bi, ti, namel, names, stk);
                 }
             }
         }
-        let to: Ref = f.blk(bi).ins[ii].to;
-        let new_to: Ref = rendef(&mut f.tmps, bi, to, namel, names, stk);
-        f.blk_mut(bi).ins[ii].to = new_to;
+        let to: Ref = blks[bi].ins[ii].to;
+        let new_to: Ref = rendef(tmps, bi, to, namel, names, stk);
+        blks[bi].ins[ii].to = new_to;
     }
-    let jmp_arg: Ref = f.blk(bi).jmp.arg;
+    let jmp_arg: Ref = blks[bi].jmp.arg;
     if let Ref::RTmp(ti) = jmp_arg {
-        if f.tmp(ti).visit != TmpIdx::NONE {
-            f.blk_mut(bi).jmp.arg = getstk(&f.blks, bi, ti, namel, names, stk);
+        if tmps[ti].visit != TmpIdx::NONE {
+            blks[bi].jmp.arg = getstk(blks, bi, ti, namel, names, stk);
         }
     }
-    let (s1, s2) = f.blk(bi).s1_s2();
+    let (s1, s2) = blks[bi].s1_s2();
     let succ: [BlkIdx; 2] = [s1, if s1 == s2 { BlkIdx::NONE } else { s2 }];
     for si in succ {
         if si == BlkIdx::NONE {
             continue; // QBE effectively break's
         }
-        let mut pi: PhiIdx = f.blk(si).phi;
+        let mut pi: PhiIdx = blks[si].phi;
         while pi != PhiIdx::NONE {
-            if let Ref::RTmp(to_ti) = f.phi(pi).to {
-                let ti: TmpIdx = f.tmp(to_ti).visit;
+            if let Ref::RTmp(to_ti) = phis[pi].to {
+                let ti: TmpIdx = tmps[to_ti].visit;
                 if ti != TmpIdx::NONE {
-                    let arg: Ref = getstk(&f.blks, bi, ti, namel, names, stk);
-                    let p: &mut Phi = f.phi_mut(pi);
+                    let arg: Ref = getstk(blks, bi, ti, namel, names, stk);
+                    let p: &mut Phi = &mut phis[pi];
                     p.args.push(arg);
                     p.blks.push(bi);
                 }
@@ -370,13 +378,13 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
                 // phi to MUST be an RTmp (TODO is there a better way?)
                 assert!(false);
             }
-            pi = f.phi(pi).link;
+            pi = phis[pi].link;
         }
     }
-    let mut si: BlkIdx = f.blk(bi).dom;
+    let mut si: BlkIdx = blks[bi].dom;
     while si != BlkIdx::NONE {
-        renblk(f, si, namel, names, stk);
-        si = f.blk(si).dlink;
+        renblk(blks, phis, tmps, si, namel, names, stk);
+        si = blks[si].dlink;
     }
 }
 
@@ -417,7 +425,10 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     let mut namel: NameIdx = NameIdx::INVALID;
     let mut names: Vec<Name> = vec![];
     let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
-    renblk(f, f.start, &mut namel, &mut names, &mut stk);
+    let blks: &mut Vec<Blk> = &mut f.blks;
+    let phis: &mut Vec<Phi> = &mut f.phis;
+    let tmps: &mut Vec<Tmp> = &mut f.tmps;
+    renblk(blks, phis, tmps, f.start, &mut namel, &mut names, &mut stk);
     // TODO
     //debug['L'] = d;
     if false
