@@ -437,12 +437,11 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     Ok(())
 }
 
-fn phicheck(f: &Fn, pi: PhiIdx, bi: BlkIdx, t: Ref) -> bool {
-    let p: &Phi = f.phi(pi);
+fn phicheck(blks: &[Blk], p: &Phi, bi: BlkIdx, t: Ref) -> bool {
     for n in 0..p.args.len() {
         if p.args[n] == t {
             let bi1 = p.blks[n];
-            if bi1 != bi && !sdom(&f.blks, bi, bi1) {
+            if bi1 != bi && !sdom(blks, bi, bi1) {
                 return true;
             }
         }
@@ -452,14 +451,12 @@ fn phicheck(f: &Fn, pi: PhiIdx, bi: BlkIdx, t: Ref) -> bool {
 
 /* require use and ssa */
 pub fn ssacheck(f: &Fn) -> RubeResult<()> {
-    // Tmp *t;
-    // Ins *i;
-    // Phi *p;
-    // Use *u;
-    // Blk *b, *bu;
-    // Ref r;
+    let blks: &[Blk] = &f.blks;
+    let rpo: &[BlkIdx] = &f.rpo;
+    let phis: &[Phi] = &f.phis;
+    let tmps: &[Tmp] = &f.tmps;
 
-    for t in f.tmps.iter().skip(TMP0 as usize) {
+    for t in tmps.iter().skip(TMP0 as usize) {
         if t.ndef > 1 {
             return Err(Box::new(SsaError::new(&format!(
                 "ssa temporary %{} defined more than once",
@@ -467,16 +464,16 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
             ))));
         }
         if !t.uses.is_empty() && t.ndef == 0 {
-            let bui: BlkIdx = f.rpo[t.uses[0].bid as usize];
+            let bui: BlkIdx = rpo[t.uses[0].bid as usize];
             return Err(ssacheck_err(f, t, bui));
         }
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let b: &Blk = f.blk(bi);
+        let b: &Blk = &blks[bi];
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
-            let p: &Phi = f.phi(pi);
+            let p: &Phi = &phis[pi];
             let r: Ref = p.to;
             let ti: TmpIdx = if let Ref::RTmp(ti0) = r {
                 ti0
@@ -486,28 +483,28 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                     to_s(&b.name)
                 ))));
             };
-            let t: &Tmp = f.tmp(ti);
+            let t: &Tmp = &tmps[ti];
             for u in &t.uses {
-                let bui: BlkIdx = f.rpo[u.bid as usize];
+                let bui: BlkIdx = rpo[u.bid as usize];
 
                 if let UseT::UPhi(upi) = u.type_ {
-                    if phicheck(f, upi, bi, r) {
+                    if phicheck(blks, &phis[upi], bi, r) {
                         return Err(ssacheck_err(f, t, bui));
                     }
                 } else {
-                    if bui != bi && !sdom(&f.blks, bi, bui) {
+                    if bui != bi && !sdom(blks, bi, bui) {
                         return Err(ssacheck_err(f, t, bui));
                     }
                 }
             }
             for (ii, i) in b.ins.iter().enumerate() {
                 if let Ref::RTmp(ti) = i.to {
-                    let t: &Tmp = f.tmp(ti);
+                    let t: &Tmp = &tmps[ti];
                     for u in &t.uses {
-                        let bui: BlkIdx = f.rpo[u.bid as usize];
+                        let bui: BlkIdx = rpo[u.bid as usize];
                         match u.type_ {
                             UseT::UPhi(upi) => {
-                                if phicheck(f, upi, bi, r) {
+                                if phicheck(blks, &phis[upi], bi, r) {
                                     return Err(ssacheck_err(f, t, bui));
                                 }
                             }
@@ -517,7 +514,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                                 }
                             }
                             _ => {
-                                if bui != bi && !sdom(&f.blks, bi, bui) {
+                                if bui != bi && !sdom(blks, bi, bui) {
                                     return Err(ssacheck_err(f, t, bui));
                                 }
                             }
