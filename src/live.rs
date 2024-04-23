@@ -78,7 +78,6 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     loop {
         for n in (0..rpo.len()).rev() {
             let bi: BlkIdx = rpo[n];
-            let b: &mut Blk = &mut blks[bi];
             bscopy(&mut u, &blks[bi].out);
             // Ugh, crying for succs iter
             add_liveon_succ_out(blks, phis, &mut v, bi, blks[bi].s1);
@@ -113,14 +112,11 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
 
             blks[bi].nlive.copy_from_slice(&nlv);
             for ii in (0..blks[bi].ins.len()).rev() {
-                let (op, to, arg0, arg1) = {
-                    let i: &Ins = &blks[bi].ins[ii];
-                    (i.op, i.to, i.args[0], i.args[1])
-                };
-                if op == O::Ocall {
-                    if let Ref::RCall(_) = arg1 {
+                let i: Ins = blks[bi].ins[ii]; // Note, copy
+                if i.op == O::Ocall {
+                    if let Ref::RCall(_) = i.args[1] {
                         let mut m: [u32; 2] = [0; 2];
-                        blks[bi].in_[0] &= (targ.retregs)(arg1, &mut m);
+                        blks[bi].in_[0] &= (targ.retregs)(i.args[1], &mut m);
                         for k in 0..2 {
                             nlv[k] -= m[k];
                             /* caller-save registers are used
@@ -132,32 +128,29 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                                 blks[bi].nlive[k] = nlv[k];
                             }
                         }
-                        blks[bi].in_[0] |= (targ.argregs)(arg1, &mut m);
+                        blks[bi].in_[0] |= (targ.argregs)(i.args[1], &mut m);
                         for k in 0..2 {
                             nlv[k] -= targ.nrsave[k];
                             nlv[k] += m[k];
                         }
                     }
                 }
-                if to != Ref::R {
-                    let ti: TmpIdx = {
-                        if let Ref::RTmp(ti0) = to {
-                            ti0
-                        } else {
-                            // to MUST be R or RTmp
-                            assert!(false);
-                            TmpIdx::NONE
+                match i.to {
+                    Ref::R => (),
+                    Ref::RTmp(ti) => {
+                        if bshas(&blks[bi].in_, ti.usize()) {
+                            nlv[kbase(tmps[ti].cls) as usize] -= 1;
                         }
-                    };
-                    if bshas(&blks[bi].in_, ti.usize()) {
-                        nlv[kbase(tmps[ti].cls) as usize] -= 1;
+                        bsset(&mut blks[bi].gen, ti.usize());
+                        bsclr(&mut blks[bi].in_, ti.usize());
                     }
-                    bsset(&mut blks[bi].gen, ti.usize());
-                    bsclr(&mut blks[bi].in_, ti.usize());
+                    _ => {
+                        // i.to MUST be R or RTmp
+                        assert!(false);
+                    }
                 }
                 for k in 0..2 {
-                    let argk: Ref = [arg0, arg1][k];
-                    match argk {
+                    match i.args[k] {
                         Ref::RMem(ma) => {
                             let (base, index) = {
                                 let mem: &Mem = &mems[ma];
@@ -167,7 +160,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                             bset(tmps, index, &mut blks[bi], &mut nlv);
                         }
                         _ => {
-                            bset(tmps, argk, &mut blks[bi], &mut nlv);
+                            bset(tmps, i.args[k], &mut blks[bi], &mut nlv);
                         }
                     }
                 }
