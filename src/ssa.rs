@@ -297,7 +297,7 @@ fn rendef(
 }
 
 fn getstk(
-    f: &Fn,
+    blks: &[Blk],
     bi: BlkIdx,
     ti: TmpIdx,
     namel: &mut NameIdx,
@@ -305,7 +305,7 @@ fn getstk(
     stk: &mut [NameIdx],
 ) -> Ref {
     let mut ni: NameIdx = stk[ti.0 as usize];
-    while ni != NameIdx::INVALID && !dom(&f.blks, names[ni.0 as usize].bi, bi) {
+    while ni != NameIdx::INVALID && !dom(blks, names[ni.0 as usize].bi, bi) {
         let ni1: NameIdx = ni;
         ni = names[ni.0 as usize].up;
         nfree(ni1, namel, names);
@@ -320,6 +320,10 @@ fn getstk(
 }
 
 fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, stk: &mut [NameIdx]) {
+    let blks: &[Blk] = &f.blks;
+    let phis: &mut Vec<Phi> = &mut f.phis;
+    let tmps: &[Tmp] = &f.tmps;
+
     let mut pi = f.blk(bi).phi;
     while pi != PhiIdx::NONE {
         let to: Ref = f.phi(pi).to;
@@ -332,7 +336,7 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
         for m in 0..2 {
             if let Ref::RTmp(ti) = f.blk(bi).ins[ii].args[m] {
                 if f.tmp(ti).visit != TmpIdx::NONE {
-                    f.blk_mut(bi).ins[ii].args[m] = getstk(f, bi, ti, namel, names, stk);
+                    f.blk_mut(bi).ins[ii].args[m] = getstk(&f.blks, bi, ti, namel, names, stk);
                 }
             }
         }
@@ -343,7 +347,7 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
     let jmp_arg: Ref = f.blk(bi).jmp.arg;
     if let Ref::RTmp(ti) = jmp_arg {
         if f.tmp(ti).visit != TmpIdx::NONE {
-            f.blk_mut(bi).jmp.arg = getstk(f, bi, ti, namel, names, stk);
+            f.blk_mut(bi).jmp.arg = getstk(&f.blks, bi, ti, namel, names, stk);
         }
     }
     let (s1, s2) = f.blk(bi).s1_s2();
@@ -357,7 +361,7 @@ fn renblk(f: &mut Fn, bi: BlkIdx, namel: &mut NameIdx, names: &mut Vec<Name>, st
             if let Ref::RTmp(to_ti) = f.phi(pi).to {
                 let ti: TmpIdx = f.tmp(to_ti).visit;
                 if ti != TmpIdx::NONE {
-                    let arg: Ref = getstk(f, bi, ti, namel, names, stk);
+                    let arg: Ref = getstk(&f.blks, bi, ti, namel, names, stk);
                     let p: &mut Phi = f.phi_mut(pi);
                     p.args.push(arg);
                     p.blks.push(bi);
