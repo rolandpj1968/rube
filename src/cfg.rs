@@ -41,15 +41,12 @@ pub fn fillpreds(f: &Fn) {
     let blks = &f.blks;
     blks.for_each_mut(|b| b.preds.clear());
     blks.for_each_bi(|bi| {
-        // let mut bi: BlkIdx = f.start;
-        // while bi != BlkIdx::NONE {
-        let (succs, link) = blks.with(bi, |b| (b.succs(), b.link));
+        let succs = blks.with(bi, |b| b.succs());
         succs.iter().for_each(|si| {
             if *si != BlkIdx::NONE {
                 blks.with_mut(*si, |s| s.preds.push(bi));
             }
         });
-        //bi = link;
     });
 }
 
