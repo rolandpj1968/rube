@@ -345,9 +345,7 @@ fn renblk(
     for ii in 0..ins_len {
         for m in 0..2 {
             let arg = blks.borrow(bi).ins()[ii].args[m];
-            if let Ref::RTmp(ti) = arg
-            /*blks.borrow(bi).ins()[ii].args[m]*/
-            {
+            if let Ref::RTmp(ti) = arg {
                 if tmps[ti].visit != TmpIdx::NONE {
                     let new_arg = getstk(blks, bi, ti, namel, names, stk);
                     blks.borrow_mut(bi).ins_mut()[ii].args[m] = new_arg;

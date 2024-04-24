@@ -44,55 +44,60 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
     /* promote uniform stack slots to temporaries */
     // TODO - ask QBE; only touches first/start Blk
     let bi: BlkIdx = f.start;
-    'ins_loop: for ii in 0..blks.borrow(bi).ins().len() {
-        let b = blks.borrow(bi);
-        let i: &Ins = &b /*blks.borrow(bi)*/
-            .ins()[ii];
-        // TODO isalloc
-        if OALLOC > i.op || i.op > OALLOC1 {
-            continue;
-        }
-        /* specific to NAlign == 3 */
-        /* TODO - what does this comment ^^^ mean */
-        let ti = if let Ref::RTmp(ti0) = i.to {
-            ti0
-        } else {
-            assert!(false);
-            continue 'ins_loop;
-        };
-
-        let t: &mut Tmp = &mut tmps[ti];
-
-        if t.ndef != 1 {
-            continue 'ins_loop;
-        }
+    let ins_len = blks.borrow(bi).ins().len();
+    'ins_loop: for ii in 0..ins_len
+    /*blks.borrow(bi).ins().len()*/
+    {
+        let ti: TmpIdx;
+        let t: &mut Tmp;
         let mut k: KExt = KX;
-        let mut s: i32 = -1; // TODO - what is this actually?
+        let mut s: i32 = -1; // TODO sz types in general :(
+        {
+            let b = blks.borrow(bi);
+            let i: &Ins = &b.ins()[ii];
+            // TODO isalloc
+            if OALLOC > i.op || i.op > OALLOC1 {
+                continue;
+            }
+            /* specific to NAlign == 3 */
+            /* TODO - what does this comment ^^^ mean */
+            ti = if let Ref::RTmp(ti0) = i.to {
+                ti0
+            } else {
+                assert!(false);
+                continue 'ins_loop;
+            };
 
-        for u in &t.uses {
-            if let UseT::UIns(li) = u.type_ {
-                let b = blks.borrow(u.bi);
-                let l: &Ins = &b /*blks.borrow(u.bi)*/
-                    .ins()[li];
-                if isload(l.op) {
-                    if s == -1 || s == loadsz(l) {
-                        s = loadsz(l);
-                        continue;
-                    }
-                } else if isstore(l.op) {
-                    if (i.to == l.args[1] && i.to != l.args[0])
-                        && (s == -1 || s == storesz(l))
-                        && (k == KX || k == OPTAB[l.op as usize].argcls[0][0])
-                    {
-                        s = storesz(l);
-                        k = OPTAB[l.op as usize].argcls[0][0];
-                        continue;
+            t = &mut tmps[ti];
+
+            if t.ndef != 1 {
+                continue 'ins_loop;
+            }
+
+            for u in &t.uses {
+                if let UseT::UIns(li) = u.type_ {
+                    let ub = blks.borrow(u.bi);
+                    let l: &Ins = &ub.ins()[li];
+                    if isload(l.op) {
+                        if s == -1 || s == loadsz(l) {
+                            s = loadsz(l);
+                            continue;
+                        }
+                    } else if isstore(l.op) {
+                        if (i.to == l.args[1] && i.to != l.args[0])
+                            && (s == -1 || s == storesz(l))
+                            && (k == KX || k == OPTAB[l.op as usize].argcls[0][0])
+                        {
+                            s = storesz(l);
+                            k = OPTAB[l.op as usize].argcls[0][0];
+                            continue;
+                        }
+                    } else {
+                        continue 'ins_loop;
                     }
                 } else {
                     continue 'ins_loop;
                 }
-            } else {
-                continue 'ins_loop;
             }
         }
 
@@ -588,11 +593,8 @@ pub fn coalesce(f: &mut Fn) {
                 UseT::UIns(ii) => {
                     let bi: BlkIdx = f.rpo[u.bid as usize];
                     let b = f.blk_mut(bi);
-                    let args: &mut [Ref; 2] = &mut b /*f.blk_mut(bi)*/
-                        .ins_mut()[ii.0 as usize]
-                        .args;
+                    let args: &mut [Ref; 2] = &mut b.ins_mut()[ii.0 as usize].args;
                     for arg in args {
-                        //         for (n=0; n<2; n++)
                         if *arg == Ref::RTmp(sti) {
                             *arg = Ref::RTmp(ssti);
                         }
