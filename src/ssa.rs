@@ -338,7 +338,8 @@ fn renblk(
 
         pi = phis[pi].link;
     }
-    for ii in 0..blks.borrow(bi).ins().len() {
+    let ins_len = blks.borrow(bi).ins().len();
+    for ii in 0..ins_len {
         for m in 0..2 {
             if let Ref::RTmp(ti) = blks.borrow(bi).ins()[ii].args[m] {
                 if tmps[ti].visit != TmpIdx::NONE {
