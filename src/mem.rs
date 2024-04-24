@@ -42,36 +42,29 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
     let tmps: &mut [Tmp] = &mut f.tmps;
 
     /* promote uniform stack slots to temporaries */
-    // TODO - ask QBE; only touches first/start Blk
     let bi: BlkIdx = f.start;
     let ins_len = blks.borrow(bi).ins().len();
-    'ins_loop: for ii in 0..ins_len
-    /*blks.borrow(bi).ins().len()*/
-    {
-        let ti: TmpIdx;
+    'ins_loop: for ii in 0..ins_len {
         let t: &mut Tmp;
         let mut k: KExt = KX;
         let mut s: i32 = -1; // TODO sz types in general :(
         {
             let b = blks.borrow(bi);
             let i: &Ins = &b.ins()[ii];
-            // TODO isalloc
+            // TODO !isalloc
             if OALLOC > i.op || i.op > OALLOC1 {
                 continue;
             }
             /* specific to NAlign == 3 */
             /* TODO - what does this comment ^^^ mean */
-            ti = if let Ref::RTmp(ti0) = i.to {
-                ti0
+            assert!(matches!(i.to, Ref::RTmp(_)));
+            if let Ref::RTmp(ti) = i.to {
+                t = &mut tmps[ti];
             } else {
-                assert!(false);
-                continue 'ins_loop;
-            };
-
-            t = &mut tmps[ti];
-
+                continue;
+            }
             if t.ndef != 1 {
-                continue 'ins_loop;
+                continue;
             }
 
             for u in &t.uses {
@@ -109,20 +102,18 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
             let ub = blks.borrow_mut(u.bi);
             let mut ub_ins = ub.ins_mut();
             let l: &mut Ins = {
+                assert!(matches!(u.type_, UseT::UIns(_)));
                 if let UseT::UIns(li) = u.type_ {
                     &mut ub_ins/*ub.ins_mut()*/[li]
                 } else {
-                    // Checked above that uses are only UIns
-                    assert!(false);
                     continue;
                 }
             };
             if isstore(l.op) {
                 *l = Ins::new1(O::Ocopy, k, l.args[1], [l.args[0]]);
-                //t.nuse -= 1; // Hrmmm... TODO TODO TODO
+                //t.nuse -= 1; // Hrmmm... TODO TODO TODO; this seems dodge cos it's not the last use
                 t.ndef += 1;
             } else {
-                // Skipped all instructions other than load/store above
                 assert!(isload(l.op));
 
                 if k == KX {

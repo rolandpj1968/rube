@@ -51,12 +51,11 @@ pub fn filluse(f: &mut Fn) {
 
     /* todo, is this the correct file? */
     for tmp in tmps.iter_mut().skip(TMP0 as usize) {
-        // TODO - Tmp::clear()???
-        tmp.def = InsIdx::NONE; // QBE initialises with 0
+        tmp.def = InsIdx::NONE;
         tmp.bid = u32::MAX;
         tmp.ndef = 0;
-        tmp.cls = KW; // QBE sets to 0
-        tmp.phi = TmpIdx::NONE; // QBE sets to 0
+        tmp.cls = KW;
+        tmp.phi = TmpIdx::NONE;
         tmp.width = TmpWdth::WFull;
         tmp.uses.clear();
     }
@@ -64,37 +63,33 @@ pub fn filluse(f: &mut Fn) {
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
         blks.with(bi, |b| {
-            let bid: u32 = b.id;
             let mut pi: PhiIdx = b.phi;
             while pi != PhiIdx::NONE {
                 let p: &Phi = &phis[pi];
                 let cls = p.cls;
+                assert!(matches!(p.to, Ref::RTmp(_)));
                 if let Ref::RTmp(mut pti) = p.to {
-                    {
-                        let tmp: &mut Tmp = &mut tmps[pti];
-                        tmp.bid = bid;
-                        tmp.ndef += 1;
-                        tmp.cls = cls;
-                    }
+                    let tmp: &mut Tmp = &mut tmps[pti];
+                    tmp.bid = b.id;
+                    tmp.ndef += 1;
+                    tmp.cls = cls;
+
                     pti = phicls(pti, tmps);
                     for a in &p.args {
                         if let Ref::RTmp(mut ati) = a {
-                            adduse(&mut tmps[ati], UseT::UPhi(pi), bi, bid);
+                            adduse(&mut tmps[ati], UseT::UPhi(pi), bi, b.id);
                             ati = phicls(ati, tmps);
                             if ati != pti {
                                 tmps[ati].phi = pti;
                             }
                         }
                     }
-                } else {
-                    // p.to MUST be an RTmp
-                    assert!(false);
                 }
-
                 pi = p.link;
             }
 
             for (ii, i) in b.ins().iter().enumerate() {
+                assert!(i.to == Ref::R || matches!(i.to, Ref::RTmp(_)));
                 if let Ref::RTmp(ti) = i.to {
                     let mut w: TmpWdth = TmpWdth::WFull;
                     if isparbh(i.op) {
@@ -112,22 +107,19 @@ pub fn filluse(f: &mut Fn) {
                     let tmp: &mut Tmp = &mut tmps[ti];
                     tmp.width = w;
                     tmp.def = InsIdx::new(ii);
-                    tmp.bid = bid;
+                    tmp.bid = b.id;
                     tmp.ndef += 1;
                     tmp.cls = i.cls;
-                } else {
-                    // Ins i.to must be R or RTmp
-                    assert!(i.to == Ref::R);
                 }
                 for arg in i.args {
                     if let Ref::RTmp(ti) = arg {
-                        adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, bid);
+                        adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, b.id);
                     }
                 }
             }
 
             if let Ref::RTmp(ti) = b.jmp().arg {
-                adduse(&mut tmps[ti], UseT::UJmp, bi, bid);
+                adduse(&mut tmps[ti], UseT::UJmp, bi, b.id);
             }
 
             bi = b.link;
@@ -152,15 +144,18 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     let start_id: u32 = blks.id_of(f.start);
     for tii in TMP0..nt {
         let ti: TmpIdx = TmpIdx::new(tii);
-        tmps[ti].visit = TmpIdx::NONE;
-        if tmps[ti].phi != TmpIdx::NONE {
-            continue;
-        }
-        if tmps[ti].ndef == 1 {
-            let defb: u32 = tmps[ti].bid;
-            let ok = tmps[ti].uses.iter().all(|u| u.bid == defb);
-            if ok || defb == start_id {
+        {
+            let t: &mut Tmp = &mut tmps[ti];
+            t.visit = TmpIdx::NONE;
+            if t.phi != TmpIdx::NONE {
                 continue;
+            }
+            if t.ndef == 1 {
+                let defb: u32 = t.bid;
+                let ok = t.uses.iter().all(|u| u.bid == defb);
+                if ok || defb == start_id {
+                    continue;
+                }
             }
         }
         let mut u: BSet = bsinit(blks.len());
@@ -278,27 +273,21 @@ fn rendef(
     names: &mut Vec<Name>,
     stk: &mut [NameIdx],
 ) -> Ref {
-    if r == Ref::R {
-        return r;
-    }
-    if let Ref::RTmp(ti) = r {
-        if tmps[ti].visit == TmpIdx::NONE {
-            return r;
+    assert!(r == Ref::R || matches!(r, Ref::RTmp(_)));
+    match r {
+        Ref::RTmp(ti) => {
+            if tmps[ti].visit == TmpIdx::NONE {
+                return r;
+            }
+            let r1: Ref = refindex(tmps, ti);
+            if let Ref::RTmp(t1i) = r1 {
+                tmps[t1i].visit = ti;
+                let ni: NameIdx = nnew(r1, bi, namel, names, stk[ti.0 as usize]);
+                stk[ti.0 as usize] = ni;
+            }
+            r1
         }
-        let r1: Ref = refindex(tmps, ti);
-        // TODO - there must be a better way of indicating that refindex() returns Ref::RTmp
-        if let Ref::RTmp(t1i) = r1 {
-            tmps[t1i].visit = ti;
-            let ni: NameIdx = nnew(r1, bi, namel, names, stk[ti.0 as usize]);
-            stk[ti.0 as usize] = ni;
-        } else {
-            assert!(false);
-        }
-        r1
-    } else {
-        // r must be R or RTmp
-        assert!(false);
-        r
+        _ => r,
     }
 }
 
@@ -355,7 +344,6 @@ fn renblk(
                 }
             }
             let to: Ref = b.ins()[ii].to;
-            //let new_to: Ref = rendef(tmps, bi, to, namel, names, stk);
             b.ins_mut()[ii].to = rendef(tmps, bi, to, namel, names, stk);
         }
         let jmp_arg: Ref = b.jmp().arg;
@@ -369,24 +357,24 @@ fn renblk(
     let succs = blks.succs_of(bi);
     for si in succs {
         if si == BlkIdx::NONE {
-            continue; // QBE effectively break's
+            continue;
         }
         let mut pi: PhiIdx = blks.phi_of(si);
         while pi != PhiIdx::NONE {
-            if let Ref::RTmp(to_ti) = phis[pi].to {
+            let p: &mut Phi = &mut phis[pi];
+            assert!(matches!(p.to, Ref::RTmp(_)));
+            if let Ref::RTmp(to_ti) = p.to {
                 let ti: TmpIdx = tmps[to_ti].visit;
                 if ti != TmpIdx::NONE {
                     let arg: Ref = getstk(blks, bi, ti, namel, names, stk);
-                    phis[pi].args.push(arg);
-                    phis[pi].blks.push(bi);
+                    p.args.push(arg);
+                    p.blks.push(bi);
                 }
-            } else {
-                // phi to MUST be an RTmp (TODO is there a better way?)
-                assert!(false);
             }
-            pi = phis[pi].link;
+            pi = p.link;
         }
     }
+
     let mut si: BlkIdx = blks.dom_of(bi);
     while si != BlkIdx::NONE {
         renblk(blks, phis, tmps, si, namel, names, stk);
@@ -431,10 +419,15 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     let mut namel: NameIdx = NameIdx::INVALID;
     let mut names: Vec<Name> = vec![];
     let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
-    let blks: &Blks = &f.blks;
-    let phis: &mut Vec<Phi> = &mut f.phis;
-    let tmps: &mut Vec<Tmp> = &mut f.tmps;
-    renblk(blks, phis, tmps, f.start, &mut namel, &mut names, &mut stk);
+    renblk(
+        &f.blks,
+        &mut f.phis,
+        &mut f.tmps,
+        f.start,
+        &mut namel,
+        &mut names,
+        &mut stk,
+    );
     // TODO
     //debug['L'] = d;
     if false
@@ -481,61 +474,64 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let b = blks.borrow(bi);
-        let mut pi: PhiIdx = b.phi;
-        while pi != PhiIdx::NONE {
-            let p: &Phi = &phis[pi];
-            let r: Ref = p.to;
-            let ti: TmpIdx = if let Ref::RTmp(ti0) = r {
-                ti0
-            } else {
-                return Err(Box::new(SsaError::new(&format!(
-                    "phi does not define a temporary in @{}",
-                    to_s(&b.name)
-                ))));
-            };
-            let t: &Tmp = &tmps[ti];
-            for u in &t.uses {
-                let bui: BlkIdx = rpo[u.bid as usize];
-
-                if let UseT::UPhi(upi) = u.type_ {
-                    if phicheck(blks, &phis[upi], bi, r) {
-                        return Err(ssacheck_err(f, t, bui));
-                    }
+        blks.with(bi, |b| {
+            let mut pi: PhiIdx = b.phi;
+            while pi != PhiIdx::NONE {
+                let p: &Phi = &phis[pi];
+                let r: Ref = p.to;
+                let ti: TmpIdx = if let Ref::RTmp(ti0) = r {
+                    ti0
                 } else {
-                    if bui != bi && !sdom(blks, bi, bui) {
-                        return Err(ssacheck_err(f, t, bui));
+                    return Err(Box::new(SsaError::new(&format!(
+                        "phi does not define a temporary in @{}",
+                        to_s(&b.name)
+                    ))));
+                };
+                let t: &Tmp = &tmps[ti];
+                for u in &t.uses {
+                    let bui: BlkIdx = rpo[u.bid as usize];
+
+                    if let UseT::UPhi(upi) = u.type_ {
+                        if phicheck(blks, &phis[upi], bi, r) {
+                            return Err(ssacheck_err(f, t, bui));
+                        }
+                    } else {
+                        if bui != bi && !sdom(blks, bi, bui) {
+                            return Err(ssacheck_err(f, t, bui));
+                        }
                     }
                 }
-            }
-            for (ii, i) in b.ins().iter().enumerate() {
-                if let Ref::RTmp(ti) = i.to {
-                    let t: &Tmp = &tmps[ti];
-                    for u in &t.uses {
-                        let bui: BlkIdx = rpo[u.bid as usize];
-                        match u.type_ {
-                            UseT::UPhi(upi) => {
-                                if phicheck(blks, &phis[upi], bi, r) {
-                                    return Err(ssacheck_err(f, t, bui));
+                for (ii, i) in b.ins().iter().enumerate() {
+                    if let Ref::RTmp(ti) = i.to {
+                        let t: &Tmp = &tmps[ti];
+                        for u in &t.uses {
+                            let bui: BlkIdx = rpo[u.bid as usize];
+                            match u.type_ {
+                                UseT::UPhi(upi) => {
+                                    if phicheck(blks, &phis[upi], bi, r) {
+                                        return Err(ssacheck_err(f, t, bui));
+                                    }
                                 }
-                            }
-                            UseT::UIns(uii) => {
-                                if bui == bi && uii.0 <= (ii as u32) {
-                                    return Err(ssacheck_err(f, t, bui));
+                                UseT::UIns(uii) => {
+                                    if bui == bi && uii.0 <= (ii as u32) {
+                                        return Err(ssacheck_err(f, t, bui));
+                                    }
                                 }
-                            }
-                            _ => {
-                                if bui != bi && !sdom(blks, bi, bui) {
-                                    return Err(ssacheck_err(f, t, bui));
+                                _ => {
+                                    if bui != bi && !sdom(blks, bi, bui) {
+                                        return Err(ssacheck_err(f, t, bui));
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                pi = p.link;
             }
-            pi = p.link;
-        }
-        bi = b.link;
+            bi = b.link;
+
+            Ok(())
+        })?;
     }
     Ok(())
 }
