@@ -79,11 +79,15 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     loop {
         for n in (0..rpo.len()).rev() {
             let bi: BlkIdx = rpo[n];
-            bscopy(&mut u, &blks.borrow(bi).out);
-            // Ugh, crying for succs iter
-            add_liveon_succ_out(blks, phis, &mut v, bi, blks.borrow(bi).s1);
-            add_liveon_succ_out(blks, phis, &mut v, bi, blks.borrow(bi).s2);
-            chg = chg || !bsequal(&blks.borrow(bi).out, &u);
+            println!("       filllive: bi is {:?}", bi);
+            {
+                bscopy(&mut u, &blks.borrow(bi).out);
+                // Ugh, crying for succs iter
+                let (s1, s2) = blks.borrow(bi).s1_s2();
+                add_liveon_succ_out(blks, phis, &mut v, bi, /*blks.borrow(bi).*/ s1);
+                add_liveon_succ_out(blks, phis, &mut v, bi, /*blks.borrow(bi).*/ s2);
+                chg = chg || !bsequal(&blks.borrow(bi).out, &u);
+            }
 
             let mut nlv: [u32; 2] = [0; 2];
             blks.with_mut(bi, |b| {
@@ -91,7 +95,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                 bscopy(&mut b.in_, &b.out);
 
                 let mut ti: usize = 0;
-                while bsiter(&blks.borrow(bi).in_, &mut ti) {
+                while bsiter(&b.in_, &mut ti) {
                     nlv[kbase(tmps[ti].cls) as usize] += 1;
                     ti += 1;
                 }
@@ -136,8 +140,8 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                             if bshas(&b.in_, ti.usize()) {
                                 nlv[kbase(tmps[ti].cls) as usize] -= 1;
                             }
-                            bsset(&mut blks.borrow_mut(bi).gen, ti.usize());
-                            bsclr(&mut blks.borrow_mut(bi).in_, ti.usize());
+                            bsset(&mut /*blks.borrow_mut(bi)*/b.gen, ti.usize());
+                            bsclr(&mut /*blks.borrow_mut(bi)*/b.in_, ti.usize());
                         }
                         _ => {
                             // i.to MUST be R or RTmp
