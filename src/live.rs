@@ -9,26 +9,32 @@ use crate::util::{bsclr, bscopy, bscount, bsequal, bsinit, bsiter, bsset, bsunio
 // Ugh, put phis on Blk
 fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
     bscopy(v, &blks.borrow(si).in_);
-    let mut pi: PhiIdx = blks.borrow(si).phi;
-    while pi != PhiIdx::NONE {
-        let p: &Phi = &phis[pi];
-        if let Ref::RTmp(ti) = p.to {
-            bsclr(v, ti.usize());
+
+    {
+        let mut pi: PhiIdx = blks.borrow(si).phi;
+        while pi != PhiIdx::NONE {
+            let p: &Phi = &phis[pi];
+            if let Ref::RTmp(ti) = p.to {
+                bsclr(v, ti.usize());
+            }
+            pi = p.link;
         }
-        pi = phis[pi].link;
     }
-    let mut pi = blks.borrow(si).phi;
-    while pi != PhiIdx::NONE {
-        assert!(phis[pi].args.len() == phis[pi].blks.len());
-        for a in 0..phis[pi].args.len() {
-            if phis[pi].blks[a] == bi {
-                if let Ref::RTmp(ati) = phis[pi].args[a] {
-                    bsset(v, ati.usize());
-                    bsset(&mut blks.borrow_mut(bi).gen, ati.usize());
+    {
+        let mut pi = blks.borrow(si).phi;
+        while pi != PhiIdx::NONE {
+            let p: &Phi = &phis[pi];
+            assert!(p.args.len() == p.blks.len());
+            for a in 0..p.args.len() {
+                if p.blks[a] == bi {
+                    if let Ref::RTmp(ati) = p.args[a] {
+                        bsset(v, ati.usize());
+                        blks.with_mut(bi, |b| bsset(&mut b.gen, ati.usize()));
+                    }
                 }
             }
+            pi = p.link;
         }
-        pi = phis[pi].link;
     }
 }
 

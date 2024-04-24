@@ -67,23 +67,17 @@ fn rporec(blks: &Blks, bi: BlkIdx, mut x: u32) -> u32 {
             && blks.borrow(b.s1).loop_ > blks.borrow(b.s2).loop_
     });
 
-    let (s1, s2) = blks.with_mut(bi, |b| {
+    let succs = blks.with_mut(bi, |b| {
+        b.id = 1;
         if swap_succs {
             (b.s1, b.s2) = (b.s2, b.s1);
         }
-
-        b.id = 1;
-
-        (b.s1, b.s2)
+        [b.s1, b.s2]
     });
-
-    x = rporec(blks, s1, x);
-    x = rporec(blks, s2, x);
+    succs.iter().for_each(|si| x = rporec(blks, *si, x));
     assert!(x != u32::MAX);
 
-    blks.with_mut(bi, |b| {
-        b.id = x;
-    });
+    blks.with_mut(bi, |b| b.id = x);
 
     // Deliberately wraps to u32:MAX
     x.wrapping_sub(1)
@@ -129,11 +123,11 @@ fn inter(blks: &Blks, mut bi1: BlkIdx, mut bi2: BlkIdx) -> BlkIdx {
         return bi2;
     }
     while bi1 != bi2 {
-        if blks.borrow(bi1).id < blks.borrow(bi2).id {
+        if blks.id_of(bi1) < blks.id_of(bi2) {
             (bi1, bi2) = (bi2, bi1);
         }
-        while blks.borrow(bi1).id > blks.borrow(bi2).id {
-            bi1 = blks.borrow(bi1).idom;
+        while blks.id_of(bi1) > blks.id_of(bi2) {
+            bi1 = blks.idom_of(bi1);
             assert!(bi1 != BlkIdx::NONE);
         }
     }
@@ -156,36 +150,35 @@ pub fn filldom(f: &mut Fn) {
             let di = blks.with(*bi, |b| {
                 let mut di0: BlkIdx = BlkIdx::NONE;
                 for pi in &b.preds {
-                    if blks.borrow(*pi).idom != BlkIdx::NONE || *pi == f.start {
+                    if blks.idom_of(*pi) != BlkIdx::NONE || *pi == f.start {
                         di0 = inter(blks, di0, *pi);
                     }
                 }
                 di0
             });
-
-            blks.with_mut(*bi, |b| {
-                if di != b.idom {
-                    ch += 1;
-                    b.idom = di;
-                }
-            });
+            if di != blks.idom_of(*bi) {
+                ch += 1;
+                blks.with_mut(*bi, |b| b.idom = di);
+            }
         }
-
         if ch == 0 {
             break;
         }
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let di: BlkIdx = blks.borrow(bi).idom;
-        if di != BlkIdx::NONE {
-            assert!(di != bi);
-            let ddomi = blks.borrow(di).dom;
-            blks.borrow_mut(bi).dlink = ddomi;
-            blks.borrow_mut(di).dom = bi;
-        }
+        blks.with_mut(bi, |b| {
+            let di: BlkIdx = b.idom;
+            if di != BlkIdx::NONE {
+                assert!(di != bi);
+                blks.with_mut(di, |d| {
+                    b.dlink = d.dom;
+                    d.dom = bi;
+                });
+            }
 
-        bi = blks.borrow(bi).link;
+            bi = b.link;
+        });
     }
 }
 
@@ -194,8 +187,8 @@ pub fn sdom(blks: &Blks, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
     if b1i == b2i {
         return false;
     }
-    while blks.borrow(b2i).id > blks.borrow(b1i).id {
-        b2i = blks.borrow(b2i).idom;
+    while blks.id_of(b2i) > blks.id_of(b1i) {
+        b2i = blks.idom_of(b2i);
     }
     b1i == b2i
 }
@@ -204,7 +197,7 @@ pub fn dom(blks: &Blks, b1i: BlkIdx, b2i: BlkIdx) -> bool {
     b1i == b2i || sdom(blks, b1i, b2i)
 }
 
-fn addfron(mut a: cell::RefMut<Blk>, bi: BlkIdx) {
+fn addfron(mut a: &mut Blk, bi: BlkIdx) {
     if !a.frons.contains(&bi) {
         a.frons.push(bi);
     }
@@ -214,8 +207,10 @@ fn fillfron_for_succ(blks: &Blks, bi: BlkIdx, si: BlkIdx) {
     if si != BlkIdx::NONE {
         let mut ai = bi;
         while !sdom(blks, ai, si) {
-            addfron(blks.borrow_mut(ai), si);
-            ai = blks.borrow(ai).idom;
+            blks.with_mut(ai, |a| {
+                addfron(a, si);
+                ai = a.idom;
+            });
         }
     }
 }
@@ -229,10 +224,9 @@ pub fn fillfron(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let (s1, s2) = blks.borrow(bi).s1_s2();
-        fillfron_for_succ(blks, bi, s1);
-        fillfron_for_succ(blks, bi, s2);
-        bi = blks.borrow(bi).link;
+        let (succs, link) = blks.with(bi, |b| ([b.s1, b.s2], b.link));
+        succs.iter().for_each(|si| fillfron_for_succ(blks, bi, *si));
+        bi = link;
     }
 }
 

@@ -111,6 +111,15 @@ impl Blks {
     pub fn for_each_mut(&self, mut f: impl FnMut(cell::RefMut<Blk>)) {
         self.v.iter().for_each(|br| f(br.borrow_mut()));
     }
+    pub fn id_of(&self, bi: BlkIdx) -> u32 {
+        self.borrow(bi).id
+    }
+    pub fn dom_of(&self, bi: BlkIdx) -> BlkIdx {
+        self.borrow(bi).dom
+    }
+    pub fn idom_of(&self, bi: BlkIdx) -> BlkIdx {
+        self.borrow(bi).idom
+    }
 }
 
 // Hrmm, it's complaining about lifetime params - need more grokking, just use .borrow() for now
