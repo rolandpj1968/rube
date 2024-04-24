@@ -11,7 +11,7 @@ fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
     bscopy(v, &blks.borrow(si).in_);
 
     {
-        let mut pi: PhiIdx = blks.borrow(si).phi;
+        let mut pi: PhiIdx = blks.phi_of(si);
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             if let Ref::RTmp(ti) = p.to {
@@ -21,7 +21,7 @@ fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
         }
     }
     {
-        let mut pi = blks.borrow(si).phi;
+        let mut pi = blks.phi_of(si);
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             assert!(p.args.len() == p.blks.len());
@@ -75,7 +75,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             {
                 let succs = blks.with_mut(bi, |b| {
                     bscopy(&mut u, &b.out);
-                    [b.s1, b.s2]
+                    b.succs()
                 });
                 succs.iter().for_each(|si| {
                     if *si != BlkIdx::NONE {
@@ -98,20 +98,17 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                 }
 
                 let jmp_arg = b.jmp().arg;
-                if let Ref::RCall(_) = jmp_arg
-                /*b.jmp().arg*/
-                {
+                if let Ref::RCall(_) = jmp_arg {
                     assert!(bscount(&b.in_) == targ.nrglob && b.in_[0] == targ.rglob);
-                    //let jmp_arg = b.jmp().arg;
-                    b.in_[0] |= (targ.retregs)(jmp_arg /*b.jmp().arg*/, &nlv); // TODO not implemented
+                    b.in_[0] |= (targ.retregs)(jmp_arg, &nlv); // TODO not implemented
                 } else {
-                    bset(tmps, jmp_arg /*b.jmp().arg*/, b, &mut nlv);
+                    bset(tmps, jmp_arg, b, &mut nlv);
                 }
 
                 b.nlive.copy_from_slice(&nlv);
 
                 let ins_len = b.ins().len();
-                for ii in (0..ins_len/*..ins().len()*/).rev() {
+                for ii in (0..ins_len).rev() {
                     let i: Ins = b.ins()[ii]; // Note, copy
                     if i.op == O::Ocall {
                         if let Ref::RCall(_) = i.args[1] {

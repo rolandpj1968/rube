@@ -365,13 +365,13 @@ fn renblk(
             }
         }
     });
-    let (s1, s2) = blks.borrow(bi).s1_s2();
-    let succ: [BlkIdx; 2] = [s1, if s1 == s2 { BlkIdx::NONE } else { s2 }];
-    for si in succ {
+
+    let succs = blks.succs_of(bi);
+    for si in succs {
         if si == BlkIdx::NONE {
             continue; // QBE effectively break's
         }
-        let mut pi: PhiIdx = blks.borrow(si).phi;
+        let mut pi: PhiIdx = blks.phi_of(si);
         while pi != PhiIdx::NONE {
             if let Ref::RTmp(to_ti) = phis[pi].to {
                 let ti: TmpIdx = tmps[to_ti].visit;
@@ -390,7 +390,7 @@ fn renblk(
     let mut si: BlkIdx = blks.dom_of(bi);
     while si != BlkIdx::NONE {
         renblk(blks, phis, tmps, si, namel, names, stk);
-        si = blks.borrow(si).dlink;
+        si = blks.dlink_of(si);
     }
 }
 

@@ -191,7 +191,7 @@ pub fn fillalias(f: &mut Fn) {
 
     for n in 0..f.nblk {
         let bi: BlkIdx = f.rpo[n as usize];
-        let mut pi: PhiIdx = f.blks.borrow(bi).phi;
+        let mut pi: PhiIdx = f.blks.phi_of(bi);
         while pi != PhiIdx::NONE {
             if let Ref::RTmp(ti) = f.phi(pi).to {
                 let ai = f.tmp(ti).alias;
@@ -318,7 +318,7 @@ pub fn fillalias(f: &mut Fn) {
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let mut pi: PhiIdx = f.blks.borrow(bi).phi;
+        let mut pi: PhiIdx = f.blks.phi_of(bi);
         while pi != PhiIdx::NONE {
             for n in 0..f.phi(pi).args.len() {
                 esc(f, f.phi(pi).args[n]);

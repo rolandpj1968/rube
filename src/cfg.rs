@@ -32,7 +32,7 @@ fn preddel(b: &mut Blk, bsi: BlkIdx) {
 fn edgedel(blks: &Blks, phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
     if bdi != BlkIdx::NONE {
         blks.with_mut(bsi, |bs| succsdel(bs, bdi));
-        phisdel(phis, blks.borrow(bdi).phi, bsi);
+        phisdel(phis, blks.phi_of(bdi), bsi);
         blks.with_mut(bdi, |bd| preddel(bd, bsi));
     }
 }
@@ -43,7 +43,7 @@ pub fn fillpreds(f: &Fn) {
     blks.for_each_mut(|mut b| b.preds.clear());
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let (succs, link) = blks.with(bi, |b| ([b.s1, b.s2], b.link));
+        let (succs, link) = blks.with(bi, |b| (b.succs(), b.link));
         succs.iter().for_each(|si| {
             if *si != BlkIdx::NONE {
                 blks.with_mut(*si, |s| s.preds.push(bi));
@@ -72,7 +72,7 @@ fn rporec(blks: &Blks, bi: BlkIdx, mut x: u32) -> u32 {
         if swap_succs {
             (b.s1, b.s2) = (b.s2, b.s1);
         }
-        [b.s1, b.s2]
+        b.succs()
     });
     succs.iter().for_each(|si| x = rporec(blks, *si, x));
     assert!(x != u32::MAX);
@@ -97,7 +97,7 @@ pub fn fillrpo(f: &mut Fn) {
     let mut prev_bi = BlkIdx::NONE;
     let mut bi = f.start;
     while bi != BlkIdx::NONE {
-        let (id, succs, link) = blks.with(bi, |b| (b.id, [b.s1, b.s2], b.link));
+        let (id, succs, link) = blks.with(bi, |b| (b.id, b.succs(), b.link));
         if id == u32::MAX {
             // Unreachable Blk
             succs.iter().for_each(|si| edgedel(blks, phis, bi, *si));
@@ -224,7 +224,7 @@ pub fn fillfron(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let (succs, link) = blks.with(bi, |b| ([b.s1, b.s2], b.link));
+        let (succs, link) = blks.with(bi, |b| (b.succs(), b.link));
         succs.iter().for_each(|si| fillfron_for_succ(blks, bi, *si));
         bi = link;
     }

@@ -126,6 +126,9 @@ impl Blks {
     pub fn succs_of(&self, bi: BlkIdx) -> [BlkIdx; 2] {
         self.borrow(bi).succs()
     }
+    pub fn dlink_of(&self, bi: BlkIdx) -> BlkIdx {
+        self.borrow(bi).dlink
+    }
 }
 
 // Hrmm, it's complaining about lifetime params - need more grokking, just use .borrow() for now
