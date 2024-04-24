@@ -126,11 +126,11 @@ pub fn filluse(f: &mut Fn) {
                 }
             }
 
-            if let Ref::RTmp(ti) = blks.borrow(bi).jmp.arg {
+            if let Ref::RTmp(ti) = b.jmp.arg {
                 adduse(&mut tmps[ti], UseT::UJmp, bi, bid);
             }
 
-            bi = blks.borrow(bi).link;
+            bi = b.link;
         });
     }
 }
@@ -334,35 +334,37 @@ fn renblk(
     names: &mut Vec<Name>,
     stk: &mut [NameIdx],
 ) {
-    let mut pi = blks.borrow(bi).phi;
-    while pi != PhiIdx::NONE {
-        let to: Ref = phis[pi].to;
-        let to_new = rendef(tmps, bi, to, namel, names, stk);
-        phis[pi].to = to_new;
+    blks.with(bi, |b| {
+        let mut pi = b.phi;
+        while pi != PhiIdx::NONE {
+            let to: Ref = phis[pi].to;
+            let to_new = rendef(tmps, bi, to, namel, names, stk);
+            phis[pi].to = to_new;
 
-        pi = phis[pi].link;
-    }
-    let ins_len = blks.borrow(bi).ins().len();
-    for ii in 0..ins_len {
-        for m in 0..2 {
-            let arg = blks.borrow(bi).ins()[ii].args[m];
-            if let Ref::RTmp(ti) = arg {
-                if tmps[ti].visit != TmpIdx::NONE {
-                    let new_arg = getstk(blks, bi, ti, namel, names, stk);
-                    blks.borrow_mut(bi).ins_mut()[ii].args[m] = new_arg;
+            pi = phis[pi].link;
+        }
+        let ins_len = b.ins().len();
+        for ii in 0..ins_len {
+            for m in 0..2 {
+                let arg = b.ins()[ii].args[m];
+                if let Ref::RTmp(ti) = arg {
+                    if tmps[ti].visit != TmpIdx::NONE {
+                        let new_arg = getstk(blks, bi, ti, namel, names, stk);
+                        b.ins_mut()[ii].args[m] = new_arg;
+                    }
                 }
             }
+            let to: Ref = b.ins()[ii].to;
+            //let new_to: Ref = rendef(tmps, bi, to, namel, names, stk);
+            b.ins_mut()[ii].to = rendef(tmps, bi, to, namel, names, stk);
         }
-        let to: Ref = blks.borrow(bi).ins()[ii].to;
-        let new_to: Ref = rendef(tmps, bi, to, namel, names, stk);
-        blks.borrow_mut(bi).ins_mut()[ii].to = new_to;
-    }
-    let jmp_arg: Ref = blks.borrow(bi).jmp.arg;
-    if let Ref::RTmp(ti) = jmp_arg {
-        if tmps[ti].visit != TmpIdx::NONE {
-            blks.borrow_mut(bi).jmp.arg = getstk(blks, bi, ti, namel, names, stk);
+        let jmp_arg: Ref = b.jmp.arg;
+        if let Ref::RTmp(ti) = jmp_arg {
+            if tmps[ti].visit != TmpIdx::NONE {
+                b.jmp.arg = getstk(blks, bi, ti, namel, names, stk);
+            }
         }
-    }
+    });
     let (s1, s2) = blks.borrow(bi).s1_s2();
     let succ: [BlkIdx; 2] = [s1, if s1 == s2 { BlkIdx::NONE } else { s2 }];
     for si in succ {
