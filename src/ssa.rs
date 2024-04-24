@@ -207,7 +207,10 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             let bi: BlkIdx = blist[bp];
             bp += 1;
             bsclr(&mut u, blks.borrow(bi).id as usize);
-            for n in 0..blks.borrow(bi).frons.len() {
+            let frons_len = blks.borrow(bi).frons.len();
+            for n in 0..frons_len
+            /*blks.borrow(bi).frons.len()*/
+            {
                 let ai: BlkIdx = blks.borrow(bi).frons[n];
                 let a_visit = blks.borrow(ai).visit;
                 blks.borrow_mut(ai).visit += 1;
@@ -341,10 +344,13 @@ fn renblk(
     let ins_len = blks.borrow(bi).ins().len();
     for ii in 0..ins_len {
         for m in 0..2 {
-            if let Ref::RTmp(ti) = blks.borrow(bi).ins()[ii].args[m] {
+            let arg = blks.borrow(bi).ins()[ii].args[m];
+            if let Ref::RTmp(ti) = arg
+            /*blks.borrow(bi).ins()[ii].args[m]*/
+            {
                 if tmps[ti].visit != TmpIdx::NONE {
-                    blks.borrow_mut(bi).ins_mut()[ii].args[m] =
-                        getstk(blks, bi, ti, namel, names, stk);
+                    let new_arg = getstk(blks, bi, ti, namel, names, stk);
+                    blks.borrow_mut(bi).ins_mut()[ii].args[m] = new_arg;
                 }
             }
         }
