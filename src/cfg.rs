@@ -10,10 +10,6 @@ fn succsdel(mut b: cell::RefMut<Blk>, bdi: BlkIdx) {
     if b.s2 == bdi {
         b.s2 = BlkIdx::NONE;
     }
-    // let mut succs = [&mut b.s1, &mut b.s2];
-    // for si in succs.iter_mut().filter(|si| ***si == bdi) {
-    //     **si = BlkIdx::NONE;
-    // }
 }
 
 fn phisdel(phis: &mut [Phi], mut pi: PhiIdx, bsi: BlkIdx) {
@@ -42,22 +38,18 @@ fn edgedel(blks: &Blks, phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
 }
 
 pub fn fillpreds(f: &Fn) {
+    let blks = &f.blks;
+    // TODO - live blocks only
+    blks.for_each_mut(|mut b| b.preds.clear());
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let mut b = f.blk_mut(bi);
-        b.preds.clear();
-        bi = b.link;
-    }
-    bi = f.start;
-    while bi != BlkIdx::NONE {
-        let (s1, s2) = f.blk(bi).s1_s2();
-        if s1 != BlkIdx::NONE {
-            f.blk_mut(s1).preds.push(bi);
-        }
-        if s2 != BlkIdx::NONE && s1 != s2 {
-            f.blk_mut(s2).preds.push(bi);
-        }
-        bi = f.blk(bi).link;
+        let (succs, link) = blks.with(bi, |b| ([b.s1, b.s2], b.link));
+        succs.iter().for_each(|si| {
+            if *si != BlkIdx::NONE {
+                blks.with_mut(*si, |s| s.preds.push(bi));
+            }
+        });
+        bi = link;
     }
 }
 
@@ -111,18 +103,19 @@ pub fn fillrpo(f: &mut Fn) {
     let mut prev_bi = BlkIdx::NONE;
     let mut bi = f.start;
     while bi != BlkIdx::NONE {
-        if blks.borrow(bi).id == u32::MAX {
+        let (id, succs, link) = blks.with(bi, |b| (b.id, [b.s1, b.s2], b.link));
+        if id == u32::MAX {
             // Unreachable Blk
-            edgedel(blks, phis, bi, blks.borrow(bi).s1);
-            edgedel(blks, phis, bi, blks.borrow(bi).s2);
-            blks.borrow_mut(prev_bi).link = blks.borrow(bi).link;
+            succs.iter().for_each(|si| edgedel(blks, phis, bi, *si));
+            blks.with_mut(prev_bi, |pb| pb.link = link);
         } else {
-            let mut b: cell::RefMut<Blk> = blks.borrow_mut(bi);
-            b.id -= n;
-            f.rpo[b.id as usize] = bi;
-            prev_bi = bi;
+            blks.with_mut(bi, |b| {
+                b.id -= n;
+                f.rpo[b.id as usize] = bi;
+                prev_bi = bi;
+            });
         }
-        bi = blks.borrow(bi).link;
+        bi = link;
     }
 }
 
