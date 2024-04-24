@@ -108,8 +108,13 @@ impl Blks {
     //             br.borrow_mut()
     //         })
     // }
-    pub fn for_each_mut(&self, mut f: impl FnMut(cell::RefMut<Blk>)) {
-        self.v.iter().for_each(|br| f(br.borrow_mut()));
+    pub fn for_each_mut(&self, mut f: impl FnMut(&mut Blk)) {
+        self.v.iter().for_each(|br| {
+            let mut b = br.borrow_mut();
+            if !b.is_dead {
+                f(&mut *b)
+            }
+        });
     }
     pub fn id_of(&self, bi: BlkIdx) -> u32 {
         self.borrow(bi).id
@@ -758,11 +763,12 @@ pub struct Blk {
     pub s2: BlkIdx,
     pub link: BlkIdx,
 
+    pub is_dead: bool,
     pub id: u32, // TODO BlkId wrapper
     pub visit: u32,
 
-    pub idom: BlkIdx, // maybe Vec<BlkIdx>?
-    pub dom: BlkIdx,  // maybe Vec<BlkIdx>?
+    pub idom: BlkIdx,
+    pub dom: BlkIdx,
     pub dlink: BlkIdx,
     pub frons: Vec<BlkIdx>,
     pub preds: Vec<BlkIdx>,
@@ -770,7 +776,7 @@ pub struct Blk {
     pub out: BSet,
     pub gen: BSet,
     pub nlive: [u32; 2],
-    pub loop_: u32, // was i32 in QBE
+    pub loop_: i32,
     pub name: Vec<u8>,
 }
 
@@ -783,12 +789,13 @@ impl Blk {
             s1: BlkIdx::NONE,
             s2: BlkIdx::NONE,
             link: BlkIdx::NONE,
+            is_dead: false,
 
-            id, // Same as BlkIdx for this block
+            id,
             visit: 0,
 
-            idom: BlkIdx::NONE, // maybe Vec<BlkIdx>?
-            dom: BlkIdx::NONE,  // maybe Vec<BlkIdx>?
+            idom: BlkIdx::NONE,
+            dom: BlkIdx::NONE,
             dlink,
             frons: vec![],
             preds: vec![],

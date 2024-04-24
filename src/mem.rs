@@ -262,9 +262,8 @@ fn scmp(a: &Slot, b: &Slot) -> Ordering {
 fn maxrpo(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx) {
     let bid = f.blk(bi).id;
     let mut hd = f.blk_mut(hdi);
-    if (hd.loop_ as i32) < (bid as i32) {
-        // Mmm maybe the cast is ^^^ to include hd.loop == u32::MAX?
-        hd.loop_ = bid;
+    if hd.loop_ < (bid as i32) {
+        hd.loop_ = bid as i32;
     }
 }
 
@@ -314,7 +313,7 @@ pub fn coalesce(f: &mut Fn) {
         let mut bi: BlkIdx = f.start;
         while bi != BlkIdx::NONE {
             let mut b = f.blk_mut(bi);
-            b.loop_ = u32::MAX;
+            b.loop_ = -1;
             bi = b.link;
         }
     }
@@ -386,8 +385,8 @@ pub fn coalesce(f: &mut Fn) {
             for s in &mut sl {
                 if s.l != 0 {
                     radd(&mut s.r, ip);
-                    if bloop != u32::MAX {
-                        assert!(bloop > n);
+                    if bloop != -1 {
+                        assert!(bloop > n as i32);
                         radd(&mut s.r, br[bloop as usize].b - 1);
                     }
                 }

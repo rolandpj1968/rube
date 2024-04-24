@@ -61,8 +61,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     let mut u: BSet = bsinit(tmps.len());
     let mut v: BSet = bsinit(tmps.len());
 
-    // TODO - live blks only!
-    blks.for_each_mut(|mut b| {
+    blks.for_each_mut(|b| {
         b.in_ = bsinit(tmps.len());
         b.out = bsinit(tmps.len());
         b.gen = bsinit(tmps.len());

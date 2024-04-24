@@ -39,8 +39,7 @@ fn edgedel(blks: &Blks, phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
 
 pub fn fillpreds(f: &Fn) {
     let blks = &f.blks;
-    // TODO - live blocks only
-    blks.for_each_mut(|mut b| b.preds.clear());
+    blks.for_each_mut(|b| b.preds.clear());
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
         let (succs, link) = blks.with(bi, |b| (b.succs(), b.link));
@@ -88,7 +87,7 @@ pub fn fillrpo(f: &mut Fn) {
     let blks = &f.blks;
     let phis: &mut [Phi] = &mut f.phis;
 
-    blks.for_each_mut(|mut b| b.id = u32::MAX);
+    blks.for_each_mut(|b| b.id = u32::MAX);
 
     // Deliberately wraps from u32::MAX
     let n: u32 = rporec(blks, f.start, f.nblk - 1).wrapping_add(1);
@@ -102,6 +101,7 @@ pub fn fillrpo(f: &mut Fn) {
             // Unreachable Blk
             succs.iter().for_each(|si| edgedel(blks, phis, bi, *si));
             blks.with_mut(prev_bi, |pb| pb.link = link);
+            blks.with_mut(bi, |b| b.is_dead = true);
         } else {
             blks.with_mut(bi, |b| {
                 b.id -= n;
@@ -138,8 +138,7 @@ pub fn filldom(f: &mut Fn) {
     let blks: &Blks = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
 
-    // TODO - live blocks only
-    blks.for_each_mut(|mut b| {
+    blks.for_each_mut(|b| {
         b.idom = BlkIdx::NONE;
         b.dom = BlkIdx::NONE;
         b.dlink = BlkIdx::NONE;
@@ -219,8 +218,7 @@ fn fillfron_for_succ(blks: &Blks, bi: BlkIdx, si: BlkIdx) {
 pub fn fillfron(f: &mut Fn) {
     let blks: &Blks = &f.blks;
 
-    // TODO live blks only (but it doesn't matter)
-    blks.for_each_mut(|mut b| b.frons.clear());
+    blks.for_each_mut(|b| b.frons.clear());
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
