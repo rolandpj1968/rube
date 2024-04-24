@@ -161,30 +161,19 @@ pub fn filldom(f: &mut Fn) {
         let mut ch: u32 = 0;
         for bi in rpo.iter().skip(1) {
             let di = blks.with(*bi, |b| {
-                //let mut b = blks.borrow_mut(*bi);
-                let mut di: BlkIdx = BlkIdx::NONE;
+                let mut di0: BlkIdx = BlkIdx::NONE;
                 for pi in &b.preds {
-                    // Oops, pi could be same as bi?
-                    //assert!(bi != pi || b.idom == BlkIdx::NONE);
-                    let idom = if bi == pi {
-                        b.idom
-                    } else {
-                        blks.borrow(*pi).idom
-                    };
-                    if
-                    /*bi != pi &&*/
-                    (/*blks.borrow(*pi).*/idom != BlkIdx::NONE || *pi == f.start) {
-                        di = inter(blks, di, *pi);
+                    if blks.borrow(*pi).idom != BlkIdx::NONE || *pi == f.start {
+                        di0 = inter(blks, di0, *pi);
                     }
                 }
-                di
+                di0
             });
 
             blks.with_mut(*bi, |b| {
                 if di != b.idom {
                     ch += 1;
-                    b /*blks.borrow_mut(*bi)*/
-                        .idom = di;
+                    b.idom = di;
                 }
             });
         }
@@ -247,8 +236,9 @@ pub fn fillfron(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        fillfron_for_succ(blks, bi, blks.borrow(bi).s1);
-        fillfron_for_succ(blks, bi, blks.borrow(bi).s2);
+        let (s1, s2) = blks.borrow(bi).s1_s2();
+        fillfron_for_succ(blks, bi, s1);
+        fillfron_for_succ(blks, bi, s2);
         bi = blks.borrow(bi).link;
     }
 }
