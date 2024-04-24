@@ -97,11 +97,15 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                     ti += 1;
                 }
 
-                if let Ref::RCall(_) = b.jmp.arg {
+                let jmp_arg = b.jmp().arg;
+                if let Ref::RCall(_) = jmp_arg
+                /*b.jmp().arg*/
+                {
                     assert!(bscount(&b.in_) == targ.nrglob && b.in_[0] == targ.rglob);
-                    b.in_[0] |= (targ.retregs)(b.jmp.arg, &nlv); // TODO not implemented
+                    //let jmp_arg = b.jmp().arg;
+                    b.in_[0] |= (targ.retregs)(jmp_arg /*b.jmp().arg*/, &nlv); // TODO not implemented
                 } else {
-                    bset(tmps, b.jmp.arg, b, &mut nlv);
+                    bset(tmps, jmp_arg /*b.jmp().arg*/, b, &mut nlv);
                 }
 
                 b.nlive.copy_from_slice(&nlv);

@@ -351,9 +351,9 @@ pub fn coalesce(f: &mut Fn) {
                     }
                 }
             }
-            if f.blk(bi).jmp.type_ == J::Jretc {
+            if f.blk(bi).jmp().type_ == J::Jretc {
                 ip -= 1;
-                load(f, f.blk(bi).jmp.arg, u64::MAX, ip, &mut sl);
+                load(f, f.blk(bi).jmp().arg, u64::MAX, ip, &mut sl);
             }
             for iii in (0..f.blk(bi).ins().len()).rev() {
                 let i: Ins = f.blk(bi).ins()[iii]; // note copy
@@ -476,10 +476,10 @@ pub fn coalesce(f: &mut Fn) {
                     match u.type_ {
                         UseT::UJmp => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
-                            let mut b = f.blk_mut(bi);
-                            assert!(isret(b.jmp.type_));
-                            b.jmp.type_ = J::Jret0;
-                            b.jmp.arg = Ref::R;
+                            let b = f.blk_mut(bi);
+                            assert!(isret(b.jmp().type_));
+                            b.jmp_mut().type_ = J::Jret0;
+                            b.jmp_mut().arg = Ref::R;
                         }
                         UseT::UIns(ii) => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
@@ -588,7 +588,7 @@ pub fn coalesce(f: &mut Fn) {
             match u.type_ {
                 UseT::UJmp => {
                     let bi: BlkIdx = f.rpo[u.bid as usize];
-                    f.blk_mut(bi).jmp.arg = Ref::RTmp(ssti);
+                    f.blk_mut(bi).jmp_mut().arg = Ref::RTmp(ssti);
                 }
                 UseT::UIns(ii) => {
                     let bi: BlkIdx = f.rpo[u.bid as usize];

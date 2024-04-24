@@ -311,9 +311,9 @@ pub fn fillalias(f: &mut Fn) {
                 store(f, i_arg1, storesz(&i /*f.blks.borrow(bi).ins()[ii]*/));
             }
         }
-        if f.blks.borrow(bi).jmp.type_ != J::Jretc {
-            let jmp_arg = f.blks.borrow(bi).jmp.arg;
-            esc(f, jmp_arg /*f.blks.borrow(bi).jmp.arg*/);
+        if f.blks.borrow(bi).jmp().type_ != J::Jretc {
+            let jmp_arg = f.blks.borrow(bi).jmp().arg;
+            esc(f, jmp_arg /*f.blks.borrow(bi).jmp().arg*/);
         }
     }
     let mut bi: BlkIdx = f.start;

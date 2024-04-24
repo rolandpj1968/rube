@@ -20,8 +20,8 @@ pub fn elimsb(f: &mut Fn) {
                     i.op = O::Opar;
                 }
             }
-            if isretbh(b.jmp.type_) {
-                b.jmp.type_ = J::Jretw;
+            if isretbh(b.jmp().type_) {
+                b.jmp_mut().type_ = J::Jretw;
             }
 
             bi = b.link;

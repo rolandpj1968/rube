@@ -197,7 +197,7 @@ pub fn dom(blks: &Blks, b1i: BlkIdx, b2i: BlkIdx) -> bool {
     b1i == b2i || sdom(blks, b1i, b2i)
 }
 
-fn addfron(mut a: &mut Blk, bi: BlkIdx) {
+fn addfron(a: &mut Blk, bi: BlkIdx) {
     if !a.frons.contains(&bi) {
         a.frons.push(bi);
     }

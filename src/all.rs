@@ -120,6 +120,12 @@ impl Blks {
     pub fn idom_of(&self, bi: BlkIdx) -> BlkIdx {
         self.borrow(bi).idom
     }
+    pub fn phi_of(&self, bi: BlkIdx) -> PhiIdx {
+        self.borrow(bi).phi
+    }
+    pub fn succs_of(&self, bi: BlkIdx) -> [BlkIdx; 2] {
+        self.borrow(bi).succs()
+    }
 }
 
 // Hrmm, it's complaining about lifetime params - need more grokking, just use .borrow() for now
@@ -744,7 +750,7 @@ pub struct Blk {
     pub phi: PhiIdx,
     // Behind a RefCell to get access mutably together with other fields.
     pub ins: cell::RefCell<Vec<Ins>>,
-    pub jmp: BlkJmp,
+    pub jmp: cell::RefCell<BlkJmp>,
     pub s1: BlkIdx,
     pub s2: BlkIdx,
     pub link: BlkIdx,
@@ -770,7 +776,7 @@ impl Blk {
         Blk {
             phi: PhiIdx::NONE,
             ins: cell::RefCell::new(vec![]),
-            jmp: BlkJmp::new(),
+            jmp: cell::RefCell::new(BlkJmp::new()),
             s1: BlkIdx::NONE,
             s2: BlkIdx::NONE,
             link: BlkIdx::NONE,
@@ -802,6 +808,25 @@ impl Blk {
 
     pub fn ins_mut(&self) -> cell::RefMut<Vec<Ins>> {
         self.ins.borrow_mut()
+    }
+
+    pub fn jmp(&self) -> cell::Ref<BlkJmp> {
+        self.jmp.borrow()
+    }
+
+    pub fn jmp_mut(&self) -> cell::RefMut<BlkJmp> {
+        self.jmp.borrow_mut()
+    }
+
+    pub fn succs(&self) -> [BlkIdx; 2] {
+        [
+            self.s1,
+            if self.s1 == self.s2 {
+                BlkIdx::NONE
+            } else {
+                self.s2
+            },
+        ]
     }
 
     pub fn s1_s2(&self) -> (BlkIdx, BlkIdx) {

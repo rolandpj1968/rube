@@ -126,7 +126,7 @@ pub fn filluse(f: &mut Fn) {
                 }
             }
 
-            if let Ref::RTmp(ti) = b.jmp.arg {
+            if let Ref::RTmp(ti) = b.jmp().arg {
                 adduse(&mut tmps[ti], UseT::UJmp, bi, bid);
             }
 
@@ -197,8 +197,8 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                         }
                     }
                 }
-                if r != Ref::R && b.jmp.arg == rt {
-                    b.jmp.arg = r;
+                if r != Ref::R && b.jmp().arg == rt {
+                    b.jmp_mut().arg = r;
                 }
                 bi = b.link;
 
@@ -358,10 +358,10 @@ fn renblk(
             //let new_to: Ref = rendef(tmps, bi, to, namel, names, stk);
             b.ins_mut()[ii].to = rendef(tmps, bi, to, namel, names, stk);
         }
-        let jmp_arg: Ref = b.jmp.arg;
+        let jmp_arg: Ref = b.jmp().arg;
         if let Ref::RTmp(ti) = jmp_arg {
             if tmps[ti].visit != TmpIdx::NONE {
-                b.jmp.arg = getstk(blks, bi, ti, namel, names, stk);
+                b.jmp_mut().arg = getstk(blks, bi, ti, namel, names, stk);
             }
         }
     });
@@ -387,7 +387,7 @@ fn renblk(
             pi = phis[pi].link;
         }
     }
-    let mut si: BlkIdx = blks.borrow(bi).dom;
+    let mut si: BlkIdx = blks.dom_of(bi);
     while si != BlkIdx::NONE {
         renblk(blks, phis, tmps, si, namel, names, stk);
         si = blks.borrow(si).dlink;
