@@ -177,16 +177,21 @@ fn store(f: &mut Fn, r: Ref, sz: i32) {
 
 pub fn fillalias(f: &mut Fn) {
     // println!("        fillalias:      function ${}", to_s(&f.name));
+    //let aliases = &mut f.aliases;
 
-    f.aliases.clear();
-    for ti in 0..f.tmps.len() {
-        let ai = f.add_alias(Alias::default());
-        f.tmps[ti].alias = ai;
+    {
+        f.aliases.clear();
+        for ti in 0..f.tmps.len() {
+            let ai = f.add_alias(Alias::default());
+            f.tmps[ti].alias = ai;
+        }
     }
+
+    //let blks = &f.blks;
 
     for n in 0..f.nblk {
         let bi: BlkIdx = f.rpo[n as usize];
-        let mut pi: PhiIdx = f.blk(bi).phi;
+        let mut pi: PhiIdx = f.blks.borrow(bi).phi;
         while pi != PhiIdx::NONE {
             if let Ref::RTmp(ti) = f.phi(pi).to {
                 let ai = f.tmp(ti).alias;
@@ -202,12 +207,16 @@ pub fn fillalias(f: &mut Fn) {
             }
             pi = f.phi(pi).link;
         }
-        for ii in 0..f.blk(bi).ins.len() {
+        let ins_len = f.blks.borrow(bi).ins.len();
+        for ii in 0..ins_len
+        /*f.blks.borrow(bi).ins.len()*/
+        {
             let (i_to, i_op, i_arg0, i_arg1) = {
-                let i: &Ins = &f.blk(bi).ins[ii];
+                let i: &Ins = &f.blks.borrow(bi).ins[ii];
                 // println!("        fillalias:          ins ${:?}", i);
                 (i.to, i.op, i.args[0], i.args[1])
             };
+            let i: Ins = f.blks.borrow(bi).ins[ii]; // Note copy
 
             if i_op == O::Oblit1 {
                 // Already handled as part of preceding Oblit0
@@ -281,9 +290,9 @@ pub fn fillalias(f: &mut Fn) {
                 }
             }
             if i_op == O::Oblit0 {
-                assert!(ii < f.blk(bi).ins.len() - 1);
+                assert!(ii < f.blks.borrow(bi).ins.len() - 1);
                 let (blit1_op, blit1_arg0) = {
-                    let blit1: &Ins = &f.blk(bi).ins[ii + 1];
+                    let blit1: &Ins = &f.blks.borrow(bi).ins[ii + 1];
                     (blit1.op, blit1.args[0])
                 };
                 assert!(blit1_op == O::Oblit1);
@@ -295,22 +304,23 @@ pub fn fillalias(f: &mut Fn) {
                 }
             }
             if isstore(i_op) {
-                store(f, i_arg1, storesz(&f.blk(bi).ins[ii]));
+                store(f, i_arg1, storesz(&i /*f.blks.borrow(bi).ins[ii]*/));
             }
         }
-        if f.blk(bi).jmp.type_ != J::Jretc {
-            esc(f, f.blk(bi).jmp.arg);
+        if f.blks.borrow(bi).jmp.type_ != J::Jretc {
+            let jmp_arg = f.blks.borrow(bi).jmp.arg;
+            esc(f, jmp_arg /*f.blks.borrow(bi).jmp.arg*/);
         }
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let mut pi: PhiIdx = f.blk(bi).phi;
+        let mut pi: PhiIdx = f.blks.borrow(bi).phi;
         while pi != PhiIdx::NONE {
             for n in 0..f.phi(pi).args.len() {
                 esc(f, f.phi(pi).args[n]);
             }
             pi = f.phi(pi).link;
         }
-        bi = f.blk(bi).link;
+        bi = f.blks.borrow(bi).link;
     }
 }

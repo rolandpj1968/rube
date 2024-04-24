@@ -1,13 +1,19 @@
-use std::{borrow::BorrowMut, cell};
+use std::cell;
 
 use crate::all::{Blk, BlkIdx, Blks, Fn, Phi, PhiIdx};
 
 // Not pretty - would be better if s1, s2 were [BlkIndex; 2]
 fn succsdel(mut b: cell::RefMut<Blk>, bdi: BlkIdx) {
-    let mut succs = [&mut b.s1, &mut b.s2];
-    for si in succs.iter_mut().filter(|si| ***si == bdi) {
-        **si = BlkIdx::NONE;
+    if b.s1 == bdi {
+        b.s1 = BlkIdx::NONE;
     }
+    if b.s2 == bdi {
+        b.s2 = BlkIdx::NONE;
+    }
+    // let mut succs = [&mut b.s1, &mut b.s2];
+    // for si in succs.iter_mut().filter(|si| ***si == bdi) {
+    //     **si = BlkIdx::NONE;
+    // }
 }
 
 fn phisdel(phis: &mut [Phi], mut pi: PhiIdx, bsi: BlkIdx) {
@@ -21,7 +27,7 @@ fn phisdel(phis: &mut [Phi], mut pi: PhiIdx, bsi: BlkIdx) {
     }
 }
 
-fn preddel(b: cell::RefMut<Blk>, bsi: BlkIdx) {
+fn preddel(mut b: cell::RefMut<Blk>, bsi: BlkIdx) {
     if let Some(a) = b.preds.iter().position(|pbi| *pbi == bsi) {
         b.preds.remove(a);
     }
@@ -96,7 +102,7 @@ pub fn fillrpo(f: &mut Fn) {
     let blks = &f.blks;
     let phis: &mut [Phi] = &mut f.phis;
 
-    blks.for_each_mut(|b| b.id = u32::MAX);
+    blks.for_each_mut(|mut b| b.id = u32::MAX);
 
     // Deliberately wraps from u32::MAX
     let n: u32 = rporec(blks, f.start, f.nblk - 1).wrapping_add(1);
@@ -111,7 +117,7 @@ pub fn fillrpo(f: &mut Fn) {
             edgedel(blks, phis, bi, blks.borrow(bi).s2);
             blks.borrow_mut(prev_bi).link = blks.borrow(bi).link;
         } else {
-            let b: cell::RefMut<Blk> = blks.borrow_mut(bi);
+            let mut b: cell::RefMut<Blk> = blks.borrow_mut(bi);
             b.id -= n;
             f.rpo[b.id as usize] = bi;
             prev_bi = bi;
@@ -146,7 +152,7 @@ pub fn filldom(f: &mut Fn) {
     let rpo: &[BlkIdx] = &f.rpo;
 
     // TODO - live blocks only
-    blks.for_each_mut(|b| {
+    blks.for_each_mut(|mut b| {
         b.idom = BlkIdx::NONE;
         b.dom = BlkIdx::NONE;
         b.dlink = BlkIdx::NONE;
@@ -200,7 +206,7 @@ pub fn dom(blks: &Blks, b1i: BlkIdx, b2i: BlkIdx) -> bool {
     b1i == b2i || sdom(blks, b1i, b2i)
 }
 
-fn addfron(a: cell::RefMut<Blk>, bi: BlkIdx) {
+fn addfron(mut a: cell::RefMut<Blk>, bi: BlkIdx) {
     if !a.frons.contains(&bi) {
         a.frons.push(bi);
     }
@@ -221,7 +227,7 @@ pub fn fillfron(f: &mut Fn) {
     let blks: &Blks = &f.blks;
 
     // TODO live blks only (but it doesn't matter)
-    blks.for_each_mut(|b| b.frons.clear());
+    blks.for_each_mut(|mut b| b.frons.clear());
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
@@ -241,7 +247,10 @@ fn loopmark(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx, func: fn(&mut Fn, BlkIdx, BlkId
     }
     f.blk_mut(bi).visit = f.blk(hdi).id;
     func(f, hdi, bi);
-    for p in 0..f.blk(bi).preds.len() {
+    let preds_len = f.blk(bi).preds.len();
+    for p in 0..preds_len
+    /*f.blk(bi).preds.len()*/
+    {
         let predi: BlkIdx = f.blk(bi).preds[p];
         loopmark(f, hdi, predi, func);
     }
@@ -250,14 +259,17 @@ fn loopmark(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx, func: fn(&mut Fn, BlkIdx, BlkId
 pub fn loopiter(f: &mut Fn, func: fn(&mut Fn, BlkIdx, BlkIdx)) {
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let b: cell::RefMut<Blk> = f.blk_mut(bi);
+        let mut b: cell::RefMut<Blk> = f.blk_mut(bi);
         b.visit = u32::MAX;
         bi = b.link;
     }
 
     for n in 0..f.rpo.len() {
         let bi: BlkIdx = f.rpo[n];
-        for p in 0..f.blk(bi).preds.len() {
+        let preds_len = f.blk(bi).preds.len();
+        for p in 0..preds_len
+        /*0..f.blk(bi).preds.len()*/
+        {
             let predi: BlkIdx = f.blk(bi).preds[p];
             if f.blk(predi).id >= n as u32 {
                 loopmark(f, bi, predi, func);

@@ -4,9 +4,9 @@ use std::fmt;
 
 use crate::alias::getalias;
 use crate::all::{
-    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasIdx, AliasT, AliasU, Bits, Blk,
-    BlkIdx, Fn, Ins, InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, KL, KW, KX,
-    NBIT, O, OALLOC, OALLOC1, TMP0, UNDEF,
+    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasIdx, AliasT, AliasU, Bits, BlkIdx,
+    Fn, Ins, InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, KL, KW, KX, NBIT, O,
+    OALLOC, OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
@@ -38,14 +38,14 @@ impl Error for MemError {
 }
 
 pub fn promote(f: &mut Fn) -> RubeResult<()> {
-    let blks: &mut [Blk] = &mut f.blks;
+    let blks = &f.blks;
     let tmps: &mut [Tmp] = &mut f.tmps;
 
     /* promote uniform stack slots to temporaries */
     // TODO - ask QBE; only touches first/start Blk
     let bi: BlkIdx = f.start;
-    'ins_loop: for ii in 0..blks[bi].ins.len() {
-        let i: &Ins = &blks[bi].ins[ii];
+    'ins_loop: for ii in 0..blks.borrow(bi).ins.len() {
+        let i: &Ins = &blks.borrow(bi).ins[ii];
         // TODO isalloc
         if OALLOC > i.op || i.op > OALLOC1 {
             continue;
@@ -69,7 +69,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
 
         for u in &t.uses {
             if let UseT::UIns(li) = u.type_ {
-                let l: &Ins = &blks[u.bi].ins[li];
+                let l: &Ins = &blks.borrow(u.bi).ins[li];
                 if isload(l.op) {
                     if s == -1 || s == loadsz(l) {
                         s = loadsz(l);
@@ -93,11 +93,11 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
         }
 
         /* get rid of the alloc and replace uses */
-        blks[bi].ins[ii] = Ins::new0(O::Onop, KW, Ref::R);
+        blks.borrow_mut(bi).ins[ii] = Ins::new0(O::Onop, KW, Ref::R);
         t.ndef -= 1;
 
         for u in &t.uses {
-            let ub: &mut Blk = &mut blks[u.bi];
+            let mut ub = blks.borrow_mut(u.bi);
             let l: &mut Ins = {
                 if let UseT::UIns(li) = u.type_ {
                     &mut ub.ins[li]
@@ -260,7 +260,7 @@ fn scmp(a: &Slot, b: &Slot) -> Ordering {
 
 fn maxrpo(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx) {
     let bid = f.blk(bi).id;
-    let hd: &mut Blk = f.blk_mut(hdi);
+    let mut hd = f.blk_mut(hdi);
     if (hd.loop_ as i32) < (bid as i32) {
         // Mmm maybe the cast is ^^^ to include hd.loop == u32::MAX?
         hd.loop_ = bid;
@@ -312,7 +312,7 @@ pub fn coalesce(f: &mut Fn) {
     {
         let mut bi: BlkIdx = f.start;
         while bi != BlkIdx::NONE {
-            let b: &mut Blk = f.blk_mut(bi);
+            let mut b = f.blk_mut(bi);
             b.loop_ = u32::MAX;
             bi = b.link;
         }
@@ -466,14 +466,14 @@ pub fn coalesce(f: &mut Fn) {
                     match u.type_ {
                         UseT::UJmp => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
-                            let b: &mut Blk = f.blk_mut(bi);
+                            let mut b = f.blk_mut(bi);
                             assert!(isret(b.jmp.type_));
                             b.jmp.type_ = J::Jret0;
                             b.jmp.arg = Ref::R;
                         }
                         UseT::UIns(ii) => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
-                            let b: &mut Blk = f.blk_mut(bi);
+                            let mut b = f.blk_mut(bi);
                             let i: Ins = b.ins[ii.0 as usize]; // Note - copy
                             match i.to {
                                 Ref::R => {

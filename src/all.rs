@@ -16,6 +16,28 @@ use crate::util::InternId;
 pub type RubeError = Box<dyn std::error::Error>;
 pub type RubeResult<T> = Result<T, RubeError>;
 
+// struct Sss {
+//     u: usize,
+//     v: cell::RefCell<Vec<usize>>,
+// }
+
+// fn sss1(sss: &mut Sss) {
+//     for u2 in sss.v.borrow_mut().iter_mut() {
+//         if sss.u > *u2 {
+//             *u2 = sss.u;
+//         }
+//     }
+// }
+
+// fn sss2(mut sss: cell::RefMut<Sss>) {
+//     for u2 in sss.v.borrow_mut().iter_mut() {
+//         if sss.u > *u2 {
+//             *u2 = sss.u;
+//         }
+//     }
+//     sss.u = 0;
+// }
+
 // Helper for displaying byte slice
 pub fn to_s(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).to_string()

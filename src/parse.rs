@@ -968,7 +968,7 @@ impl Parser<'_> {
         let h: u32 = hash(name) & BMASK;
         let mut bi: BlkIdx = self.blkh[h as usize];
         while bi != BlkIdx::NONE {
-            let b: &Blk = curf.blk(bi);
+            let b = curf.blk(bi);
             if b.name == name {
                 return bi;
             }
@@ -984,7 +984,7 @@ impl Parser<'_> {
     }
 
     fn closeblk(&mut self, curf: &mut Fn) {
-        let curb: &mut Blk = curf.blk_mut(self.cur_bi);
+        let mut curb = curf.blk_mut(self.cur_bi);
         // TODO - this is silly, just use Blk::ins directly
         curb.ins = self.insb.clone();
         self.blink = self.cur_bi;
@@ -1039,16 +1039,18 @@ impl Parser<'_> {
                 let new_bi: BlkIdx = self.findblk(curf, &tv.as_str());
                 if self.cur_bi != BlkIdx::NONE && curf.blk(self.cur_bi).jmp.type_ == J::Jxxx {
                     self.closeblk(curf);
-                    let curb: &mut Blk = curf.blk_mut(self.cur_bi);
+                    let mut curb = curf.blk_mut(self.cur_bi);
                     curb.jmp.type_ = J::Jjmp;
                     curb.s1 = new_bi;
                 }
-                let new_b: &Blk = curf.blk(new_bi);
-                if new_b.jmp.type_ != J::Jxxx {
-                    return Err(self.err(&format!(
-                        "multiple definitions of block @{}",
-                        to_s(&new_b.name),
-                    )));
+                {
+                    let new_b = curf.blk(new_bi);
+                    if new_b.jmp.type_ != J::Jxxx {
+                        return Err(self.err(&format!(
+                            "multiple definitions of block @{}",
+                            to_s(&new_b.name),
+                        )));
+                    }
                 }
                 // TODO? curf.set_blk_link(from_bi, to_bi);
                 if self.blink == BlkIdx::NONE {
@@ -1318,9 +1320,13 @@ impl Parser<'_> {
                 }
                 pi = fn_.phi(pi).link;
             }
-            for ii in 0..fn_.blk(bi).ins.len() {
-                if let Ref::RTmp(ti) = fn_.blk(bi).ins[ii].to {
-                    let ins_cls: KExt = fn_.blk(bi).ins[ii].cls;
+            let ins_len = fn_.blk(bi).ins.len();
+            for ii in 0..ins_len
+            /*fn_.blk(bi).ins.len()*/
+            {
+                let i: Ins = fn_.blk(bi).ins[ii]; // Note - copy
+                if let Ref::RTmp(ti) = /*fn_.blk(bi).ins[ii]*/ i.to {
+                    let ins_cls: KExt = /*fn_.blk(bi).ins[ii]*/i.cls;
                     let t: &mut Tmp = fn_.tmp_mut(ti);
                     if clsmerge(&mut t.cls, ins_cls) {
                         return Err(self.err(&format!(
@@ -1335,7 +1341,7 @@ impl Parser<'_> {
 
         bi = fn_.start;
         while bi != BlkIdx::NONE {
-            let b: &Blk = fn_.blk(bi);
+            let b = fn_.blk(bi);
 
             let mut pb: BSet = bsinit(fn_.blks.len());
 
@@ -1537,7 +1543,7 @@ impl Parser<'_> {
 
         let mut bi = curf.start;
         while bi != BlkIdx::NONE {
-            let b: &mut Blk = curf.blk_mut(bi);
+            let mut b = curf.blk_mut(bi);
             b.dlink = BlkIdx::NONE;
             bi = b.link;
         }
@@ -2053,7 +2059,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
     let _ = writeln!(f, "function ${}() {{", to_s(&fn_.name));
     let mut bi: BlkIdx = fn_.start;
     while bi != BlkIdx::NONE {
-        let b: &Blk = fn_.blk(bi);
+        let b = fn_.blk(bi);
         let _ = writeln!(f, "@{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {

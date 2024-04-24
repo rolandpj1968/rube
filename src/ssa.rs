@@ -4,7 +4,7 @@ use std::fmt;
 use std::io::stdout;
 
 use crate::all::{
-    bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, InsIdx, KExt, Phi, PhiIdx, Ref,
+    bshas, isext, isload, isparbh, to_s, BSet, BlkIdx, Blks, Fn, InsIdx, KExt, Phi, PhiIdx, Ref,
     RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, KW, KX, O, TMP0, UNDEF,
 };
 use crate::cfg::{dom, filldom, fillfron, sdom};
@@ -45,7 +45,7 @@ fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: u32) {
  * must not change .visit fields
  */
 pub fn filluse(f: &mut Fn) {
-    let blks: &mut [Blk] = &mut f.blks;
+    let blks = &f.blks;
     let phis: &mut [Phi] = &mut f.phis;
     let tmps: &mut [Tmp] = &mut f.tmps;
 
@@ -63,8 +63,8 @@ pub fn filluse(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let bid: u32 = blks[bi].id;
-        let mut pi: PhiIdx = blks[bi].phi;
+        let bid: u32 = blks.borrow(bi).id;
+        let mut pi: PhiIdx = blks.borrow(bi).phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             let cls = p.cls;
@@ -93,7 +93,7 @@ pub fn filluse(f: &mut Fn) {
             pi = p.link;
         }
 
-        for (ii, i) in blks[bi].ins.iter().enumerate() {
+        for (ii, i) in blks.borrow(bi).ins.iter().enumerate() {
             if let Ref::RTmp(ti) = i.to {
                 let mut w: TmpWdth = TmpWdth::WFull;
                 if isparbh(i.op) {
@@ -118,18 +118,18 @@ pub fn filluse(f: &mut Fn) {
                 // Ins i.to must be R or RTmp
                 assert!(i.to == Ref::R);
             }
-            for arg in /*blks[bi].ins[ii]*/ i.args {
+            for arg in /*blks.borrow(bi).ins[ii]*/ i.args {
                 if let Ref::RTmp(ti) = arg {
                     adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, bid);
                 }
             }
         }
 
-        if let Ref::RTmp(ti) = blks[bi].jmp.arg {
+        if let Ref::RTmp(ti) = blks.borrow(bi).jmp.arg {
             adduse(&mut tmps[ti], UseT::UJmp, bi, bid);
         }
 
-        bi = blks[bi].link;
+        bi = blks.borrow(bi).link;
     }
 }
 
@@ -140,7 +140,7 @@ fn refindex(tmps: &mut Vec<Tmp>, ti: TmpIdx) -> Ref {
 }
 
 fn phiins(f: &mut Fn) -> RubeResult<()> {
-    let blks: &mut [Blk] = &mut f.blks;
+    let blks = &f.blks;
     let phis: &mut Vec<Phi> = &mut f.phis;
     let tmps: &mut Vec<Tmp> = &mut f.tmps;
 
@@ -156,7 +156,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         if tmps[ti].ndef == 1 {
             let defb: u32 = tmps[ti].bid;
             let ok = tmps[ti].uses.iter().all(|u| u.bid == defb);
-            if ok || defb == blks[f.start].id {
+            if ok || defb == blks.borrow(f.start).id {
                 continue;
             }
         }
@@ -166,7 +166,9 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         let rt: Ref = Ref::RTmp(ti);
         let mut bi = f.start;
         while bi != BlkIdx::NONE {
-            let b: &mut Blk = &mut blks[bi];
+            let mut b = blks.borrow_mut(bi);
+            let bid = b.id;
+            let b_out = &b.out;
             b.visit = 0;
             let mut r: Ref = Ref::R;
             for i in &mut b.ins {
@@ -178,12 +180,12 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                     }
                 }
                 if i.to == rt {
-                    if !bshas(&b.out, ti.usize()) {
+                    if !bshas(/*&b.out*/ b_out, ti.usize()) {
                         r = refindex(tmps, ti);
                         i.to = r;
                     } else {
-                        if !bshas(&u, b.id as usize) {
-                            bsset(&mut u, b.id as usize);
+                        if !bshas(&u, /*b.id*/ bid as usize) {
+                            bsset(&mut u, /*b.id*/ bid as usize);
                             bp -= 1;
                             blist[bp] = bi;
                         }
@@ -204,17 +206,17 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             tmps[ti].visit = ti;
             let bi: BlkIdx = blist[bp];
             bp += 1;
-            bsclr(&mut u, blks[bi].id as usize);
-            for n in 0..blks[bi].frons.len() {
-                let ai: BlkIdx = blks[bi].frons[n];
-                let a_visit = blks[ai].visit;
-                blks[ai].visit += 1;
-                if a_visit == 0 && bshas(&blks[ai].in_, ti.usize()) {
-                    let a_pi: PhiIdx = blks[ai].phi;
+            bsclr(&mut u, blks.borrow(bi).id as usize);
+            for n in 0..blks.borrow(bi).frons.len() {
+                let ai: BlkIdx = blks.borrow(bi).frons[n];
+                let a_visit = blks.borrow(ai).visit;
+                blks.borrow_mut(ai).visit += 1;
+                if a_visit == 0 && bshas(&blks.borrow(ai).in_, ti.usize()) {
+                    let a_pi: PhiIdx = blks.borrow(ai).phi;
                     let pi: PhiIdx = PhiIdx::new(phis.len());
                     phis.push(Phi::new(rt, vec![], vec![], k, a_pi));
-                    blks[ai].phi = pi;
-                    let a_id = blks[ai].id;
+                    blks.borrow_mut(ai).phi = pi;
+                    let a_id = blks.borrow(ai).id;
                     if !bshas(&defs, a_id as usize) && !bshas(&u, a_id as usize) {
                         bsset(&mut u, a_id as usize);
                         bp -= 1;
@@ -297,7 +299,7 @@ fn rendef(
 }
 
 fn getstk(
-    blks: &[Blk],
+    blks: &Blks,
     bi: BlkIdx,
     ti: TmpIdx,
     namel: &mut NameIdx,
@@ -320,7 +322,7 @@ fn getstk(
 }
 
 fn renblk(
-    blks: &mut Vec<Blk>,
+    blks: &Blks,
     phis: &mut Vec<Phi>,
     tmps: &mut Vec<Tmp>,
     bi: BlkIdx,
@@ -328,7 +330,7 @@ fn renblk(
     names: &mut Vec<Name>,
     stk: &mut [NameIdx],
 ) {
-    let mut pi = blks[bi].phi;
+    let mut pi = blks.borrow(bi).phi;
     while pi != PhiIdx::NONE {
         let to: Ref = phis[pi].to;
         let to_new = rendef(tmps, bi, to, namel, names, stk);
@@ -336,31 +338,31 @@ fn renblk(
 
         pi = phis[pi].link;
     }
-    for ii in 0..blks[bi].ins.len() {
+    for ii in 0..blks.borrow(bi).ins.len() {
         for m in 0..2 {
-            if let Ref::RTmp(ti) = blks[bi].ins[ii].args[m] {
+            if let Ref::RTmp(ti) = blks.borrow(bi).ins[ii].args[m] {
                 if tmps[ti].visit != TmpIdx::NONE {
-                    blks[bi].ins[ii].args[m] = getstk(blks, bi, ti, namel, names, stk);
+                    blks.borrow_mut(bi).ins[ii].args[m] = getstk(blks, bi, ti, namel, names, stk);
                 }
             }
         }
-        let to: Ref = blks[bi].ins[ii].to;
+        let to: Ref = blks.borrow(bi).ins[ii].to;
         let new_to: Ref = rendef(tmps, bi, to, namel, names, stk);
-        blks[bi].ins[ii].to = new_to;
+        blks.borrow_mut(bi).ins[ii].to = new_to;
     }
-    let jmp_arg: Ref = blks[bi].jmp.arg;
+    let jmp_arg: Ref = blks.borrow(bi).jmp.arg;
     if let Ref::RTmp(ti) = jmp_arg {
         if tmps[ti].visit != TmpIdx::NONE {
-            blks[bi].jmp.arg = getstk(blks, bi, ti, namel, names, stk);
+            blks.borrow_mut(bi).jmp.arg = getstk(blks, bi, ti, namel, names, stk);
         }
     }
-    let (s1, s2) = blks[bi].s1_s2();
+    let (s1, s2) = blks.borrow(bi).s1_s2();
     let succ: [BlkIdx; 2] = [s1, if s1 == s2 { BlkIdx::NONE } else { s2 }];
     for si in succ {
         if si == BlkIdx::NONE {
             continue; // QBE effectively break's
         }
-        let mut pi: PhiIdx = blks[si].phi;
+        let mut pi: PhiIdx = blks.borrow(si).phi;
         while pi != PhiIdx::NONE {
             if let Ref::RTmp(to_ti) = phis[pi].to {
                 let ti: TmpIdx = tmps[to_ti].visit;
@@ -376,10 +378,10 @@ fn renblk(
             pi = phis[pi].link;
         }
     }
-    let mut si: BlkIdx = blks[bi].dom;
+    let mut si: BlkIdx = blks.borrow(bi).dom;
     while si != BlkIdx::NONE {
         renblk(blks, phis, tmps, si, namel, names, stk);
-        si = blks[si].dlink;
+        si = blks.borrow(si).dlink;
     }
 }
 
@@ -396,13 +398,13 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
         eprintln!("\n> Dominators:");
         let mut b1i: BlkIdx = f.start;
         while b1i != BlkIdx::NONE {
-            let b1: &Blk = f.blk(b1i);
+            let b1 = f.blk(b1i);
             if b1.dom != BlkIdx::NONE {
                 /*e*/
                 print!("{:>10}:", to_s(&b1.name));
                 let mut bi: BlkIdx = b1.dom;
                 while bi != BlkIdx::NONE {
-                    let b: &Blk = f.blk(bi);
+                    let b = f.blk(bi);
                     /*e*/
                     print!(" {}", to_s(&b.name));
                     bi = b.dlink;
@@ -420,7 +422,7 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     let mut namel: NameIdx = NameIdx::INVALID;
     let mut names: Vec<Name> = vec![];
     let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
-    let blks: &mut Vec<Blk> = &mut f.blks;
+    let blks: &Blks = &f.blks;
     let phis: &mut Vec<Phi> = &mut f.phis;
     let tmps: &mut Vec<Tmp> = &mut f.tmps;
     renblk(blks, phis, tmps, f.start, &mut namel, &mut names, &mut stk);
@@ -437,7 +439,7 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     Ok(())
 }
 
-fn phicheck(blks: &[Blk], p: &Phi, bi: BlkIdx, t: Ref) -> bool {
+fn phicheck(blks: &Blks, p: &Phi, bi: BlkIdx, t: Ref) -> bool {
     for n in 0..p.args.len() {
         if p.args[n] == t {
             let bi1 = p.blks[n];
@@ -451,7 +453,7 @@ fn phicheck(blks: &[Blk], p: &Phi, bi: BlkIdx, t: Ref) -> bool {
 
 /* require use and ssa */
 pub fn ssacheck(f: &Fn) -> RubeResult<()> {
-    let blks: &[Blk] = &f.blks;
+    let blks = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let phis: &[Phi] = &f.phis;
     let tmps: &[Tmp] = &f.tmps;
@@ -470,7 +472,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let b: &Blk = &blks[bi];
+        let b = blks.borrow(bi);
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];

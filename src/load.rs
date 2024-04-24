@@ -557,7 +557,10 @@ fn def(
             InsIdx::new(0), // NONE???
             InsertU::Phi(UPhi { m: *sl, pi }),
         ));
-        for np in 0..f.blk(bi).preds.len() {
+        let preds_len = f.blk(bi).preds.len();
+        for np in 0..preds_len
+        /*f.blk(bi).preds.len()*/
+        {
             let bpi: BlkIdx = f.blk(bi).preds[np];
             let l_type: LocT;
             if f.blk(bpi).s2 == BlkIdx::NONE
@@ -655,7 +658,10 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        for iii in 0..f.blk(bi).ins.len() {
+        let ins_len = f.blk(bi).ins.len();
+        for iii in 0..ins_len
+        /*f.blk(bi).ins.len()*/
+        {
             // println!(
             //     "                     loadopt: bi {} bid {} @{} ins {} {}",
             //     bi.0,
@@ -665,11 +671,11 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             //     to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
             // );
             let i_arg1 = {
-                let i: &Ins = &f.blk(bi).ins[iii];
+                let i: Ins = f.blk(bi).ins[iii]; // Note - copy
                 if !isload(i.op) {
                     continue;
                 }
-                let sz: i32 = loadsz(i);
+                let sz: i32 = loadsz(&i);
                 let sl: Slice = Slice {
                     r: i.args[0],
                     off: 0,
@@ -725,7 +731,8 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
         let bi: BlkIdx = f.rpo[n as usize];
         while ist.bid == n {
             if let InsertU::Phi(uphi) = &mut ist.new {
-                f.phi_mut(uphi.pi).link = f.blk(bi).phi;
+                let pi = f.blk(bi).phi;
+                f.phi_mut(uphi.pi).link = pi/*f.blk(bi).phi*/;
                 f.blk_mut(bi).phi = uphi.pi;
             } else {
                 break;
