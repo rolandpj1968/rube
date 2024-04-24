@@ -1,7 +1,8 @@
 // TODO remove eventually
 #![allow(dead_code, unused_variables)]
 
-use std::cell; //::{Ref, RefCell, RefMut};
+use std::cell;
+//use std::iter::Map;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
@@ -25,27 +26,79 @@ struct RefCellVec<T> {
 }
 
 impl<T> RefCellVec<T> {
-    fn borrow(&self, i: usize) -> cell::Ref<T> {
+    fn borrow_i(&self, i: usize) -> cell::Ref<T> {
         self.v[i].borrow()
     }
     pub fn with_i<R>(&self, i: usize, f: impl FnOnce(&T) -> R) -> R {
-        f(&*self.borrow(i))
+        f(&*self.borrow_i(i))
     }
-    fn borrow_mut(&self, i: usize) -> cell::RefMut<T> {
+    fn borrow_mut_i(&self, i: usize) -> cell::RefMut<T> {
         self.v[i].borrow_mut()
     }
     pub fn with_mut_i<R>(&self, i: usize, f: impl FnOnce(&mut T) -> R) -> R {
-        f(&mut *self.borrow_mut(i))
+        f(&mut *self.borrow_mut_i(i))
+    }
+    pub fn len(&self) -> usize {
+        self.v.len()
+    }
+    fn add_i(&mut self, elem: T) -> usize {
+        self.v.push(cell::RefCell::new(elem));
+        self.len() - 1
     }
 }
 
 pub type Blks = RefCellVec<Blk>;
+// Hrmmm, wants lifetime specifier?
+// pub type BlkRef = cell::Ref<Blk>;
+// pub type BlkRefMut = cell::RefMut<Blk>;
 
+// TODO - can do this on RefCellVec as generic on TagT
 impl Blks {
+    pub fn borrow(&self, bi: BlkIdx) -> cell::Ref<Blk> {
+        assert!(bi != BlkIdx::NONE);
+        self.borrow_i(bi.0 as usize)
+    }
+    pub fn with<R>(&self, bi: BlkIdx, f: impl FnOnce(&Blk) -> R) -> R {
+        assert!(bi != BlkIdx::NONE);
+        self.with_i(bi.0 as usize, f)
+    }
+    pub fn borrow_mut(&self, bi: BlkIdx) -> cell::RefMut<Blk> {
+        assert!(bi != BlkIdx::NONE);
+        self.borrow_mut_i(bi.0 as usize)
+    }
     pub fn with_mut<R>(&self, bi: BlkIdx, f: impl FnOnce(&mut Blk) -> R) -> R {
+        assert!(bi != BlkIdx::NONE);
         self.with_mut_i(bi.0 as usize, f)
     }
+    pub fn add(&mut self, b: Blk) -> BlkIdx {
+        BlkIdx::new(self.add_i(b))
+    }
+    pub fn play(&self) -> std::slice::Iter<cell::RefCell<Blk>> {
+        self.v.iter()
+    }
+    // Hrmmmm, what type does map() return...
+    // pub fn iter_mut<R, F: FnMut(cell::RefMut<Blk>) -> R>(
+    //     &self,
+    // ) -> Map<std::slice::Iter<cell::RefCell<Blk>>, F> {
+    //     self.v
+    //         .iter()
+    //         .map::<std::slice::Iter<cell::RefCell<Blk>>, F>(|br: cell::RefCell<Blk>| {
+    //             br.borrow_mut()
+    //         })
+    // }
+    pub fn for_each_mut(&self, mut f: impl FnMut(cell::RefMut<Blk>)) {
+        self.v.iter().for_each(|br| f(br.borrow_mut()));
+    }
 }
+
+// Hrmm, it's complaining about lifetime params - need more grokking, just use .borrow() for now
+// impl Index<BlkIdx> for Blks {
+//     type Output = cell::Ref<Blk>;
+//     fn index(&self, index: BlkIdx) -> &Self::Output {
+//         debug_assert!(index != BlkIdx::NONE);
+//         &self.borrow(index)
+//     }
+// }
 
 // Typed index into blks, tmps, etc for type safety
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -770,14 +823,6 @@ impl IndexMut<BlkIdx> for Vec<Blk> {
     }
 }
 
-// impl Index<BlkIdx> for Blks {
-//     type Output = cell::Ref<Blk>;
-//     fn index(&self, index: BlkIdx) -> Self::Output {
-//         debug_assert!(index != BlkIdx::NONE);
-//         self.borrow(index.0 as usize)
-//     }
-// }
-
 /*
 struct Use {
     enum {
@@ -1168,20 +1213,16 @@ impl Fn {
         }
     }
 
-    pub fn blk(&self, bi: BlkIdx) -> &Blk {
-        assert!(bi != BlkIdx::NONE);
-        &self.blks[bi.0 as usize]
+    pub fn blk(&self, bi: BlkIdx) -> cell::Ref<Blk> {
+        self.blks.borrow(bi)
     }
 
-    pub fn blk_mut(&mut self, bi: BlkIdx) -> &mut Blk {
-        assert!(bi != BlkIdx::NONE);
-        &mut self.blks[bi.0 as usize]
+    pub fn blk_mut(&self, bi: BlkIdx) -> cell::RefMut<Blk> {
+        self.blks.borrow_mut(bi)
     }
 
     pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
-        let bi: BlkIdx = BlkIdx::new(self.blks.len());
-        self.blks.push(b);
-        bi
+        self.blks.add(b)
     }
 
     pub fn set_blk_link(&mut self, from_bi: BlkIdx, to_bi: BlkIdx) {

@@ -1,4 +1,4 @@
-use crate::all::{isargbh, isparbh, isretbh, Blk, BlkIdx, Blks, Fn, J, O};
+use crate::all::{isargbh, isparbh, isretbh, BlkIdx, Blks, Fn, J, O};
 
 /* eliminate sub-word abi op
  * variants for targets that
@@ -6,7 +6,8 @@ use crate::all::{isargbh, isparbh, isretbh, Blk, BlkIdx, Blks, Fn, J, O};
  * words with arbitrary high
  * bits
  */
-pub fn elimsb(f: &Fn) {
+// TODO - f now does now need to be mut here (interior mutability)
+pub fn elimsb(f: &mut Fn) {
     let blks: &Blks = &f.blks;
 
     let mut bi: BlkIdx = f.start;
