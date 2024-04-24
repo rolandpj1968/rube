@@ -1,6 +1,7 @@
 // TODO remove eventually
 #![allow(dead_code, unused_variables)]
 
+use std::cell; //::{Ref, RefCell, RefMut};
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
 
@@ -17,6 +18,33 @@ pub type RubeResult<T> = Result<T, RubeError>;
 // Helper for displaying byte slice
 pub fn to_s(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).to_string()
+}
+
+struct RefCellVec<T> {
+    v: Vec<cell::RefCell<T>>,
+}
+
+impl<T> RefCellVec<T> {
+    fn borrow(&self, i: usize) -> cell::Ref<T> {
+        self.v[i].borrow()
+    }
+    pub fn with_i<R>(&self, i: usize, f: impl FnOnce(&T) -> R) -> R {
+        f(&*self.borrow(i))
+    }
+    fn borrow_mut(&self, i: usize) -> cell::RefMut<T> {
+        self.v[i].borrow_mut()
+    }
+    pub fn with_mut_i<R>(&self, i: usize, f: impl FnOnce(&mut T) -> R) -> R {
+        f(&mut *self.borrow_mut(i))
+    }
+}
+
+pub type Blks = RefCellVec<Blk>;
+
+impl Blks {
+    pub fn with_mut<R>(&self, bi: BlkIdx, f: impl FnOnce(&mut Blk) -> R) -> R {
+        self.with_mut_i(bi.0 as usize, f)
+    }
 }
 
 // Typed index into blks, tmps, etc for type safety
@@ -742,6 +770,14 @@ impl IndexMut<BlkIdx> for Vec<Blk> {
     }
 }
 
+// impl Index<BlkIdx> for Blks {
+//     type Output = cell::Ref<Blk>;
+//     fn index(&self, index: BlkIdx) -> Self::Output {
+//         debug_assert!(index != BlkIdx::NONE);
+//         self.borrow(index.0 as usize)
+//     }
+// }
+
 /*
 struct Use {
     enum {
@@ -1087,7 +1123,7 @@ pub struct Lnk {
 }
 
 pub struct Fn {
-    pub blks: Vec<Blk>,
+    pub blks: Blks,
     pub phis: Vec<Phi>,
     // Hrmmm, these actually are 1:1 with Tmp's
     // Maybe make Alias.slot a TmpIdx?
@@ -1112,7 +1148,7 @@ pub struct Fn {
 impl Fn {
     pub fn new(lnk: Lnk) -> Fn {
         Fn {
-            blks: vec![],
+            blks: Blks { v: vec![] },
             phis: vec![], // TODO - should be on Blk
             aliases: vec![],
             start: BlkIdx::NONE,

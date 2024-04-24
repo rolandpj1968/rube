@@ -4,8 +4,8 @@ use std::fmt;
 use std::io::stdout;
 
 use crate::all::{
-    bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, Ins, InsIdx, KExt, Phi, PhiIdx,
-    Ref, RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, KW, KX, O, TMP0, UNDEF,
+    bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, InsIdx, KExt, Phi, PhiIdx, Ref,
+    RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, KW, KX, O, TMP0, UNDEF,
 };
 use crate::cfg::{dom, filldom, fillfron, sdom};
 use crate::live::filllive;
