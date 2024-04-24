@@ -160,17 +160,33 @@ pub fn filldom(f: &mut Fn) {
     loop {
         let mut ch: u32 = 0;
         for bi in rpo.iter().skip(1) {
-            let b = &blks.borrow(*bi);
-            let mut di: BlkIdx = BlkIdx::NONE;
-            for pi in &b.preds {
-                if blks.borrow(*pi).idom != BlkIdx::NONE || *pi == f.start {
-                    di = inter(blks, di, *pi);
+            let di = blks.with(*bi, |b| {
+                //let mut b = blks.borrow_mut(*bi);
+                let mut di: BlkIdx = BlkIdx::NONE;
+                for pi in &b.preds {
+                    // Oops, pi could be same as bi?
+                    //assert!(bi != pi || b.idom == BlkIdx::NONE);
+                    let idom = if bi == pi {
+                        b.idom
+                    } else {
+                        blks.borrow(*pi).idom
+                    };
+                    if
+                    /*bi != pi &&*/
+                    (/*blks.borrow(*pi).*/idom != BlkIdx::NONE || *pi == f.start) {
+                        di = inter(blks, di, *pi);
+                    }
                 }
-            }
-            if di != b.idom {
-                ch += 1;
-                blks.borrow_mut(*bi).idom = di;
-            }
+                di
+            });
+
+            blks.with_mut(*bi, |b| {
+                if di != b.idom {
+                    ch += 1;
+                    b /*blks.borrow_mut(*bi)*/
+                        .idom = di;
+                }
+            });
         }
 
         if ch == 0 {
