@@ -63,7 +63,7 @@ pub fn filluse(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let bid: u32 = blks.borrow(bi).id;
+        let bid: u32 = blks.id_of(bi);
         let mut pi: PhiIdx = blks.borrow(bi).phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
