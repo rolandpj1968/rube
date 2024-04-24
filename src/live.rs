@@ -48,13 +48,6 @@ fn bset(tmps: &[Tmp], r: Ref, b: &mut Blk, nlv: &mut [u32; 2]) {
     }
 }
 
-fn add_liveon_succ_out(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
-    if si != BlkIdx::NONE {
-        liveon(blks, phis, v, bi, si);
-        bsunion(&mut blks.borrow_mut(bi).out, v);
-    }
-}
-
 /* liveness analysis
  * requires rpo computation
  */
@@ -86,11 +79,16 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
         for n in (0..rpo.len()).rev() {
             let bi: BlkIdx = rpo[n];
             {
-                bscopy(&mut u, &blks.borrow(bi).out);
-                // Ugh, crying for succs iter
-                let (s1, s2) = blks.borrow(bi).s1_s2();
-                add_liveon_succ_out(blks, phis, &mut v, bi, s1);
-                add_liveon_succ_out(blks, phis, &mut v, bi, s2);
+                let succs = blks.with_mut(bi, |b| {
+                    bscopy(&mut u, &b.out);
+                    [b.s1, b.s2]
+                });
+                succs.iter().for_each(|si| {
+                    if *si != BlkIdx::NONE {
+                        liveon(blks, phis, &mut v, bi, *si);
+                        blks.with_mut(bi, |b| bsunion(&mut b.out, &v));
+                    }
+                });
                 chg = chg || !bsequal(&blks.borrow(bi).out, &u);
             }
 

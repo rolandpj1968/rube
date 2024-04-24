@@ -792,6 +792,10 @@ impl Blk {
         }
     }
 
+    pub fn with_ins<R>(&self, f: impl FnOnce(&[Ins]) -> R) -> R {
+        f(&*self.ins.borrow())
+    }
+
     pub fn ins(&self) -> cell::Ref<Vec<Ins>> {
         self.ins.borrow()
     }
