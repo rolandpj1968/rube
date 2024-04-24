@@ -3,7 +3,7 @@ use std::cell;
 use crate::all::{Blk, BlkIdx, Blks, Fn, Phi, PhiIdx};
 
 // Not pretty - would be better if s1, s2 were [BlkIndex; 2]
-fn succsdel(mut b: cell::RefMut<Blk>, bdi: BlkIdx) {
+fn succsdel(b: &mut Blk, bdi: BlkIdx) {
     if b.s1 == bdi {
         b.s1 = BlkIdx::NONE;
     }
@@ -23,7 +23,7 @@ fn phisdel(phis: &mut [Phi], mut pi: PhiIdx, bsi: BlkIdx) {
     }
 }
 
-fn preddel(mut b: cell::RefMut<Blk>, bsi: BlkIdx) {
+fn preddel(b: &mut Blk, bsi: BlkIdx) {
     if let Some(a) = b.preds.iter().position(|pbi| *pbi == bsi) {
         b.preds.remove(a);
     }
@@ -31,9 +31,9 @@ fn preddel(mut b: cell::RefMut<Blk>, bsi: BlkIdx) {
 
 fn edgedel(blks: &Blks, phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
     if bdi != BlkIdx::NONE {
-        succsdel(blks.borrow_mut(bsi), bdi);
-        phisdel(phis, blks.borrow_mut(bdi).phi, bsi);
-        preddel(blks.borrow_mut(bdi), bsi);
+        blks.with_mut(bsi, |bs| succsdel(bs, bdi));
+        phisdel(phis, blks.borrow(bdi).phi, bsi);
+        blks.with_mut(bdi, |bd| preddel(bd, bsi));
     }
 }
 

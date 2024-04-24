@@ -61,20 +61,14 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     let mut u: BSet = bsinit(tmps.len());
     let mut v: BSet = bsinit(tmps.len());
 
-    // TODO - just iterate over live blks with for_each()
-    {
-        let mut bi: BlkIdx = f.start;
-        while bi != BlkIdx::NONE {
-            blks.with_mut(bi, |b| {
-                b.in_ = bsinit(tmps.len());
-                b.out = bsinit(tmps.len());
-                b.gen = bsinit(tmps.len());
-                bi = b.link;
-            });
-        }
-    }
-    let mut chg: bool = true;
+    // TODO - live blks only!
+    blks.for_each_mut(|mut b| {
+        b.in_ = bsinit(tmps.len());
+        b.out = bsinit(tmps.len());
+        b.gen = bsinit(tmps.len());
+    });
 
+    let mut chg: bool = true;
     loop {
         for n in (0..rpo.len()).rev() {
             let bi: BlkIdx = rpo[n];
