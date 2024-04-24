@@ -116,6 +116,17 @@ impl Blks {
             }
         });
     }
+
+    pub fn for_each_bi(&self, mut f: impl FnMut(BlkIdx)) {
+        let len = self.len();
+        for bii in 0..len {
+            let is_dead = self.v[bii].borrow().is_dead;
+            if !is_dead {
+                f(BlkIdx::new(bii));
+            }
+        }
+    }
+
     pub fn id_of(&self, bi: BlkIdx) -> u32 {
         self.borrow(bi).id
     }
