@@ -104,66 +104,67 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                 }
 
                 b.nlive.copy_from_slice(&nlv);
-            });
-            for ii in (0..blks.borrow(bi).ins.len()).rev() {
-                let i: Ins = blks.borrow(bi).ins[ii]; // Note, copy
-                if i.op == O::Ocall {
-                    if let Ref::RCall(_) = i.args[1] {
-                        let mut m: [u32; 2] = [0; 2];
-                        blks[bi].in_[0] &= (targ.retregs)(i.args[1], &mut m);
-                        for k in 0..2 {
-                            nlv[k] -= m[k];
-                            /* caller-save registers are used
-                             * by the callee, in that sense,
-                             * right in the middle of the call,
-                             * they are live: */
-                            nlv[k] += targ.nrsave[k];
-                            if nlv[k] > blks.borrow(bi).nlive[k] {
-                                blks[bi].nlive[k] = nlv[k];
+
+                for ii in (0..b.ins.len()).rev() {
+                    let i: Ins = b.ins[ii]; // Note, copy
+                    if i.op == O::Ocall {
+                        if let Ref::RCall(_) = i.args[1] {
+                            let mut m: [u32; 2] = [0; 2];
+                            b.in_[0] &= (targ.retregs)(i.args[1], &mut m);
+                            for k in 0..2 {
+                                nlv[k] -= m[k];
+                                /* caller-save registers are used
+                                 * by the callee, in that sense,
+                                 * right in the middle of the call,
+                                 * they are live: */
+                                nlv[k] += targ.nrsave[k];
+                                if nlv[k] > b.nlive[k] {
+                                    b.nlive[k] = nlv[k];
+                                }
+                            }
+                            b.in_[0] |= (targ.argregs)(i.args[1], &mut m);
+                            for k in 0..2 {
+                                nlv[k] -= targ.nrsave[k];
+                                nlv[k] += m[k];
                             }
                         }
-                        blks[bi].in_[0] |= (targ.argregs)(i.args[1], &mut m);
-                        for k in 0..2 {
-                            nlv[k] -= targ.nrsave[k];
-                            nlv[k] += m[k];
-                        }
                     }
-                }
-                match i.to {
-                    Ref::R => (),
-                    Ref::RTmp(ti) => {
-                        if bshas(&blks.borrow(bi).in_, ti.usize()) {
-                            nlv[kbase(tmps[ti].cls) as usize] -= 1;
-                        }
-                        bsset(&mut blks.borrow_mut(bi).gen, ti.usize());
-                        bsclr(&mut blks.borrow_mut(bi).in_, ti.usize());
-                    }
-                    _ => {
-                        // i.to MUST be R or RTmp
-                        assert!(false);
-                    }
-                }
-                for k in 0..2 {
-                    match i.args[k] {
-                        Ref::RMem(ma) => {
-                            let (base, index) = {
-                                let mem: &Mem = &mems[ma];
-                                (mem.base, mem.index)
-                            };
-                            bset(tmps, base, &mut blks[bi], &mut nlv);
-                            bset(tmps, index, &mut blks[bi], &mut nlv);
+                    match i.to {
+                        Ref::R => (),
+                        Ref::RTmp(ti) => {
+                            if bshas(&b.in_, ti.usize()) {
+                                nlv[kbase(tmps[ti].cls) as usize] -= 1;
+                            }
+                            bsset(&mut blks.borrow_mut(bi).gen, ti.usize());
+                            bsclr(&mut blks.borrow_mut(bi).in_, ti.usize());
                         }
                         _ => {
-                            bset(tmps, i.args[k], &mut blks[bi], &mut nlv);
+                            // i.to MUST be R or RTmp
+                            assert!(false);
+                        }
+                    }
+                    for k in 0..2 {
+                        match i.args[k] {
+                            Ref::RMem(ma) => {
+                                let (base, index) = {
+                                    let mem: &Mem = &mems[ma];
+                                    (mem.base, mem.index)
+                                };
+                                bset(tmps, base, b, &mut nlv);
+                                bset(tmps, index, b, &mut nlv);
+                            }
+                            _ => {
+                                bset(tmps, i.args[k], b, &mut nlv);
+                            }
+                        }
+                    }
+                    for k in 0..2 {
+                        if nlv[k] > b.nlive[k] {
+                            b.nlive[k] = nlv[k];
                         }
                     }
                 }
-                for k in 0..2 {
-                    if nlv[k] > blks.borrow(bi).nlive[k] {
-                        blks.borrow(bi).nlive[k] = nlv[k];
-                    }
-                }
-            }
+            });
         }
         if chg {
             chg = false;
