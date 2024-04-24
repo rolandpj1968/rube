@@ -63,73 +63,75 @@ pub fn filluse(f: &mut Fn) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let bid: u32 = blks.id_of(bi);
-        let mut pi: PhiIdx = blks.borrow(bi).phi;
-        while pi != PhiIdx::NONE {
-            let p: &Phi = &phis[pi];
-            let cls = p.cls;
-            if let Ref::RTmp(mut pti) = p.to {
-                {
-                    let tmp: &mut Tmp = &mut tmps[pti];
-                    tmp.bid = bid;
-                    tmp.ndef += 1;
-                    tmp.cls = cls;
-                }
-                pti = phicls(pti, tmps);
-                for a in &p.args {
-                    if let Ref::RTmp(mut ati) = a {
-                        adduse(&mut tmps[ati], UseT::UPhi(pi), bi, bid);
-                        ati = phicls(ati, tmps);
-                        if ati != pti {
-                            tmps[ati].phi = pti;
+        blks.with(bi, |b| {
+            let bid: u32 = b.id;
+            let mut pi: PhiIdx = b.phi;
+            while pi != PhiIdx::NONE {
+                let p: &Phi = &phis[pi];
+                let cls = p.cls;
+                if let Ref::RTmp(mut pti) = p.to {
+                    {
+                        let tmp: &mut Tmp = &mut tmps[pti];
+                        tmp.bid = bid;
+                        tmp.ndef += 1;
+                        tmp.cls = cls;
+                    }
+                    pti = phicls(pti, tmps);
+                    for a in &p.args {
+                        if let Ref::RTmp(mut ati) = a {
+                            adduse(&mut tmps[ati], UseT::UPhi(pi), bi, bid);
+                            ati = phicls(ati, tmps);
+                            if ati != pti {
+                                tmps[ati].phi = pti;
+                            }
                         }
                     }
+                } else {
+                    // p.to MUST be an RTmp
+                    assert!(false);
                 }
-            } else {
-                // p.to MUST be an RTmp
-                assert!(false);
+
+                pi = p.link;
             }
 
-            pi = p.link;
-        }
-
-        for (ii, i) in blks.borrow(bi).ins().iter().enumerate() {
-            if let Ref::RTmp(ti) = i.to {
-                let mut w: TmpWdth = TmpWdth::WFull;
-                if isparbh(i.op) {
-                    w = TmpWdth::from_parbh(i.op);
-                } else if isload(i.op) && i.op != O::Oload {
-                    w = TmpWdth::from_loadbh(i.op);
-                } else if isext(i.op) {
-                    w = TmpWdth::from_ext(i.op);
+            for (ii, i) in b.ins().iter().enumerate() {
+                if let Ref::RTmp(ti) = i.to {
+                    let mut w: TmpWdth = TmpWdth::WFull;
+                    if isparbh(i.op) {
+                        w = TmpWdth::from_parbh(i.op);
+                    } else if isload(i.op) && i.op != O::Oload {
+                        w = TmpWdth::from_loadbh(i.op);
+                    } else if isext(i.op) {
+                        w = TmpWdth::from_ext(i.op);
+                    }
+                    if w == TmpWdth::Wsw || w == TmpWdth::Wuw {
+                        if i.cls == KW {
+                            w = TmpWdth::WFull;
+                        }
+                    }
+                    let tmp: &mut Tmp = &mut tmps[ti];
+                    tmp.width = w;
+                    tmp.def = InsIdx::new(ii);
+                    tmp.bid = bid;
+                    tmp.ndef += 1;
+                    tmp.cls = i.cls;
+                } else {
+                    // Ins i.to must be R or RTmp
+                    assert!(i.to == Ref::R);
                 }
-                if w == TmpWdth::Wsw || w == TmpWdth::Wuw {
-                    if i.cls == KW {
-                        w = TmpWdth::WFull;
+                for arg in i.args {
+                    if let Ref::RTmp(ti) = arg {
+                        adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, bid);
                     }
                 }
-                let tmp: &mut Tmp = &mut tmps[ti];
-                tmp.width = w;
-                tmp.def = InsIdx::new(ii);
-                tmp.bid = bid;
-                tmp.ndef += 1;
-                tmp.cls = i.cls;
-            } else {
-                // Ins i.to must be R or RTmp
-                assert!(i.to == Ref::R);
             }
-            for arg in /*blks.borrow(bi).ins()[ii]*/ i.args {
-                if let Ref::RTmp(ti) = arg {
-                    adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, bid);
-                }
+
+            if let Ref::RTmp(ti) = blks.borrow(bi).jmp.arg {
+                adduse(&mut tmps[ti], UseT::UJmp, bi, bid);
             }
-        }
 
-        if let Ref::RTmp(ti) = blks.borrow(bi).jmp.arg {
-            adduse(&mut tmps[ti], UseT::UJmp, bi, bid);
-        }
-
-        bi = blks.borrow(bi).link;
+            bi = blks.borrow(bi).link;
+        });
     }
 }
 
@@ -147,6 +149,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     let mut blist: Vec<BlkIdx> = vec![BlkIdx::NONE; blks.len()];
     let be: usize = blks.len();
     let nt: usize = tmps.len();
+    let start_id: u32 = blks.id_of(f.start);
     for tii in TMP0..nt {
         let ti: TmpIdx = TmpIdx::new(tii);
         tmps[ti].visit = TmpIdx::NONE;
@@ -156,7 +159,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         if tmps[ti].ndef == 1 {
             let defb: u32 = tmps[ti].bid;
             let ok = tmps[ti].uses.iter().all(|u| u.bid == defb);
-            if ok || defb == blks.borrow(f.start).id {
+            if ok || defb == start_id {
                 continue;
             }
         }
@@ -166,40 +169,41 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         let rt: Ref = Ref::RTmp(ti);
         let mut bi = f.start;
         while bi != BlkIdx::NONE {
-            let mut b = blks.borrow_mut(bi);
-            let bid = b.id;
-            //let b_out = &b.out;
-            b.visit = 0;
-            let mut r: Ref = Ref::R;
-            for i in b.ins_mut().iter_mut() {
-                if r != Ref::R {
-                    for arg in &mut i.args {
-                        if *arg == rt {
-                            *arg = r;
+            blks.with_mut(bi, |b| {
+                b.visit = 0;
+                let mut r: Ref = Ref::R;
+                for i in b.ins_mut().iter_mut() {
+                    if r != Ref::R {
+                        for arg in &mut i.args {
+                            if *arg == rt {
+                                *arg = r;
+                            }
+                        }
+                    }
+                    if i.to == rt {
+                        if !bshas(&b.out, ti.usize()) {
+                            r = refindex(tmps, ti);
+                            i.to = r;
+                        } else {
+                            if !bshas(&u, b.id as usize) {
+                                bsset(&mut u, b.id as usize);
+                                bp -= 1;
+                                blist[bp] = bi;
+                            }
+                            if clsmerge(&mut k, i.cls) {
+                                // TODO - better msg
+                                return Err(Box::new(SsaError::new("invalid input")));
+                            }
                         }
                     }
                 }
-                if i.to == rt {
-                    if !bshas(&b.out /*b_out*/, ti.usize()) {
-                        r = refindex(tmps, ti);
-                        i.to = r;
-                    } else {
-                        if !bshas(&u, /*b.id*/ bid as usize) {
-                            bsset(&mut u, /*b.id*/ bid as usize);
-                            bp -= 1;
-                            blist[bp] = bi;
-                        }
-                        if clsmerge(&mut k, i.cls) {
-                            // TODO - better msg
-                            return Err(Box::new(SsaError::new("invalid input")));
-                        }
-                    }
+                if r != Ref::R && b.jmp.arg == rt {
+                    b.jmp.arg = r;
                 }
-            }
-            if r != Ref::R && b.jmp.arg == rt {
-                b.jmp.arg = r;
-            }
-            bi = b.link;
+                bi = b.link;
+
+                Ok(())
+            })?;
         }
         let defs: BSet = u.clone();
         while bp != be {
@@ -208,24 +212,21 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             bp += 1;
             bsclr(&mut u, blks.borrow(bi).id as usize);
             let frons_len = blks.borrow(bi).frons.len();
-            for n in 0..frons_len
-            /*blks.borrow(bi).frons.len()*/
-            {
+            for n in 0..frons_len {
                 let ai: BlkIdx = blks.borrow(bi).frons[n];
-                let a_visit = blks.borrow(ai).visit;
-                blks.borrow_mut(ai).visit += 1;
-                if a_visit == 0 && bshas(&blks.borrow(ai).in_, ti.usize()) {
-                    let a_pi: PhiIdx = blks.borrow(ai).phi;
-                    let pi: PhiIdx = PhiIdx::new(phis.len());
-                    phis.push(Phi::new(rt, vec![], vec![], k, a_pi));
-                    blks.borrow_mut(ai).phi = pi;
-                    let a_id = blks.borrow(ai).id;
-                    if !bshas(&defs, a_id as usize) && !bshas(&u, a_id as usize) {
-                        bsset(&mut u, a_id as usize);
-                        bp -= 1;
-                        blist[bp] = ai;
+                blks.with_mut(ai, |a| {
+                    a.visit += 1;
+                    if a.visit == 1 && bshas(&a.in_, ti.usize()) {
+                        let pi: PhiIdx = PhiIdx::new(phis.len());
+                        phis.push(Phi::new(rt, vec![], vec![], k, a.phi));
+                        a.phi = pi;
+                        if !bshas(&defs, a.id as usize) && !bshas(&u, a.id as usize) {
+                            bsset(&mut u, a.id as usize);
+                            bp -= 1;
+                            blist[bp] = ai;
+                        }
                     }
-                }
+                });
             }
         }
     }
