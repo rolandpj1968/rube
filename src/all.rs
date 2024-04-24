@@ -43,7 +43,7 @@ pub fn to_s(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).to_string()
 }
 
-struct RefCellVec<T> {
+pub struct RefCellVec<T> {
     v: Vec<cell::RefCell<T>>,
 }
 
@@ -733,7 +733,8 @@ impl BlkJmp {
 
 pub struct Blk {
     pub phi: PhiIdx,
-    pub ins: Vec<Ins>,
+    // Behind a RefCell to get access mutably together with other fields.
+    pub ins: cell::RefCell<Vec<Ins>>,
     pub jmp: BlkJmp,
     pub s1: BlkIdx,
     pub s2: BlkIdx,
@@ -759,7 +760,7 @@ impl Blk {
     pub fn new(name: &[u8], id: u32, dlink: BlkIdx) -> Blk {
         Blk {
             phi: PhiIdx::NONE,
-            ins: vec![],
+            ins: cell::RefCell::new(vec![]),
             jmp: BlkJmp::new(),
             s1: BlkIdx::NONE,
             s2: BlkIdx::NONE,
@@ -780,6 +781,14 @@ impl Blk {
             loop_: 0,
             name: name.to_vec(),
         }
+    }
+
+    pub fn ins(&self) -> cell::Ref<Vec<Ins>> {
+        self.ins.borrow()
+    }
+
+    pub fn ins_mut(&self) -> cell::RefMut<Vec<Ins>> {
+        self.ins.borrow_mut()
     }
 
     pub fn s1_s2(&self) -> (BlkIdx, BlkIdx) {

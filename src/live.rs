@@ -105,8 +105,9 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
 
                 b.nlive.copy_from_slice(&nlv);
 
-                for ii in (0..b.ins.len()).rev() {
-                    let i: Ins = b.ins[ii]; // Note, copy
+                let ins_len = b.ins().len();
+                for ii in (0..ins_len/*..ins().len()*/).rev() {
+                    let i: Ins = b.ins()[ii]; // Note, copy
                     if i.op == O::Ocall {
                         if let Ref::RCall(_) = i.args[1] {
                             let mut m: [u32; 2] = [0; 2];

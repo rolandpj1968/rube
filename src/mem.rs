@@ -44,8 +44,10 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
     /* promote uniform stack slots to temporaries */
     // TODO - ask QBE; only touches first/start Blk
     let bi: BlkIdx = f.start;
-    'ins_loop: for ii in 0..blks.borrow(bi).ins.len() {
-        let i: &Ins = &blks.borrow(bi).ins[ii];
+    'ins_loop: for ii in 0..blks.borrow(bi).ins().len() {
+        let b = blks.borrow(bi);
+        let i: &Ins = &b /*blks.borrow(bi)*/
+            .ins()[ii];
         // TODO isalloc
         if OALLOC > i.op || i.op > OALLOC1 {
             continue;
@@ -69,7 +71,9 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
 
         for u in &t.uses {
             if let UseT::UIns(li) = u.type_ {
-                let l: &Ins = &blks.borrow(u.bi).ins[li];
+                let b = blks.borrow(u.bi);
+                let l: &Ins = &b /*blks.borrow(u.bi)*/
+                    .ins()[li];
                 if isload(l.op) {
                     if s == -1 || s == loadsz(l) {
                         s = loadsz(l);
@@ -93,14 +97,15 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
         }
 
         /* get rid of the alloc and replace uses */
-        blks.borrow_mut(bi).ins[ii] = Ins::new0(O::Onop, KW, Ref::R);
+        blks.borrow_mut(bi).ins_mut()[ii] = Ins::new0(O::Onop, KW, Ref::R);
         t.ndef -= 1;
 
         for u in &t.uses {
-            let mut ub = blks.borrow_mut(u.bi);
+            let ub = blks.borrow_mut(u.bi);
+            let mut ub_ins = ub.ins_mut();
             let l: &mut Ins = {
                 if let UseT::UIns(li) = u.type_ {
-                    &mut ub.ins[li]
+                    &mut ub_ins/*ub.ins_mut()*/[li]
                 } else {
                     // Checked above that uses are only UIns
                     assert!(false);
@@ -345,8 +350,8 @@ pub fn coalesce(f: &mut Fn) {
                 ip -= 1;
                 load(f, f.blk(bi).jmp.arg, u64::MAX, ip, &mut sl);
             }
-            for iii in (0..f.blk(bi).ins.len()).rev() {
-                let i: Ins = f.blk(bi).ins[iii]; // note copy
+            for iii in (0..f.blk(bi).ins().len()).rev() {
+                let i: Ins = f.blk(bi).ins()[iii]; // note copy
                 let ii: InsIdx = InsIdx::new(iii);
                 if i.op == O::Oargc {
                     ip -= 1;
@@ -363,8 +368,8 @@ pub fn coalesce(f: &mut Fn) {
                     ip -= 1;
                 }
                 if i.op == O::Oblit0 {
-                    assert!(f.blk(bi).ins[iii + 1].op == O::Oblit1); // TODO bounds check
-                    if let Ref::RInt(rsval) = f.blk(bi).ins[iii + 1].args[0] {
+                    assert!(f.blk(bi).ins()[iii + 1].op == O::Oblit1); // TODO bounds check
+                    if let Ref::RInt(rsval) = f.blk(bi).ins()[iii + 1].args[0] {
                         let sz: i32 = rsval.abs();
                         let x: Bits = if sz >= (NBIT as i32) {
                             u64::MAX
@@ -401,26 +406,26 @@ pub fn coalesce(f: &mut Fn) {
             if !rin(&s.r, s.st[n].ip) {
                 let bi: BlkIdx = s.st[n].bi;
                 let ii: InsIdx = s.st[n].ii;
-                if f.blk(bi).ins[ii.0 as usize].op == O::Oblit0 {
-                    f.blk_mut(bi).ins[(ii.0 as usize) + 1] = Ins::new0(O::Onop, KX, Ref::R);
+                if f.blk(bi).ins()[ii.0 as usize].op == O::Oblit0 {
+                    f.blk_mut(bi).ins_mut()[(ii.0 as usize) + 1] = Ins::new0(O::Onop, KX, Ref::R);
                 }
-                f.blk_mut(bi).ins[ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+                f.blk_mut(bi).ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
             }
         }
     }
 
     /* kill slots with an empty live range */
-    let mut total: i32 = 0;
-    let mut freed: i32 = 0;
+    let mut _total: i32 = 0;
+    let mut _freed: i32 = 0;
     let mut stk: Vec<TmpIdx> = vec![];
     //let n: usize = 0;
     let mut s0: usize = 0;
     // TODO - use retain_mut()
     for s in 0..sl.len() {
-        total += sl[s].sz;
+        _total += sl[s].sz;
         if sl[s].r.b == 0 {
             stk.push(sl[s].ti);
-            freed += sl[s].sz;
+            _freed += sl[s].sz;
         } else {
             sl[s0] = sl[s].clone(); // Ugh, cloning for vec st
             s0 += 1;
@@ -454,13 +459,13 @@ pub fn coalesce(f: &mut Fn) {
                     assert!(t.ndef == 1 && t.def != InsIdx::NONE);
                     (t.def, f.rpo[t.bid as usize])
                 };
-                let i: Ins = f.blk(t_def_bi).ins[t_def_ii.0 as usize]; /* Note - copy */
+                let i: Ins = f.blk(t_def_bi).ins()[t_def_ii.0 as usize]; /* Note - copy */
                 if isload(i.op) {
-                    f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] =
+                    f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] =
                         Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
                     continue;
                 }
-                f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+                f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
                 for ui in 0..f.tmp(ti).uses.len() {
                     let u: Use = f.tmp(ti).uses[ui]; // Note - copy
                     match u.type_ {
@@ -473,19 +478,20 @@ pub fn coalesce(f: &mut Fn) {
                         }
                         UseT::UIns(ii) => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
-                            let mut b = f.blk_mut(bi);
-                            let i: Ins = b.ins[ii.0 as usize]; // Note - copy
+                            let b = f.blk_mut(bi);
+                            let i: Ins = b.ins()[ii.0 as usize]; // Note - copy
                             match i.to {
                                 Ref::R => {
                                     if isarg(i.op) {
                                         assert!(i.op == O::Oargc);
-                                        b.ins[ii.0 as usize].args[1] = CON_Z; /* crash */
+                                        b.ins_mut()[ii.0 as usize].args[1] = CON_Z;
+                                    /* crash */
                                     } else {
                                         if i.op == O::Oblit0 {
-                                            b.ins[(ii.0 + 1) as usize] =
+                                            b.ins_mut()[(ii.0 + 1) as usize] =
                                                 Ins::new0(O::Onop, KX, Ref::R);
                                         }
-                                        b.ins[ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+                                        b.ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
                                     }
                                 }
                                 Ref::RTmp(ti) => {
@@ -508,7 +514,7 @@ pub fn coalesce(f: &mut Fn) {
     // /* fuse slots by decreasing size */
     sl.sort_by(scmp);
     // qsort(sl, nsl, sizeof *sl, scmp);
-    let mut fused: i32 = 0;
+    let mut _fused: i32 = 0;
     'outer: for s0i in 0..sl.len() {
         if sl[s0i].si != SlotIdx::NONE {
             continue;
@@ -532,7 +538,7 @@ pub fn coalesce(f: &mut Fn) {
             radd(&mut r, sl[si].r.a);
             radd(&mut r, sl[si].r.b - 1);
             sl[si].si = SlotIdx(s0i as u32);
-            fused += sl[si].sz;
+            _fused += sl[si].sz;
         }
     }
 
@@ -554,7 +560,7 @@ pub fn coalesce(f: &mut Fn) {
         if sl[si].si == SlotIdx(si as u32) {
             continue;
         }
-        f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+        f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
         let ssi: SlotIdx = sl[si].si;
         let ssti: TmpIdx = sl[ssi.0 as usize].ti;
         let (ts_def_ii, ts_bid) = {
@@ -567,9 +573,9 @@ pub fn coalesce(f: &mut Fn) {
              * selected has a def that
              * dominates its new uses
              */
-            let tsi: Ins = f.blk(t_def_bi).ins[ts_def_ii.0 as usize]; // Note copy
-            f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = tsi;
-            f.blk_mut(t_def_bi).ins[ts_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
+            let tsi: Ins = f.blk(t_def_bi).ins()[ts_def_ii.0 as usize]; // Note copy
+            f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = tsi;
+            f.blk_mut(t_def_bi).ins_mut()[ts_def_ii.0 as usize] = Ins::new0(O::Onop, KX, Ref::R);
             f.tmp_mut(ssti).def = t_def_ii;
         }
         for ui in 0..f.tmp(sti).uses.len() {
@@ -581,7 +587,10 @@ pub fn coalesce(f: &mut Fn) {
                 }
                 UseT::UIns(ii) => {
                     let bi: BlkIdx = f.rpo[u.bid as usize];
-                    let args: &mut [Ref; 2] = &mut f.blk_mut(bi).ins[ii.0 as usize].args;
+                    let b = f.blk_mut(bi);
+                    let args: &mut [Ref; 2] = &mut b /*f.blk_mut(bi)*/
+                        .ins_mut()[ii.0 as usize]
+                        .args;
                     for arg in args {
                         //         for (n=0; n<2; n++)
                         if *arg == Ref::RTmp(sti) {

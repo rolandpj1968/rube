@@ -1,4 +1,5 @@
 use derive_new::new;
+use std::cell;
 use std::cmp::Ordering;
 
 use crate::alias::{alias, escapes};
@@ -296,7 +297,7 @@ fn def(
 
     if ii == InsIdx::NONE {
         // Bit naughty - this is out of range
-        ii = InsIdx::new(f.blk(bi).ins.len());
+        ii = InsIdx::new(f.blk(bi).ins().len());
     }
     let cls: KExt = if sl.sz > 4 { KL } else { KW };
     let msks: Bits = genmask(sl.sz as i32);
@@ -312,7 +313,7 @@ fn def(
         //         ii.0
         //     );
         // }
-        let mut i: Ins = f.blk(bi).ins[ii.0 as usize]; /* Note: copy! */
+        let mut i: Ins = f.blk(bi).ins()[ii.0 as usize]; /* Note: copy! */
         if killsl(f, i.to, &sl) || (i.op == O::Ocall && escapes(f, sl.r)) {
             // println!("                              killsl or escaping call");
             goto_load = true;
@@ -328,7 +329,7 @@ fn def(
                 if let Ref::RInt(blit1_i) = i.args[0] {
                     assert!(ii != InsIdx::new(0));
                     ii = InsIdx::new(ii.usize() - 1);
-                    i = f.blk(bi).ins[ii.0 as usize];
+                    i = f.blk(bi).ins()[ii.0 as usize];
                     assert!(i.op == O::Oblit0);
                     (blit1_i.abs(), i.args[1], Ref::R)
                 } else {
@@ -574,7 +575,7 @@ fn def(
             let l: Loc = Loc {
                 type_: l_type,
                 bi: bpi,
-                off: InsIdx::new(f.blk(bpi).ins.len()),
+                off: InsIdx::new(f.blk(bpi).ins().len()),
             };
             let r1: Ref = def(
                 f,
@@ -658,9 +659,9 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let ins_len = f.blk(bi).ins.len();
+        let ins_len = f.blk(bi).ins().len();
         for iii in 0..ins_len
-        /*f.blk(bi).ins.len()*/
+        /*f.blk(bi).ins().len()*/
         {
             // println!(
             //     "                     loadopt: bi {} bid {} @{} ins {} {}",
@@ -668,10 +669,10 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             //     f.blk(bi).id,
             //     to_s(&f.blk(bi).name),
             //     iii,
-            //     to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
+            //     to_s(OPTAB[f.blk(bi).ins()[iii].op as usize].name)
             // );
             let i_arg1 = {
-                let i: Ins = f.blk(bi).ins[iii]; // Note - copy
+                let i: Ins = f.blk(bi).ins()[iii]; // Note - copy
                 if !isload(i.op) {
                     continue;
                 }
@@ -699,12 +700,12 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                     &l, /*, 0, debug*/
                 )
             };
-            f.blk_mut(bi).ins[iii].args[1] = i_arg1;
+            f.blk_mut(bi).ins_mut()[iii].args[1] = i_arg1;
             // print!(
             //     "                     loadopt: @{} ins {} {} - arg1 is now ",
             //     to_s(&f.blk(bi).name),
             //     iii,
-            //     to_s(OPTAB[f.blk(bi).ins[iii].op as usize].name)
+            //     to_s(OPTAB[f.blk(bi).ins()[iii].op as usize].name)
             // );
             // if i_arg1 == Ref::R {
             //     print!("R");
@@ -756,10 +757,10 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 isti += 1;
                 ist = &mut ilog[isti];
             } else {
-                if ni == InsIdx::new(f.blk(bi).ins.len()) {
+                if ni == InsIdx::new(f.blk(bi).ins().len()) {
                     break;
                 }
-                i = f.blk(bi).ins[ni.0 as usize];
+                i = f.blk(bi).ins()[ni.0 as usize];
                 ni = InsIdx::new(ni.usize() + 1);
                 if isload(i.op) && i.args[1] != Ref::R {
                     // TODO same code in mem.rs
@@ -792,7 +793,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             }
             ib.push(i);
         }
-        f.blk_mut(bi).ins = ib;
+        f.blk_mut(bi).ins = cell::RefCell::new(ib);
         n += 1;
     }
     // TODO

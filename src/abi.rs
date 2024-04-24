@@ -13,7 +13,7 @@ pub fn elimsb(f: &mut Fn) {
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
         blks.with_mut(bi, |b| {
-            for i in &mut b.ins {
+            for i in b.ins_mut().iter_mut() {
                 if isargbh(i.op) {
                     i.op = O::Oarg;
                 } else if isparbh(i.op) {

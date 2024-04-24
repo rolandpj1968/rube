@@ -1,4 +1,5 @@
 use std::ascii::escape_default;
+use std::cell;
 use std::error::Error;
 use std::fmt;
 use std::fs::File;
@@ -986,7 +987,7 @@ impl Parser<'_> {
     fn closeblk(&mut self, curf: &mut Fn) {
         let mut curb = curf.blk_mut(self.cur_bi);
         // TODO - this is silly, just use Blk::ins directly
-        curb.ins = self.insb.clone();
+        curb.ins = cell::RefCell::new(self.insb.clone());
         self.blink = self.cur_bi;
         self.insb.clear();
     }
@@ -1320,13 +1321,13 @@ impl Parser<'_> {
                 }
                 pi = fn_.phi(pi).link;
             }
-            let ins_len = fn_.blk(bi).ins.len();
+            let ins_len = fn_.blk(bi).ins().len();
             for ii in 0..ins_len
-            /*fn_.blk(bi).ins.len()*/
+            /*fn_.blk(bi).ins().len()*/
             {
-                let i: Ins = fn_.blk(bi).ins[ii]; // Note - copy
-                if let Ref::RTmp(ti) = /*fn_.blk(bi).ins[ii]*/ i.to {
-                    let ins_cls: KExt = /*fn_.blk(bi).ins[ii]*/i.cls;
+                let i: Ins = fn_.blk(bi).ins()[ii]; // Note - copy
+                if let Ref::RTmp(ti) = /*fn_.blk(bi).ins()[ii]*/ i.to {
+                    let ins_cls: KExt = /*fn_.blk(bi).ins()[ii]*/i.cls;
                     let t: &mut Tmp = fn_.tmp_mut(ti);
                     if clsmerge(&mut t.cls, ins_cls) {
                         return Err(self.err(&format!(
@@ -1393,7 +1394,7 @@ impl Parser<'_> {
                     assert!(false);
                 }
             }
-            for i in &b.ins {
+            for i in b.ins().iter() {
                 for n in 0..2 {
                     let op: &Op = &OPTAB[i.op as usize];
                     let k: KExt = op.argcls[n][i.cls as usize];
@@ -2081,7 +2082,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             let _ = writeln!(f);
             pi = p.link;
         }
-        for i in &b.ins {
+        for i in b.ins().iter() {
             let _ = write!(f, "\t");
             if i.to != Ref::R {
                 printref(f, fn_, typ, itbl, i.to);

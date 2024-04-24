@@ -93,7 +93,7 @@ pub fn filluse(f: &mut Fn) {
             pi = p.link;
         }
 
-        for (ii, i) in blks.borrow(bi).ins.iter().enumerate() {
+        for (ii, i) in blks.borrow(bi).ins().iter().enumerate() {
             if let Ref::RTmp(ti) = i.to {
                 let mut w: TmpWdth = TmpWdth::WFull;
                 if isparbh(i.op) {
@@ -118,7 +118,7 @@ pub fn filluse(f: &mut Fn) {
                 // Ins i.to must be R or RTmp
                 assert!(i.to == Ref::R);
             }
-            for arg in /*blks.borrow(bi).ins[ii]*/ i.args {
+            for arg in /*blks.borrow(bi).ins()[ii]*/ i.args {
                 if let Ref::RTmp(ti) = arg {
                     adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, bid);
                 }
@@ -168,10 +168,10 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         while bi != BlkIdx::NONE {
             let mut b = blks.borrow_mut(bi);
             let bid = b.id;
-            let b_out = &b.out;
+            //let b_out = &b.out;
             b.visit = 0;
             let mut r: Ref = Ref::R;
-            for i in &mut b.ins {
+            for i in b.ins_mut().iter_mut() {
                 if r != Ref::R {
                     for arg in &mut i.args {
                         if *arg == rt {
@@ -180,7 +180,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                     }
                 }
                 if i.to == rt {
-                    if !bshas(/*&b.out*/ b_out, ti.usize()) {
+                    if !bshas(&b.out /*b_out*/, ti.usize()) {
                         r = refindex(tmps, ti);
                         i.to = r;
                     } else {
@@ -338,17 +338,18 @@ fn renblk(
 
         pi = phis[pi].link;
     }
-    for ii in 0..blks.borrow(bi).ins.len() {
+    for ii in 0..blks.borrow(bi).ins().len() {
         for m in 0..2 {
-            if let Ref::RTmp(ti) = blks.borrow(bi).ins[ii].args[m] {
+            if let Ref::RTmp(ti) = blks.borrow(bi).ins()[ii].args[m] {
                 if tmps[ti].visit != TmpIdx::NONE {
-                    blks.borrow_mut(bi).ins[ii].args[m] = getstk(blks, bi, ti, namel, names, stk);
+                    blks.borrow_mut(bi).ins_mut()[ii].args[m] =
+                        getstk(blks, bi, ti, namel, names, stk);
                 }
             }
         }
-        let to: Ref = blks.borrow(bi).ins[ii].to;
+        let to: Ref = blks.borrow(bi).ins()[ii].to;
         let new_to: Ref = rendef(tmps, bi, to, namel, names, stk);
-        blks.borrow_mut(bi).ins[ii].to = new_to;
+        blks.borrow_mut(bi).ins_mut()[ii].to = new_to;
     }
     let jmp_arg: Ref = blks.borrow(bi).jmp.arg;
     if let Ref::RTmp(ti) = jmp_arg {
@@ -499,7 +500,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                     }
                 }
             }
-            for (ii, i) in b.ins.iter().enumerate() {
+            for (ii, i) in b.ins().iter().enumerate() {
                 if let Ref::RTmp(ti) = i.to {
                     let t: &Tmp = &tmps[ti];
                     for u in &t.uses {
