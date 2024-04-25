@@ -10,11 +10,11 @@ use chomp1::ascii::{is_alpha, is_alphanumeric, is_digit};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, FromRepr};
 
+use crate::all::K::{Kc, Kd, Ke, Kl, Ks, Ksb, Ksh, Kub, Kuh, Kw, Kx, K0};
 use crate::all::{
     bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT,
     Dat, DatT, DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp,
-    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX,
-    NPUBOP, O, TMP0, TMP0IDX,
+    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0, TMP0IDX,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -796,7 +796,7 @@ impl Parser<'_> {
                 }
             }
         }
-        let ti: TmpIdx = newtmp(name, false, KX, curf);
+        let ti: TmpIdx = newtmp(name, false, Kx, curf);
         self.tmph[tmph_i] = ti;
         Ref::RTmp(ti)
     }
@@ -837,15 +837,15 @@ impl Parser<'_> {
     fn parsecls(&mut self) -> RubeResult<(K, TypIdx)> {
         let (t, tv) = self.next()?;
         match t {
-            Token::Ttyp => Ok((KC, self.findtyp(&tv.as_str())?)),
-            Token::Tsb => Ok((KSB, TypIdx::NONE)),
-            Token::Tub => Ok((KUB, TypIdx::NONE)),
-            Token::Tsh => Ok((KSH, TypIdx::NONE)),
-            Token::Tuh => Ok((KUH, TypIdx::NONE)),
-            Token::Tw => Ok((KW, TypIdx::NONE)),
-            Token::Tl => Ok((KL, TypIdx::NONE)),
-            Token::Ts => Ok((KS, TypIdx::NONE)),
-            Token::Td => Ok((KD, TypIdx::NONE)),
+            Token::Ttyp => Ok((Kc, self.findtyp(&tv.as_str())?)),
+            Token::Tsb => Ok((Ksb, TypIdx::NONE)),
+            Token::Tub => Ok((Kub, TypIdx::NONE)),
+            Token::Tsh => Ok((Ksh, TypIdx::NONE)),
+            Token::Tuh => Ok((Kuh, TypIdx::NONE)),
+            Token::Tw => Ok((Kw, TypIdx::NONE)),
+            Token::Tl => Ok((Kl, TypIdx::NONE)),
+            Token::Ts => Ok((Ks, TypIdx::NONE)),
+            Token::Td => Ok((Kd, TypIdx::NONE)),
             _ => Err(self.err("invalid class specifier")),
         }
     }
@@ -853,20 +853,20 @@ impl Parser<'_> {
 
 fn op_arg_bh(k: K) -> O {
     match k {
-        KSB => O::Oargsb,
-        KUB => O::Oargub,
-        KSH => O::Oargsh,
-        KUH => O::Oarguh,
+        Ksb => O::Oargsb,
+        Kub => O::Oargub,
+        Ksh => O::Oargsh,
+        Kuh => O::Oarguh,
         _ => panic!("BUG: expected byte/short type but got {:?}", k),
     }
 }
 
 fn op_par_bh(k: K) -> O {
     match k {
-        KSB => O::Oparsb,
-        KUB => O::Oparub,
-        KSH => O::Oparsh,
-        KUH => O::Oparuh,
+        Ksb => O::Oparsb,
+        Kub => O::Oparub,
+        Ksh => O::Oparsh,
+        Kuh => O::Oparuh,
         _ => panic!("BUG: expected byte/short type but got {:?}", k),
     }
 }
@@ -874,7 +874,7 @@ fn op_par_bh(k: K) -> O {
 impl Parser<'_> {
     fn parserefl(&mut self, arg: bool, curf: &mut Fn) -> RubeResult<bool> {
         let mut ty: TypIdx = TypIdx::NONE;
-        let mut k: K = KE; // KW???
+        let mut k: K = Ke; // KW???
         let mut env: bool = false;
         let mut hasenv: bool = false;
         let mut vararg: bool = false;
@@ -895,7 +895,7 @@ impl Parser<'_> {
                     vararg = true;
                     if arg {
                         // TODO - Mmm, would actually like Ins's to be on Blk's
-                        self.insb.push(Ins::new0(O::Oargv, KW, Ref::R)); // TODO - KW is 0 but seems wrong???
+                        self.insb.push(Ins::new0(O::Oargv, Kw, Ref::R)); // TODO - KW is 0 but seems wrong???
                     }
                     let _ = self.next()?;
                     goto_next = true;
@@ -907,7 +907,7 @@ impl Parser<'_> {
                     hasenv = true;
                     env = true;
                     let _ = self.next()?;
-                    k = KL;
+                    k = Kl;
                 }
                 _ => {
                     env = false;
@@ -933,17 +933,17 @@ impl Parser<'_> {
                         } else {
                             Ins::new1(O::Opare, k, r, [Ref::R])
                         }
-                    } else if k == KC {
+                    } else if k == Kc {
                         if arg {
-                            Ins::new2(O::Oargc, KL, Ref::R, [Ref::RTyp(ty), r])
+                            Ins::new2(O::Oargc, Kl, Ref::R, [Ref::RTyp(ty), r])
                         } else {
-                            Ins::new1(O::Oparc, KL, r, [Ref::RTyp(ty)])
+                            Ins::new1(O::Oparc, Kl, r, [Ref::RTyp(ty)])
                         }
-                    } else if k >= KSB {
+                    } else if k >= Ksb {
                         if arg {
-                            Ins::new1(op_arg_bh(k), KW, Ref::R, [r])
+                            Ins::new1(op_arg_bh(k), Kw, Ref::R, [r])
                         } else {
-                            Ins::new1(op_par_bh(k), KW, r, [Ref::R])
+                            Ins::new1(op_par_bh(k), Kw, r, [Ref::R])
                         }
                     } else {
                         if arg {
@@ -999,7 +999,7 @@ impl Parser<'_> {
         // Phi targets
         let mut blk: Vec<BlkIdx> = vec![];
         let mut r: Ref = Ref::R;
-        let mut k: K = KE; // KW???
+        let mut k: K = Ke; // KW???
         let mut ty: TypIdx = TypIdx::NONE;
 
         let mut op_tok: Token = Token::Txxx;
@@ -1031,7 +1031,7 @@ impl Parser<'_> {
             Token::Tblit | Token::Tcall | Token::TOvastart => {
                 /* operations without result */
                 r = Ref::R;
-                k = KW; // Why not T0? Note typecheck() assumes KW.
+                k = Kw; // Why not T0? Note typecheck() assumes KW.
                 op_tok = t;
             }
             // End of function
@@ -1119,7 +1119,7 @@ impl Parser<'_> {
             // Debug line/column location tag
             Token::TOdbgloc => {
                 op_tok = t;
-                k = KW;
+                k = Kw;
                 r = Ref::R;
                 let ln_i = self.expect(Token::Tint)?.as_i();
                 let ln: i32 = ln_i as i32;
@@ -1150,7 +1150,7 @@ impl Parser<'_> {
                 if isstore(t) {
                     /* operations without result */
                     r = Ref::R;
-                    k = KW; // TODO why not K0?
+                    k = Kw; // TODO why not K0?
                     op_tok = t;
                 } else {
                     return Err(self.err("label, instruction or jump expected"));
@@ -1176,17 +1176,17 @@ impl Parser<'_> {
                 op = O::Ocall;
                 self.expect(Token::Tnl)?;
                 let arg1 = {
-                    if k == KC {
-                        k = KL;
+                    if k == Kc {
+                        k = Kl;
                         Ref::RTyp(ty)
                     } else {
                         Ref::R
                     }
                 };
                 arg.push(arg1);
-                if k >= KSB {
+                if k >= Ksb {
                     // else if ???
-                    k = KW;
+                    k = Kw;
                 }
             } else {
                 // Alias instructions
@@ -1201,7 +1201,7 @@ impl Parser<'_> {
                     op_tok = Token::TOalloc4; // Interesting, byte/short alloc promoted to word
                 }
 
-                if k >= KSB {
+                if k >= Ksb {
                     return Err(self.err("size class must be w, l, s, or d"));
                 }
                 // Instruction args
@@ -1248,7 +1248,7 @@ impl Parser<'_> {
                             return Err(self.err("insufficient args for blit"));
                         }
                         self.insb
-                            .push(Ins::new2(O::Oblit0, KW, Ref::R, [arg[0], arg[1]]));
+                            .push(Ins::new2(O::Oblit0, Kw, Ref::R, [arg[0], arg[1]]));
                         let ci: ConIdx;
                         if let Ref::RCon(ci0) = arg[2] {
                             ci = ci0;
@@ -1274,7 +1274,7 @@ impl Parser<'_> {
                             sz_u32
                         };
                         let r: Ref = Ref::RInt(sz as i32); /* Mmm */
-                        self.insb.push(Ins::new1(O::Oblit1, KW, Ref::R, [r]));
+                        self.insb.push(Ins::new1(O::Oblit1, Kw, Ref::R, [r]));
                         return Ok(PState::PIns);
                     }
                     _ => {
@@ -1299,7 +1299,7 @@ fn usecheck(fn_: &Fn, r: &Ref, k: K) -> bool {
     match r {
         Ref::RTmp(ti) => {
             let cls: K = fn_.tmp(*ti).cls;
-            cls == k || (cls == KL && k == KW)
+            cls == k || (cls == Kl && k == Kw)
         }
         _ => true,
     }
@@ -1400,7 +1400,7 @@ impl Parser<'_> {
                     let op: &Op = &OPTAB[i.op as usize];
                     let k: K = op.argcls[n][i.cls as usize];
                     let r: &Ref = &i.args[n];
-                    if k == KE {
+                    if k == Ke {
                         return Err(
                             self.err(&format!("invalid instruction type in {}", to_s(op.name)))
                         );
@@ -1409,14 +1409,14 @@ impl Parser<'_> {
                         continue;
                     }
                     static FS: [&str; 2] = ["first", "second"];
-                    if *r != Ref::R && k == KX {
+                    if *r != Ref::R && k == Kx {
                         return Err(self.err(&format!(
                             "no {} operand expected in {}",
                             FS[n],
                             to_s(op.name)
                         )));
                     }
-                    if *r == Ref::R && k != KX {
+                    if *r == Ref::R && k != Kx {
                         return Err(self.err(&format!(
                             "missing {} operand in {}",
                             FS[n],
@@ -1451,7 +1451,7 @@ impl Parser<'_> {
                     }
                 }
             }
-            if b.jmp().type_ == J::Jjnz && !usecheck(fn_, r, KW) {
+            if b.jmp().type_ == J::Jjnz && !usecheck(fn_, r, Kw) {
                 goto_jerr = true;
             }
             if goto_jerr {
@@ -1494,10 +1494,10 @@ impl Parser<'_> {
             /* TODO jus use usize for targ.fpr0 etc. */
             if self.targ.fpr0 <= i && i < self.targ.fpr0 + self.targ.nfpr {
                 // Ugh, returns Ref
-                let _ = newtmpref(b"", false, KD, &mut curf);
+                let _ = newtmpref(b"", false, Kd, &mut curf);
             } else {
                 // Ugh, returns Ref
-                let _ = newtmpref(b"", false, KL, &mut curf);
+                let _ = newtmpref(b"", false, Kl, &mut curf);
             }
         }
 

@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use crate::all::{
     astack, bit, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, Blk, BlkIdx, Blks,
     CanAlias, Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC,

@@ -3,9 +3,10 @@ use std::cell;
 use std::cmp::Ordering;
 
 use crate::alias::{alias, escapes};
+use crate::all::K::{Kd, Kl, Ks, Kw, Kx};
 use crate::all::{
     bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn, Ins,
-    InsIdx, Phi, PhiIdx, Ref, TmpIdx, K, KD, KL, KS, KW, KX, O,
+    InsIdx, Phi, PhiIdx, Ref, TmpIdx, K, O,
 };
 use crate::cfg::dom;
 use crate::util::{getcon, newcon, newtmp, newtmpref};
@@ -126,22 +127,22 @@ fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
         Ref::RCon(_) => (), /*ok*/
         Ref::RTmp(ti) => {
             let cls0: K = f.tmp(ti).cls;
-            if cls0 == cls || (cls == KW && cls0 == KL) {
+            if cls0 == cls || (cls == Kw && cls0 == Kl) {
                 return;
             }
             if kwide(cls0) < kwide(cls) {
-                if cls0 == KS {
-                    *r = iins(f, ilog, KW, O::Ocast, *r, Ref::R, l);
+                if cls0 == Ks {
+                    *r = iins(f, ilog, Kw, O::Ocast, *r, Ref::R, l);
                 }
-                *r = iins(f, ilog, KL, O::Oextuw, *r, Ref::R, l);
-                if cls == KD {
-                    *r = iins(f, ilog, KD, O::Ocast, *r, Ref::R, l);
+                *r = iins(f, ilog, Kl, O::Oextuw, *r, Ref::R, l);
+                if cls == Kd {
+                    *r = iins(f, ilog, Kd, O::Ocast, *r, Ref::R, l);
                 }
             } else {
-                if cls0 == KD && cls != KL {
-                    *r = iins(f, ilog, KL, O::Ocast, *r, Ref::R, l);
+                if cls0 == Kd && cls != Kl {
+                    *r = iins(f, ilog, Kl, O::Ocast, *r, Ref::R, l);
                 }
-                if cls0 != KD || cls != KW {
+                if cls0 != Kd || cls != Kw {
                     *r = iins(f, ilog, cls, O::Ocast, *r, Ref::R, l);
                 }
             }
@@ -172,9 +173,9 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
         sl.cls
     } else {
         if sl.sz > 4 {
-            KL
+            Kl
         } else {
-            KW
+            Kw
         }
     };
     let mut r: Ref = sl.r;
@@ -189,7 +190,7 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
                 r = Ref::RTmp(a.base);
                 if a.offset != 0 {
                     let r1: Ref = getcon(f, a.offset);
-                    r = iins(f, ilog, KL, O::Oadd, r, r1, l);
+                    r = iins(f, ilog, Kl, O::Oadd, r, r1, l);
                 }
             }
             AliasT::ACon | AliasT::ASym => {
@@ -298,7 +299,7 @@ fn def(
         // Bit naughty - this is out of range
         ii = InsIdx::new(f.blk(bi).ins().len());
     }
-    let cls: K = if sl.sz > 4 { KL } else { KW };
+    let cls: K = if sl.sz > 4 { Kl } else { Kw };
     let msks: Bits = genmask(sl.sz as i32);
 
     let mut goto_load: bool = false;
@@ -392,7 +393,7 @@ fn def(
                 }
                 if off != 0 {
                     let cls1: K = if op == O::Oshr && off + (sl.sz as i32) > 4 {
-                        KL
+                        Kl
                     } else {
                         cls
                     };
@@ -716,7 +717,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
         bi = f.blk(bi).link;
     }
     ilog.sort_by(icmp);
-    let sentinal_ins = Ins::new0(O::Oxxx, KX, Ref::R);
+    let sentinal_ins = Ins::new0(O::Oxxx, Kx, Ref::R);
     /* add a sentinel */
     ilog.push(Insert::new(
         TmpIdx::NONE,
@@ -751,7 +752,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 } else {
                     // MUST be InsertU::Ins
                     assert!(false);
-                    i = Ins::new0(O::Oxxx, KX, Ref::R);
+                    i = Ins::new0(O::Oxxx, Kx, Ref::R);
                 }
                 isti += 1;
                 ist = &mut ilog[isti];
@@ -771,7 +772,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                             i.op = ext;
                         }
                         O::Oloadsw | O::Oloaduw => {
-                            if i.cls == KL {
+                            if i.cls == Kl {
                                 i.op = ext;
                             } else {
                                 i.op = O::Ocopy;

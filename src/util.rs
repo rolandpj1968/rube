@@ -1,8 +1,7 @@
 use std::io::Write;
 
-use crate::all::{
-    bit, to_s, BSet, Bits, Con, ConIdx, Fn, Ref, Tmp, TmpIdx, K, KL, KW, KX, NBIT, TMP0,
-};
+use crate::all::K::{Kl, Kw, Kx};
+use crate::all::{bit, to_s, BSet, Bits, Con, ConIdx, Fn, Ref, Tmp, TmpIdx, K, NBIT, TMP0};
 use crate::parse::Parser; // ugh for intern()
 
 /*
@@ -409,12 +408,12 @@ clsmerge(short *pk, short k)
 
 pub fn clsmerge(pk: &mut K, k: K) -> bool {
     let k1: K = *pk;
-    if k1 == KX {
+    if k1 == Kx {
         *pk = k;
         return false;
     }
-    if (k1 == KW && k == KL) || (k1 == KL && k == KW) {
-        *pk = KW;
+    if (k1 == Kw && k == Kl) || (k1 == Kl && k == Kw) {
+        *pk = Kw;
         return false;
     }
     return k1 != k;

@@ -12,6 +12,8 @@ use strum_macros::FromRepr;
 
 use crate::util::InternId;
 
+use K::{Kd, Kl, Ks, Kw, K0};
+
 // Generic Result
 pub type RubeError = Box<dyn std::error::Error>;
 pub type RubeResult<T> = Result<T, RubeError>;
@@ -485,7 +487,7 @@ pub enum J {
 }
 
 pub fn ret_for_cls(k: K) -> Option<J> {
-    if KW <= k && k <= K0 {
+    if Kw <= k && k <= K0 {
         J::from_repr((J::Jretw) as u8 + (k as u8))
     } else {
         None
@@ -494,9 +496,9 @@ pub fn ret_for_cls(k: K) -> Option<J> {
 
 pub fn cls_for_ret(j: J) -> Option<K> {
     if j == J::Jretc {
-        Some(KL)
+        Some(Kl)
     } else if in_range_j(j, J::Jretsb, J::Jretuh) {
-        Some(KW)
+        Some(Kw)
     } else if in_range_j(j, J::Jretw, J::Jretd) {
         K::from_repr((j as i8) - (J::Jretw as i8))
     } else {
@@ -601,30 +603,14 @@ pub fn kbase(k: K) -> i32 {
     (k as i32) >> 1
 }
 
-pub const KX: K = K::Kx;
-pub const KW: K = K::Kw;
-pub const KL: K = K::Kl;
-pub const KS: K = K::Ks;
-pub const KD: K = K::Kd;
-
 // Alias
 pub const KM: K = K::Kl;
 
-pub const KSB: K = K::Ksb;
-pub const KUB: K = K::Kub;
-pub const KSH: K = K::Ksh;
-pub const KUH: K = K::Kuh;
-
-pub const KC: K = K::Kc;
-pub const K0: K = K::K0;
-
-pub const KE: K = K::Ke;
-
 // Used as array indices in OPTAB init
-const_assert_eq!(KW as usize, 0);
-const_assert_eq!(KL as usize, 1);
-const_assert_eq!(KS as usize, 2);
-const_assert_eq!(KD as usize, 3);
+const_assert_eq!(Kw as usize, 0);
+const_assert_eq!(Kl as usize, 1);
+const_assert_eq!(Ks as usize, 2);
+const_assert_eq!(Kd as usize, 3);
 
 #[derive(Clone, Copy)]
 pub struct Op {

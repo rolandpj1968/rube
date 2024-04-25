@@ -3,9 +3,10 @@ use std::error::Error;
 use std::fmt;
 use std::io::stdout;
 
+use crate::all::K::{Kw, Kx};
 use crate::all::{
     bshas, isext, isload, isparbh, to_s, BSet, BlkIdx, Blks, Fn, InsIdx, Phi, PhiIdx, Ref,
-    RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, K, KW, KX, O, TMP0, UNDEF,
+    RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, K, O, TMP0, UNDEF,
 };
 use crate::cfg::{dom, filldom, fillfron, sdom};
 use crate::live::filllive;
@@ -54,7 +55,7 @@ pub fn filluse(f: &mut Fn) {
         tmp.def = InsIdx::NONE;
         tmp.bid = u32::MAX;
         tmp.ndef = 0;
-        tmp.cls = KW;
+        tmp.cls = Kw;
         tmp.phi = TmpIdx::NONE;
         tmp.width = TmpWdth::WFull;
         tmp.uses.clear();
@@ -100,7 +101,7 @@ pub fn filluse(f: &mut Fn) {
                         w = TmpWdth::from_ext(i.op);
                     }
                     if w == TmpWdth::Wsw || w == TmpWdth::Wuw {
-                        if i.cls == KW {
+                        if i.cls == Kw {
                             w = TmpWdth::WFull;
                         }
                     }
@@ -159,7 +160,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             }
         }
         let mut u: BSet = bsinit(blks.len());
-        let mut k: K = KX;
+        let mut k: K = Kx;
         let mut bp: usize = be;
         let rt: Ref = Ref::RTmp(ti);
         let mut bi = f.start;
