@@ -208,16 +208,6 @@ impl IndexMut<SlotIdx> for [Slot] {
     }
 }
 
-// // Index into coalesce::sl vector
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// pub struct SlotIdx(pub u32);
-
-// impl SlotIdx {
-//     pub const NONE: SlotIdx = SlotIdx(u32::MAX);
-
-//     fn new(i: usize
-// }
-
 fn rin(r: &Range, n: i32) -> bool {
     r.a <= n && n < r.b
 }
@@ -304,17 +294,6 @@ pub fn coalesce(f: &mut Fn) {
     let nblk = rpo.len();
     assert!(nblk == f.nblk as usize);
     let cons: &[Con] = &f.cons;
-    // Range r, *br;
-    // Slot *s, *s0, *sl;
-    // Blk *b, **ps, *succ[3];
-    // Ins *i, **bl;
-    // Use *u;
-    // Tmp *t, *ts;
-    // Ref *arg;
-    // bits x;
-    // int64_t off0, off1;
-    // int n, m, ip, sz, nsl, nbl, *stk;
-    // uint total, freed, fused;
 
     /* minimize the stack usage
      * by coalescing slots
@@ -502,42 +481,41 @@ pub fn coalesce(f: &mut Fn) {
                 }
                 for u in &t.uses {
                     assert!(!matches!(u.typ, UseT::UPhi(_)));
-                    match u.typ {
-                        UseT::UJmp => {
-                            let bi: BlkIdx = f.rpo[u.bid];
-                            let b = f.blk_mut(bi);
-                            assert!(isret(b.jmp().typ));
-                            b.jmp_mut().typ = J::Jret0;
-                            b.jmp_mut().arg = R;
-                        }
-                        UseT::UIns(ii) => {
-                            let bi: BlkIdx = f.rpo[u.bid];
-                            let b = f.blk_mut(bi);
-                            let i: Ins = b.ins()[ii.0 as usize]; // Note - copy
-                            match i.to {
-                                R => {
-                                    if isarg(i.op) {
-                                        assert!(i.op == O::Oargc);
-                                        b.ins_mut()[ii.0 as usize].args[1] = CON_Z;
-                                    /* crash */
-                                    } else {
-                                        if i.op == O::Oblit0 {
-                                            b.ins_mut()[(ii.0 + 1) as usize] =
-                                                Ins::new0(O::Onop, Kx, R);
+                    let bi: BlkIdx = rpo[u.bid];
+                    blks.with_mut(bi, |b| {
+                        match u.typ {
+                            UseT::UJmp => {
+                                assert!(isret(b.jmp().typ));
+                                b.jmp_mut().typ = J::Jret0;
+                                b.jmp_mut().arg = R;
+                            }
+                            UseT::UIns(ii) => {
+                                let b = f.blk_mut(bi);
+                                let i: Ins = b.ins()[ii.0 as usize]; // Note - copy
+                                assert!(i.to == R || matches!(i.to, RTmp(_)));
+                                match i.to {
+                                    R => {
+                                        if isarg(i.op) {
+                                            assert!(i.op == O::Oargc);
+                                            b.ins_mut()[ii.0 as usize].args[1] = CON_Z;
+                                        /* crash */
+                                        } else {
+                                            if i.op == O::Oblit0 {
+                                                b.ins_mut()[(ii.0 + 1) as usize] =
+                                                    Ins::new0(O::Onop, Kx, R);
+                                            }
+                                            b.ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
                                         }
-                                        b.ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
                                     }
-                                }
-                                RTmp(ti) => {
-                                    stk.push(ti);
-                                }
-                                _ => {
-                                    assert!(false);
+                                    RTmp(ti) => {
+                                        stk.push(ti);
+                                    }
+                                    _ => (),
                                 }
                             }
+                            _ => (),
                         }
-                        _ => (),
-                    }
+                    });
                 }
             }
         }
