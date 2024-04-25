@@ -1,23 +1,23 @@
+use crate::all::Ref::{RCon, RInt, RTmp, RTyp, R};
 use crate::all::{
-    astack, bit, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, Blk, BlkIdx, Blks,
-    CanAlias, Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC,
-    OALLOC1,
+    astack, bit, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, BlkIdx, Blks, CanAlias,
+    Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
 };
 
 use crate::load::storesz;
 
 pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
     let mut a_out: Alias = *a_in;
-    assert!(matches!(r, Ref::RTmp(_)) || matches!(r, Ref::RCon(_)));
+    assert!(matches!(r, RTmp(_)) || matches!(r, RCon(_)));
     match r {
-        Ref::RTmp(ti) => {
+        RTmp(ti) => {
             a_out = tmps[ti].alias;
             if astack(a_out.typ) != 0 {
                 a_out.typ = tmps[a_out.slot].alias.typ;
             }
             assert!(a_out.typ != AliasT::ABot);
         }
-        Ref::RCon(ci) => {
+        RCon(ci) => {
             let c: &Con = &cons[ci.0 as usize];
             match c.type_ {
                 ConT::CAddr => {
@@ -111,7 +111,7 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
 }
 
 pub fn escapes(tmps: &[Tmp], r: Ref) -> bool {
-    if let Ref::RTmp(ti) = r {
+    if let RTmp(ti) = r {
         let a: &Alias = &tmps[ti].alias;
         astack(a.typ) == 0 || tmps[a.slot].alias.typ == AliasT::AEsc
     } else {
@@ -121,19 +121,19 @@ pub fn escapes(tmps: &[Tmp], r: Ref) -> bool {
 
 fn esc(tmps: &mut [Tmp], r: Ref) {
     match r {
-        Ref::RTmp(ti) => {
+        RTmp(ti) => {
             let a: Alias = tmps[ti].alias; // Note, copy
             if astack(a.typ) != 0 {
                 tmps[a.slot].alias.typ = AliasT::AEsc;
             }
         }
-        Ref::R | Ref::RCon(_) | Ref::RInt(_) | Ref::RTyp(_) => (), /*ok*/
+        R | RCon(_) | RInt(_) | RTyp(_) => (), /*ok*/
         _ => assert!(false),
     }
 }
 
 fn store(tmps: &mut [Tmp], r: Ref, sz: i32) {
-    if let Ref::RTmp(ti) = r {
+    if let RTmp(ti) = r {
         let a: Alias = tmps[ti].alias; // Note, copy
         if a.slot != TmpIdx::NONE {
             assert!(astack(a.typ) != 0);
@@ -168,8 +168,8 @@ pub fn fillalias(f: &mut Fn) {
         let mut pi: PhiIdx = b.phi; //blks.phi_of(bi);
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
-            assert!(matches!(p.to, Ref::RTmp(_)));
-            if let Ref::RTmp(ti) = p.to {
+            assert!(matches!(p.to, RTmp(_)));
+            if let RTmp(ti) = p.to {
                 let a: &mut Alias = &mut tmps[ti].alias;
                 assert!(a.typ == AliasT::ABot);
                 a.typ = AliasT::AUnk;
@@ -190,8 +190,8 @@ pub fn fillalias(f: &mut Fn) {
 
             let mut ai: TmpIdx = TmpIdx::NONE;
 
-            assert!(i.to == Ref::R || matches!(i.to, Ref::RTmp(_)));
-            if let Ref::RTmp(ti) = i.to {
+            assert!(i.to == R || matches!(i.to, RTmp(_)));
+            if let RTmp(ti) = i.to {
                 ai = ti;
                 let a: &mut Alias = &mut tmps[ti].alias;
                 // TODO isalloc()
@@ -200,7 +200,7 @@ pub fn fillalias(f: &mut Fn) {
                     a.typ = AliasT::ALoc;
                     a.slot = ti;
                     let mut sz: i32 = -1;
-                    if let Ref::RCon(ci) = i.args[0] {
+                    if let RCon(ci) = i.args[0] {
                         let c: &Con = &cons[ci.0 as usize];
                         assert!(matches!(c.bits, ConBits::I(_)));
                         if let ConBits::I(sz0) = c.bits {
@@ -236,7 +236,7 @@ pub fn fillalias(f: &mut Fn) {
                     tmps[ai].alias.offset += a1.offset;
                 }
             }
-            if (i.to == Ref::R || tmps[ai].alias.typ == AliasT::AUnk) && i.op != O::Oblit0 {
+            if (i.to == R || tmps[ai].alias.typ == AliasT::AUnk) && i.op != O::Oblit0 {
                 if !isload(i.op) {
                     esc(tmps, i.args[0]);
                 }
@@ -248,8 +248,8 @@ pub fn fillalias(f: &mut Fn) {
                 assert!(ii < ins.len() - 1);
                 let blit1 = &ins[ii + 1];
                 assert!(blit1.op == O::Oblit1);
-                assert!(matches!(blit1.args[0], Ref::RInt(_)));
-                if let Ref::RInt(blit1_i) = blit1.args[0] {
+                assert!(matches!(blit1.args[0], RInt(_)));
+                if let RInt(blit1_i) = blit1.args[0] {
                     store(tmps, i.args[1], blit1_i.abs());
                 }
             }

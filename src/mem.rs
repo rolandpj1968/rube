@@ -3,6 +3,7 @@ use std::error::Error;
 use std::fmt;
 
 use crate::alias::getalias;
+use crate::all::Ref::{RInt, RTmp, R};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{
     bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Fn, Ins,
@@ -58,8 +59,8 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
             }
             /* specific to NAlign == 3 */
             /* TODO - what does this comment ^^^ mean */
-            assert!(matches!(i.to, Ref::RTmp(_)));
-            if let Ref::RTmp(ti) = i.to {
+            assert!(matches!(i.to, RTmp(_)));
+            if let RTmp(ti) = i.to {
                 t = &mut tmps[ti];
             } else {
                 continue;
@@ -96,7 +97,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
         }
 
         /* get rid of the alloc and replace uses */
-        blks.borrow_mut(bi).ins_mut()[ii] = Ins::new0(O::Onop, Kw, Ref::R);
+        blks.borrow_mut(bi).ins_mut()[ii] = Ins::new0(O::Onop, Kw, R);
         t.ndef -= 1;
 
         for u in &t.uses {
@@ -119,7 +120,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
 
                 if k == Kx {
                     let t_name: &[u8] = {
-                        if let Ref::RTmp(l_arg0_ti) = l.args[0] {
+                        if let RTmp(l_arg0_ti) = l.args[0] {
                             &tmps[l_arg0_ti].name
                         } else {
                             b"<unknown>"
@@ -364,7 +365,7 @@ pub fn coalesce(f: &mut Fn) {
                 }
                 if i.op == O::Oblit0 {
                     assert!(f.blk(bi).ins()[iii + 1].op == O::Oblit1); // TODO bounds check
-                    if let Ref::RInt(rsval) = f.blk(bi).ins()[iii + 1].args[0] {
+                    if let RInt(rsval) = f.blk(bi).ins()[iii + 1].args[0] {
                         let sz: i32 = rsval.abs();
                         let x: Bits = if sz >= (NBIT as i32) {
                             u64::MAX
@@ -402,9 +403,9 @@ pub fn coalesce(f: &mut Fn) {
                 let bi: BlkIdx = s.st[n].bi;
                 let ii: InsIdx = s.st[n].ii;
                 if f.blk(bi).ins()[ii.0 as usize].op == O::Oblit0 {
-                    f.blk_mut(bi).ins_mut()[(ii.0 as usize) + 1] = Ins::new0(O::Onop, Kx, Ref::R);
+                    f.blk_mut(bi).ins_mut()[(ii.0 as usize) + 1] = Ins::new0(O::Onop, Kx, R);
                 }
-                f.blk_mut(bi).ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, Kx, Ref::R);
+                f.blk_mut(bi).ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
             }
         }
     }
@@ -460,7 +461,7 @@ pub fn coalesce(f: &mut Fn) {
                         Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
                     continue;
                 }
-                f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, Ref::R);
+                f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
                 for ui in 0..f.tmp(ti).uses.len() {
                     let u: Use = f.tmp(ti).uses[ui]; // Note - copy
                     match u.type_ {
@@ -469,14 +470,14 @@ pub fn coalesce(f: &mut Fn) {
                             let b = f.blk_mut(bi);
                             assert!(isret(b.jmp().type_));
                             b.jmp_mut().type_ = J::Jret0;
-                            b.jmp_mut().arg = Ref::R;
+                            b.jmp_mut().arg = R;
                         }
                         UseT::UIns(ii) => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
                             let b = f.blk_mut(bi);
                             let i: Ins = b.ins()[ii.0 as usize]; // Note - copy
                             match i.to {
-                                Ref::R => {
+                                R => {
                                     if isarg(i.op) {
                                         assert!(i.op == O::Oargc);
                                         b.ins_mut()[ii.0 as usize].args[1] = CON_Z;
@@ -484,12 +485,12 @@ pub fn coalesce(f: &mut Fn) {
                                     } else {
                                         if i.op == O::Oblit0 {
                                             b.ins_mut()[(ii.0 + 1) as usize] =
-                                                Ins::new0(O::Onop, Kx, Ref::R);
+                                                Ins::new0(O::Onop, Kx, R);
                                         }
-                                        b.ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, Kx, Ref::R);
+                                        b.ins_mut()[ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
                                     }
                                 }
-                                Ref::RTmp(ti) => {
+                                RTmp(ti) => {
                                     stk.push(ti);
                                 }
                                 _ => {
@@ -555,7 +556,7 @@ pub fn coalesce(f: &mut Fn) {
         if sl[si].si == SlotIdx(si as u32) {
             continue;
         }
-        f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, Ref::R);
+        f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
         let ssi: SlotIdx = sl[si].si;
         let ssti: TmpIdx = sl[ssi.0 as usize].ti;
         let (ts_def_ii, ts_bid) = {
@@ -570,7 +571,7 @@ pub fn coalesce(f: &mut Fn) {
              */
             let tsi: Ins = f.blk(t_def_bi).ins()[ts_def_ii.0 as usize]; // Note copy
             f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = tsi;
-            f.blk_mut(t_def_bi).ins_mut()[ts_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, Ref::R);
+            f.blk_mut(t_def_bi).ins_mut()[ts_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
             f.tmp_mut(ssti).def = t_def_ii;
         }
         for ui in 0..f.tmp(sti).uses.len() {
@@ -578,15 +579,15 @@ pub fn coalesce(f: &mut Fn) {
             match u.type_ {
                 UseT::UJmp => {
                     let bi: BlkIdx = f.rpo[u.bid as usize];
-                    f.blk_mut(bi).jmp_mut().arg = Ref::RTmp(ssti);
+                    f.blk_mut(bi).jmp_mut().arg = RTmp(ssti);
                 }
                 UseT::UIns(ii) => {
                     let bi: BlkIdx = f.rpo[u.bid as usize];
                     let b = f.blk_mut(bi);
                     let args: &mut [Ref; 2] = &mut b.ins_mut()[ii.0 as usize].args;
                     for arg in args {
-                        if *arg == Ref::RTmp(sti) {
-                            *arg = Ref::RTmp(ssti);
+                        if *arg == RTmp(sti) {
+                            *arg = RTmp(ssti);
                         }
                     }
                 }

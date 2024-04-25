@@ -3,6 +3,7 @@ use std::cell;
 use std::cmp::Ordering;
 
 use crate::alias::{alias, escapes};
+use crate::all::Ref::{RCon, RInt, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw, Kx};
 use crate::all::{
     bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn, Ins,
@@ -116,7 +117,7 @@ pub fn storesz(s: &Ins) -> i32 {
 
 fn iins(f: &mut Fn, ilog: &mut Vec<Insert>, cls: K, op: O, a0: Ref, a1: Ref, l: &Loc) -> Ref {
     let ti: TmpIdx = newtmp(b"ld", true, cls, f);
-    let to: Ref = Ref::RTmp(ti);
+    let to: Ref = RTmp(ti);
     let ins: Ins = Ins::new2(op, cls, to, [a0, a1]);
     ilog.push(Insert::new(ti, f.blk(l.bi).id, l.off, InsertU::Ins(ins)));
     to
@@ -124,26 +125,26 @@ fn iins(f: &mut Fn, ilog: &mut Vec<Insert>, cls: K, op: O, a0: Ref, a1: Ref, l: 
 
 fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
     match *r {
-        Ref::RCon(_) => (), /*ok*/
-        Ref::RTmp(ti) => {
+        RCon(_) => (), /*ok*/
+        RTmp(ti) => {
             let cls0: K = f.tmp(ti).cls;
             if cls0 == cls || (cls == Kw && cls0 == Kl) {
                 return;
             }
             if kwide(cls0) < kwide(cls) {
                 if cls0 == Ks {
-                    *r = iins(f, ilog, Kw, O::Ocast, *r, Ref::R, l);
+                    *r = iins(f, ilog, Kw, O::Ocast, *r, R, l);
                 }
-                *r = iins(f, ilog, Kl, O::Oextuw, *r, Ref::R, l);
+                *r = iins(f, ilog, Kl, O::Oextuw, *r, R, l);
                 if cls == Kd {
-                    *r = iins(f, ilog, Kd, O::Ocast, *r, Ref::R, l);
+                    *r = iins(f, ilog, Kd, O::Ocast, *r, R, l);
                 }
             } else {
                 if cls0 == Kd && cls != Kl {
-                    *r = iins(f, ilog, Kl, O::Ocast, *r, Ref::R, l);
+                    *r = iins(f, ilog, Kl, O::Ocast, *r, R, l);
                 }
                 if cls0 != Kd || cls != Kw {
-                    *r = iins(f, ilog, cls, O::Ocast, *r, Ref::R, l);
+                    *r = iins(f, ilog, cls, O::Ocast, *r, R, l);
                 }
             }
         }
@@ -182,12 +183,12 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
     /* sl.ref might not be live here,
      * but its alias base ref will be
      * (see killsl() below) */
-    if let Ref::RTmp(ti) = r {
+    if let RTmp(ti) = r {
         //let ai = f.tmp(ti).alias;
         let a: Alias = f.tmps[ti].alias; //*f.alias(ai); // Note - copy!
         match a.typ {
             AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => {
-                r = Ref::RTmp(a.base);
+                r = RTmp(a.base);
                 if a.offset != 0 {
                     let r1: Ref = getcon(f, a.offset);
                     r = iins(f, ilog, Kl, O::Oadd, r, r1, l);
@@ -198,17 +199,17 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
                     r = newcon(f, Con::new_sym(sym, crate::all::ConBits::I(a.offset)));
                 } else {
                     assert!(false);
-                    r = Ref::R; // Ugh, TODO
+                    r = R; // Ugh, TODO
                 }
             }
             _ => {
                 // unreachable
                 assert!(false);
-                r = Ref::R;
+                r = R;
             }
         }
     }
-    r = iins(f, ilog, cls, ld, r, Ref::R, l);
+    r = iins(f, ilog, cls, ld, r, R, l);
     if !all {
         mask(f, ilog, cls, &mut r, msk, l);
     }
@@ -216,11 +217,11 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
 }
 
 fn killsl(f: &Fn, r: Ref, sl: &Slice) -> bool {
-    if let Ref::RTmp(_ti) = r {
-        if let Ref::RTmp(slti) = sl.r {
+    if let RTmp(_ti) = r {
+        if let RTmp(slti) = sl.r {
             let a: &Alias = &f.tmps[slti].alias;
             return match a.typ {
-                AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => r == Ref::RTmp(a.base),
+                AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => r == RTmp(a.base),
                 AliasT::ACon | AliasT::ASym => false,
                 _ => {
                     // unreachable
@@ -326,12 +327,12 @@ fn def(
             } else if isstore(i.op) {
                 (storesz(&i), i.args[1], i.args[0])
             } else if i.op == O::Oblit1 {
-                if let Ref::RInt(blit1_i) = i.args[0] {
+                if let RInt(blit1_i) = i.args[0] {
                     assert!(ii != InsIdx::new(0));
                     ii = InsIdx::new(ii.usize() - 1);
                     i = f.blk(bi).ins()[ii.0 as usize];
                     assert!(i.op == O::Oblit0);
-                    (blit1_i.abs(), i.args[1], Ref::R)
+                    (blit1_i.abs(), i.args[1], R)
                 } else {
                     // OBlit1 arg MUST be RInt
                     assert!(false);
@@ -386,7 +387,7 @@ fn def(
                         ii,
                         il, /*, indent + 1, debug*/
                     );
-                    if r == Ref::R {
+                    if r == R {
                         goto_load = true;
                         continue;
                     }
@@ -414,7 +415,7 @@ fn def(
                         ii,
                         il, /*, indent + 1, debug*/
                     );
-                    if r1 == Ref::R {
+                    if r1 == R {
                         goto_load = true;
                         continue;
                     }
@@ -450,7 +451,7 @@ fn def(
     //     f.tmps.truncate(oldt);
     //     ilog.truncate(oldl);
     //     if il.type_ != LocT::LLoad {
-    //         return Ref::R;
+    //         return R;
     //     }
     //     return load(f, ilog, sl, msk, il);
     // }
@@ -529,7 +530,7 @@ fn def(
                 InsIdx::NONE,
                 &l, /*, indent + 1, debug*/
             );
-            if r1 == Ref::R {
+            if r1 == R {
                 goto_load = true;
             } else {
                 return r1;
@@ -537,7 +538,7 @@ fn def(
         }
     }
 
-    let mut r: Ref = Ref::R;
+    let mut r: Ref = R;
     if !goto_load {
         r = newtmpref(b"ld", true, sl.cls, f); // TODO - this needs to be outside the if
                                                // p = alloc(sizeof *p);
@@ -586,7 +587,7 @@ fn def(
                 InsIdx::NONE,
                 &l, /*, indent + 1, debug*/
             );
-            if r1 == Ref::R {
+            if r1 == R {
                 goto_load = true;
                 break;
             }
@@ -599,7 +600,7 @@ fn def(
         f.tmps.truncate(oldt);
         ilog.truncate(oldl);
         if il.type_ != LocT::LLoad {
-            return Ref::R;
+            return R;
         }
         load(f, ilog, sl, msk, il)
     } else {
@@ -707,7 +708,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             //     iii,
             //     to_s(OPTAB[f.blk(bi).ins()[iii].op as usize].name)
             // );
-            // if i_arg1 == Ref::R {
+            // if i_arg1 == R {
             //     print!("R");
             // } else {
             //     printref(&mut stdout(), f, typ, itbl, &i_arg1);
@@ -717,7 +718,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
         bi = f.blk(bi).link;
     }
     ilog.sort_by(icmp);
-    let sentinal_ins = Ins::new0(O::Oxxx, Kx, Ref::R);
+    let sentinal_ins = Ins::new0(O::Oxxx, Kx, R);
     /* add a sentinel */
     ilog.push(Insert::new(
         TmpIdx::NONE,
@@ -752,7 +753,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 } else {
                     // MUST be InsertU::Ins
                     assert!(false);
-                    i = Ins::new0(O::Oxxx, Kx, Ref::R);
+                    i = Ins::new0(O::Oxxx, Kx, R);
                 }
                 isti += 1;
                 ist = &mut ilog[isti];
@@ -762,7 +763,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 }
                 i = f.blk(bi).ins()[ni.0 as usize];
                 ni = InsIdx::new(ni.usize() + 1);
-                if isload(i.op) && i.args[1] != Ref::R {
+                if isload(i.op) && i.args[1] != R {
                     // TODO same code in mem.rs
                     let ext: O =
                         O::from_repr((O::Oextsb as u8) + ((i.op as u8) - (O::Oloadsb as u8)))
@@ -788,7 +789,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                         }
                     }
                     i.args[0] = i.args[1];
-                    i.args[1] = Ref::R;
+                    i.args[1] = R;
                 }
             }
             ib.push(i);

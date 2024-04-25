@@ -10,6 +10,7 @@ use chomp1::ascii::{is_alpha, is_alphanumeric, is_digit};
 use strum::IntoEnumIterator;
 use strum_macros::{EnumIter, FromRepr};
 
+use crate::all::Ref::{RCall, RCon, RInt, RMem, RSlot, RTmp, RTyp, R};
 use crate::all::K::{Kc, Kd, Ke, Kl, Ks, Ksb, Ksh, Kub, Kuh, Kw, Kx, K0};
 use crate::all::{
     bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT,
@@ -788,17 +789,17 @@ impl Parser<'_> {
         let ti: TmpIdx = self.tmph[tmph_i];
         if ti != TmpIdx::NONE {
             if curf.tmp(ti).name == name {
-                return Ref::RTmp(ti);
+                return RTmp(ti);
             }
             for ti in (TMP0..curf.tmps.len()).rev() {
                 if curf.tmps[ti].name == name {
-                    return Ref::RTmp(TmpIdx::new(ti));
+                    return RTmp(TmpIdx::new(ti));
                 }
             }
         }
         let ti: TmpIdx = newtmp(name, false, Kx, curf);
         self.tmph[tmph_i] = ti;
-        Ref::RTmp(ti)
+        RTmp(ti)
     }
 
     fn parseref(&mut self, curf: &mut Fn) -> RubeResult<Ref> {
@@ -819,7 +820,7 @@ impl Parser<'_> {
                 Sym::new(SymT::SGlo, intern(&tv.as_str(), self)),
                 ConBits::I(0),
             ), // Ugh
-            _ => return Ok(Ref::R), // TODO, hrmmm - return Ok???
+            _ => return Ok(R), // TODO, hrmmm - return Ok???
         };
 
         Ok(newcon(curf, c))
@@ -895,7 +896,7 @@ impl Parser<'_> {
                     vararg = true;
                     if arg {
                         // TODO - Mmm, would actually like Ins's to be on Blk's
-                        self.insb.push(Ins::new0(O::Oargv, Kw, Ref::R)); // TODO - KW is 0 but seems wrong???
+                        self.insb.push(Ins::new0(O::Oargv, Kw, R)); // TODO - KW is 0 but seems wrong???
                     }
                     let _ = self.next()?;
                     goto_next = true;
@@ -918,8 +919,8 @@ impl Parser<'_> {
             if !goto_next {
                 let r: Ref = self.parseref(curf)?;
                 match r {
-                    Ref::R => return Err(self.err("invalid argument")),
-                    Ref::RTmp(_) => (), // Ok
+                    R => return Err(self.err("invalid argument")),
+                    RTmp(_) => (), // Ok
                     _ => {
                         if !arg {
                             return Err(self.err("invalid function parameter"));
@@ -929,27 +930,27 @@ impl Parser<'_> {
                 let ins: Ins = {
                     if env {
                         if arg {
-                            Ins::new1(O::Oarge, k, Ref::R, [r])
+                            Ins::new1(O::Oarge, k, R, [r])
                         } else {
-                            Ins::new1(O::Opare, k, r, [Ref::R])
+                            Ins::new1(O::Opare, k, r, [R])
                         }
                     } else if k == Kc {
                         if arg {
-                            Ins::new2(O::Oargc, Kl, Ref::R, [Ref::RTyp(ty), r])
+                            Ins::new2(O::Oargc, Kl, R, [RTyp(ty), r])
                         } else {
-                            Ins::new1(O::Oparc, Kl, r, [Ref::RTyp(ty)])
+                            Ins::new1(O::Oparc, Kl, r, [RTyp(ty)])
                         }
                     } else if k >= Ksb {
                         if arg {
-                            Ins::new1(op_arg_bh(k), Kw, Ref::R, [r])
+                            Ins::new1(op_arg_bh(k), Kw, R, [r])
                         } else {
-                            Ins::new1(op_par_bh(k), Kw, r, [Ref::R])
+                            Ins::new1(op_par_bh(k), Kw, r, [R])
                         }
                     } else {
                         if arg {
-                            Ins::new1(O::Oarg, k, Ref::R, [r])
+                            Ins::new1(O::Oarg, k, R, [r])
                         } else {
-                            Ins::new1(O::Opar, k, r, [Ref::R])
+                            Ins::new1(O::Opar, k, r, [R])
                         }
                     }
                 };
@@ -998,7 +999,7 @@ impl Parser<'_> {
         let mut arg: Vec<Ref> = vec![];
         // Phi targets
         let mut blk: Vec<BlkIdx> = vec![];
-        let mut r: Ref = Ref::R;
+        let mut r: Ref = R;
         let mut k: K = Ke; // KW???
         let mut ty: TypIdx = TypIdx::NONE;
 
@@ -1030,7 +1031,7 @@ impl Parser<'_> {
             // Void instructions
             Token::Tblit | Token::Tcall | Token::TOvastart => {
                 /* operations without result */
-                r = Ref::R;
+                r = R;
                 k = Kw; // Why not T0? Note typecheck() assumes KW.
                 op_tok = t;
             }
@@ -1078,7 +1079,7 @@ impl Parser<'_> {
                     curf.blk_mut(self.cur_bi).jmp_mut().type_ = J::Jret0; // is this necessary?
                 } else if self.rcls != K0 {
                     let r: Ref = self.parseref(curf)?;
-                    if r == Ref::R {
+                    if r == R {
                         return Err(self.err("invalid return value"));
                     }
                     curf.blk_mut(self.cur_bi).jmp_mut().arg = r;
@@ -1092,7 +1093,7 @@ impl Parser<'_> {
                 } else {
                     curf.blk_mut(self.cur_bi).jmp_mut().type_ = J::Jjnz;
                     let r: Ref = self.parseref(curf)?;
-                    if let Ref::R = r {
+                    if let R = r {
                         return Err(self.err("invalid argument for jnz jump"));
                     }
                     curf.blk_mut(self.cur_bi).jmp_mut().arg = r;
@@ -1120,13 +1121,13 @@ impl Parser<'_> {
             Token::TOdbgloc => {
                 op_tok = t;
                 k = Kw;
-                r = Ref::R;
+                r = R;
                 let ln_i = self.expect(Token::Tint)?.as_i();
                 let ln: i32 = ln_i as i32;
                 if ln < 0 || (ln as i64) != ln_i {
                     return Err(self.err(&format!("line number {} negative or too big", ln_i)));
                 }
-                arg.push(Ref::RInt(ln));
+                arg.push(RInt(ln));
                 // TODO - didn't clean this up
                 let cn: i32 = {
                     if self.peek_tok()? == Token::Tcomma {
@@ -1143,13 +1144,13 @@ impl Parser<'_> {
                         0
                     }
                 };
-                arg.push(Ref::RInt(cn));
+                arg.push(RInt(cn));
                 goto_ins = true;
             }
             _ => {
                 if isstore(t) {
                     /* operations without result */
-                    r = Ref::R;
+                    r = R;
                     k = Kw; // TODO why not K0?
                     op_tok = t;
                 } else {
@@ -1178,9 +1179,9 @@ impl Parser<'_> {
                 let arg1 = {
                     if k == Kc {
                         k = Kl;
-                        Ref::RTyp(ty)
+                        RTyp(ty)
                     } else {
-                        Ref::R
+                        R
                     }
                 };
                 arg.push(arg1);
@@ -1212,7 +1213,7 @@ impl Parser<'_> {
                             blk.push(self.findblk(curf, &name));
                         }
                         let argi: Ref = self.parseref(curf)?;
-                        if let Ref::R = argi {
+                        if let R = argi {
                             return Err(self.err("invalid instruction argument"));
                         }
                         arg.push(argi);
@@ -1248,9 +1249,9 @@ impl Parser<'_> {
                             return Err(self.err("insufficient args for blit"));
                         }
                         self.insb
-                            .push(Ins::new2(O::Oblit0, Kw, Ref::R, [arg[0], arg[1]]));
+                            .push(Ins::new2(O::Oblit0, Kw, R, [arg[0], arg[1]]));
                         let ci: ConIdx;
-                        if let Ref::RCon(ci0) = arg[2] {
+                        if let RCon(ci0) = arg[2] {
                             ci = ci0;
                         } else {
                             return Err(self.err("blit size must be constant"));
@@ -1273,8 +1274,8 @@ impl Parser<'_> {
                             }
                             sz_u32
                         };
-                        let r: Ref = Ref::RInt(sz as i32); /* Mmm */
-                        self.insb.push(Ins::new1(O::Oblit1, Kw, Ref::R, [r]));
+                        let r: Ref = RInt(sz as i32); /* Mmm */
+                        self.insb.push(Ins::new1(O::Oblit1, Kw, R, [r]));
                         return Ok(PState::PIns);
                     }
                     _ => {
@@ -1287,7 +1288,7 @@ impl Parser<'_> {
             }
         }
         while arg.len() < 2 {
-            arg.push(Ref::R);
+            arg.push(R);
         }
         self.insb.push(Ins::new2(op, k, r, [arg[0], arg[1]]));
 
@@ -1297,7 +1298,7 @@ impl Parser<'_> {
 
 fn usecheck(fn_: &Fn, r: &Ref, k: K) -> bool {
     match r {
-        Ref::RTmp(ti) => {
+        RTmp(ti) => {
             let cls: K = fn_.tmp(*ti).cls;
             cls == k || (cls == Kl && k == Kw)
         }
@@ -1312,7 +1313,7 @@ impl Parser<'_> {
         while bi != BlkIdx::NONE {
             let mut pi: PhiIdx = fn_.blk(bi).phi;
             while pi != PhiIdx::NONE {
-                if let Ref::RTmp(ti) = fn_.phi(pi).to {
+                if let RTmp(ti) = fn_.phi(pi).to {
                     fn_.tmp_mut(ti).cls = fn_.phi(pi).cls;
                 } else {
                     return Err(self.err(&format!(
@@ -1327,7 +1328,7 @@ impl Parser<'_> {
             /*fn_.blk(bi).ins().len()*/
             {
                 let i: Ins = fn_.blk(bi).ins()[ii]; // Note - copy
-                if let Ref::RTmp(ti) = /*fn_.blk(bi).ins()[ii]*/ i.to {
+                if let RTmp(ti) = /*fn_.blk(bi).ins()[ii]*/ i.to {
                     let ins_cls: K = /*fn_.blk(bi).ins()[ii]*/i.cls;
                     let t: &mut Tmp = fn_.tmp_mut(ti);
                     if clsmerge(&mut t.cls, ins_cls) {
@@ -1353,7 +1354,7 @@ impl Parser<'_> {
             let mut pi = b.phi;
             while pi != PhiIdx::NONE {
                 let p: &Phi = fn_.phi(pi);
-                if let Ref::RTmp(ti) = p.to {
+                if let RTmp(ti) = p.to {
                     let t: &Tmp = fn_.tmp(ti);
                     let k: K = t.cls;
                     let mut ppb: BSet = bsinit(fn_.blks.len());
@@ -1369,7 +1370,7 @@ impl Parser<'_> {
                         if !usecheck(fn_, &p.args[n], k) {
                             let argr: &Ref = &p.args[n];
                             // Must be a RTmp after usecheck() failure
-                            if let Ref::RTmp(ti) = argr {
+                            if let RTmp(ti) = argr {
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
                                     to_s(&fn_.tmp(*ti).name),
@@ -1405,18 +1406,18 @@ impl Parser<'_> {
                             self.err(&format!("invalid instruction type in {}", to_s(op.name)))
                         );
                     }
-                    if let Ref::RTyp(_) = r {
+                    if let RTyp(_) = r {
                         continue;
                     }
                     static FS: [&str; 2] = ["first", "second"];
-                    if *r != Ref::R && k == Kx {
+                    if *r != R && k == Kx {
                         return Err(self.err(&format!(
                             "no {} operand expected in {}",
                             FS[n],
                             to_s(op.name)
                         )));
                     }
-                    if *r == Ref::R && k != Kx {
+                    if *r == R && k != Kx {
                         return Err(self.err(&format!(
                             "missing {} operand in {}",
                             FS[n],
@@ -1425,7 +1426,7 @@ impl Parser<'_> {
                     }
                     if !usecheck(fn_, r, k) {
                         // Must be a RTmp if usecheck() fails
-                        if let Ref::RTmp(ti) = r {
+                        if let RTmp(ti) = r {
                             return Err(self.err(&format!(
                                 "invalid type for {} operand %{} in {}",
                                 FS[n],
@@ -1456,7 +1457,7 @@ impl Parser<'_> {
             }
             if goto_jerr {
                 // Must be RTmp after usecheck() failure
-                if let Ref::RTmp(ti) = r {
+                if let RTmp(ti) = r {
                     return Err(self.err(&format!(
                         "invalid type for jump argument %{} in block @{}",
                         to_s(&fn_.tmp(*ti).name),
@@ -1963,15 +1964,15 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
 // TODO - remove pub
 pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Ref) {
     match r {
-        Ref::R => assert!(false),
-        Ref::RTmp(ti) => {
+        R => assert!(false),
+        RTmp(ti) => {
             if ti < TMP0IDX {
                 let _ = write!(f, "R{}", ti.0);
             } else {
                 let _ = write!(f, "%{}", to_s(&fn_.tmp(ti).name));
             }
         }
-        Ref::RCon(ci) => {
+        RCon(ci) => {
             if ci.0 == 0 {
                 //(req(r, UNDEF)) { TODO - this seems missing
                 let _ = write!(f, "UNDEF");
@@ -1979,16 +1980,16 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Re
                 printcon(f, itbl, fn_.con(ci));
             }
         }
-        Ref::RSlot(i) => {
+        RSlot(i) => {
             let _ = write!(f, "S{}", i);
         }
-        Ref::RCall(n) => {
+        RCall(n) => {
             let _ = write!(f, "{:04x}", n);
         }
-        Ref::RTyp(ti) => {
+        RTyp(ti) => {
             let _ = write!(f, ":{}", to_s(&typ[ti.0 as usize].name));
         }
-        Ref::RMem(mi) => {
+        RMem(mi) => {
             let mut i: bool = false;
             let m: &Mem = fn_.mem(mi);
             let _ = write!(f, "[");
@@ -1996,14 +1997,14 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Re
                 printcon(f, itbl, &m.offset);
                 i = true;
             }
-            if m.base != Ref::R {
+            if m.base != R {
                 if i {
                     let _ = write!(f, " + ");
                 }
                 printref(f, fn_, typ, itbl, m.base);
                 i = true;
             }
-            if m.index != Ref::R {
+            if m.index != R {
                 if i {
                     let _ = write!(f, " + ");
                 }
@@ -2012,7 +2013,7 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Re
             }
             let _ = write!(f, "]");
         }
-        Ref::RInt(i) => {
+        RInt(i) => {
             let _ = write!(f, "{}", i);
         }
     }
@@ -2085,13 +2086,13 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
         }
         for i in b.ins().iter() {
             let _ = write!(f, "\t");
-            if i.to != Ref::R {
+            if i.to != R {
                 printref(f, fn_, typ, itbl, i.to);
                 let _ = write!(f, " ={} ", KTOC[i.cls as usize]);
             }
             assert!(!OPTAB[i.op as usize].name.is_empty());
             let _ = write!(f, "{}", to_s(OPTAB[i.op as usize].name));
-            if i.to == Ref::R {
+            if i.to == R {
                 match i.op {
                     O::Oarg
                     | O::Oswap
@@ -2107,11 +2108,11 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     _ => {} // nada
                 }
             }
-            if i.args[0] != Ref::R {
+            if i.args[0] != R {
                 let _ = write!(f, " ");
                 printref(f, fn_, typ, itbl, i.args[0]);
             }
-            if i.args[1] != Ref::R {
+            if i.args[1] != R {
                 let _ = write!(f, ", ");
                 printref(f, fn_, typ, itbl, i.args[1]);
             }
@@ -2130,7 +2131,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             | J::Jretd
             | J::Jretc => {
                 let _ = write!(f, "\t{}", JTOA[b.jmp().type_ as usize]);
-                if b.jmp().type_ != J::Jret0 || b.jmp().arg != Ref::R {
+                if b.jmp().type_ != J::Jret0 || b.jmp().arg != R {
                     let _ = write!(f, " ");
                     printref(f, fn_, typ, itbl, b.jmp().arg);
                 }

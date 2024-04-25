@@ -1,5 +1,6 @@
 use std::io::Write;
 
+use crate::all::Ref::{RCon, RTmp};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{bit, to_s, BSet, Bits, Con, ConIdx, Fn, Ref, Tmp, TmpIdx, K, NBIT, TMP0};
 use crate::parse::Parser; // ugh for intern()
@@ -483,7 +484,7 @@ pub fn newtmp(prfx: &[u8], sufx: bool, k: K, fn_: &mut Fn) -> TmpIdx {
 }
 
 pub fn newtmpref(prfx: &[u8], sufx: bool, k: K, fn_: &mut Fn) -> Ref {
-    Ref::RTmp(newtmp(prfx, sufx, k, fn_))
+    RTmp(newtmp(prfx, sufx, k, fn_))
 }
 
 pub fn newtmp2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> TmpIdx {
@@ -505,7 +506,7 @@ pub fn newtmp2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> TmpIdx {
 }
 
 pub fn newtmpref2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> Ref {
-    Ref::RTmp(newtmp2(tmps, prfx, sufx, k))
+    RTmp(newtmp2(tmps, prfx, sufx, k))
 }
 
 /*
@@ -544,12 +545,12 @@ newcon(Con *c0, Fn *fn)
 pub fn newcon(f: &mut Fn, c0: Con) -> Ref {
     for i in 1..f.cons.len() {
         if c0 == f.cons[i] {
-            return Ref::RCon(ConIdx(i as u32));
+            return RCon(ConIdx(i as u32));
         }
     }
     let ci = f.add_con(c0);
 
-    Ref::RCon(ci)
+    RCon(ci)
 }
 
 /*

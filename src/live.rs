@@ -1,5 +1,6 @@
 use std::io::stdout;
 
+use crate::all::Ref::{RCall, RMem, RTmp, R};
 use crate::all::{
     bshas, kbase, to_s, BSet, Blk, BlkIdx, Blks, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target, Tmp, O,
 };
@@ -14,7 +15,7 @@ fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
         let mut pi: PhiIdx = blks.phi_of(si);
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
-            if let Ref::RTmp(ti) = p.to {
+            if let RTmp(ti) = p.to {
                 bsclr(v, ti.usize());
             }
             pi = p.link;
@@ -27,7 +28,7 @@ fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
             assert!(p.args.len() == p.blks.len());
             for a in 0..p.args.len() {
                 if p.blks[a] == bi {
-                    if let Ref::RTmp(ati) = p.args[a] {
+                    if let RTmp(ati) = p.args[a] {
                         bsset(v, ati.usize());
                         blks.with_mut(bi, |b| bsset(&mut b.gen, ati.usize()));
                     }
@@ -39,7 +40,7 @@ fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
 }
 
 fn bset(tmps: &[Tmp], r: Ref, b: &mut Blk, nlv: &mut [u32; 2]) {
-    if let Ref::RTmp(ti) = r {
+    if let RTmp(ti) = r {
         bsset(&mut b.gen, ti.usize());
         if !bshas(&b.in_, ti.usize()) {
             nlv[kbase(tmps[ti].cls) as usize] += 1;
@@ -97,7 +98,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                 }
 
                 let jmp_arg = b.jmp().arg;
-                if let Ref::RCall(_) = jmp_arg {
+                if let RCall(_) = jmp_arg {
                     assert!(bscount(&b.in_) == targ.nrglob && b.in_[0] == targ.rglob);
                     b.in_[0] |= (targ.retregs)(jmp_arg, &nlv); // TODO not implemented
                 } else {
@@ -110,7 +111,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                 for ii in (0..ins_len).rev() {
                     let i: Ins = b.ins()[ii]; // Note, copy
                     if i.op == O::Ocall {
-                        if let Ref::RCall(_) = i.args[1] {
+                        if let RCall(_) = i.args[1] {
                             let mut m: [u32; 2] = [0; 2];
                             b.in_[0] &= (targ.retregs)(i.args[1], &mut m);
                             for k in 0..2 {
@@ -131,8 +132,8 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                             }
                         }
                     }
-                    assert!(i.to == Ref::R || matches!(i.to, Ref::RTmp(_)));
-                    if let Ref::RTmp(ti) = i.to {
+                    assert!(i.to == R || matches!(i.to, RTmp(_)));
+                    if let RTmp(ti) = i.to {
                         if bshas(&b.in_, ti.usize()) {
                             nlv[kbase(tmps[ti].cls) as usize] -= 1;
                         }
@@ -141,7 +142,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                     }
                     for k in 0..2 {
                         match i.args[k] {
-                            Ref::RMem(ma) => {
+                            RMem(ma) => {
                                 let (base, index) = {
                                     let mem: &Mem = &mems[ma];
                                     (mem.base, mem.index)

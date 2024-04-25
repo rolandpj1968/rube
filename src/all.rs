@@ -12,6 +12,7 @@ use strum_macros::FromRepr;
 
 use crate::util::InternId;
 
+use Ref::{RCon, R};
 use K::{Kd, Kl, Ks, Kw, K0};
 
 // Generic Result
@@ -244,8 +245,8 @@ pub enum Ref {
     RMem(MemIdx),
 }
 
-pub const UNDEF: Ref = Ref::RCon(ConIdx::UNDEF); /* represents uninitialized data */
-pub const CON_Z: Ref = Ref::RCon(ConIdx::CON_Z); /* represents uninitialized data */
+pub const UNDEF: Ref = RCon(ConIdx::UNDEF); /* represents uninitialized data */
+pub const CON_Z: Ref = RCon(ConIdx::CON_Z); /* represents uninitialized data */
 
 /*
 enum CmpI {
@@ -639,11 +640,11 @@ pub struct Ins {
 
 impl Ins {
     pub fn new0(op: O, cls: K, to: Ref) -> Ins {
-        Ins::new(op, cls, to, [Ref::R, Ref::R])
+        Ins::new(op, cls, to, [R, R])
     }
 
     pub fn new1(op: O, cls: K, to: Ref, args1: [Ref; 1]) -> Ins {
-        Ins::new(op, cls, to, [args1[0], Ref::R])
+        Ins::new(op, cls, to, [args1[0], R])
     }
 
     pub fn new2(op: O, cls: K, to: Ref, args2: [Ref; 2]) -> Ins {
@@ -754,7 +755,7 @@ impl BlkJmp {
     pub fn new() -> BlkJmp {
         BlkJmp {
             type_: J::Jxxx,
-            arg: Ref::R,
+            arg: R,
         }
     }
 }
@@ -1285,7 +1286,7 @@ impl Fn {
             mems: vec![],
             nblk: 0,
             retty: TypIdx::NONE,
-            retr: Ref::R,
+            retr: R,
             rpo: vec![],
             //bits reg,
             slot: -1, // ???
