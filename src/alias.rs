@@ -343,35 +343,35 @@ pub fn fillalias(f: &mut Fn) {
         bi = blks.borrow(bi).link;
     }
 
-    println!("\nAfter fillalias:\n");
-    const TYPENAMES: [&str; 7] = ["ABot", "ALoc", "ACon", "AEsc", "ASym", "<5>", "AUnk"];
-    for i in TMP0..tmps.len() {
-        print!(
-            "    tmp {} {} - alias: type {} ",
-            i,
-            to_s(&tmps[i].name),
-            TYPENAMES[tmps[i].alias.typ as usize]
-        );
-        if tmps[i].alias.base == TmpIdx::NONE {
-            print!("base nil ");
-        } else {
-            print!(
-                "base {} {} ",
-                tmps[i].alias.base.0,
-                to_s(&tmps[tmps[i].alias.base].name)
-            );
-        }
-        print!("offset {} ", tmps[i].alias.offset);
-        if tmps[i].alias.slot == TmpIdx::NONE {
-            print!("slot nil");
-        } else {
-            print!(
-                "slot {} {}",
-                tmps[i].alias.slot.0,
-                to_s(&tmps[tmps[i].alias.slot].name)
-            );
-        }
-        println!();
-    }
-    println!("\n------------------------------\n");
+    // println!("\nAfter fillalias:\n");
+    // const TYPENAMES: [&str; 7] = ["ABot", "ALoc", "ACon", "AEsc", "ASym", "<5>", "AUnk"];
+    // for i in TMP0..tmps.len() {
+    //     print!(
+    //         "    tmp {} {} - alias: type {} ",
+    //         i,
+    //         to_s(&tmps[i].name),
+    //         TYPENAMES[tmps[i].alias.typ as usize]
+    //     );
+    //     if tmps[i].alias.base == TmpIdx::NONE {
+    //         print!("base nil ");
+    //     } else {
+    //         print!(
+    //             "base {} {} ",
+    //             tmps[i].alias.base.0,
+    //             to_s(&tmps[tmps[i].alias.base].name)
+    //         );
+    //     }
+    //     print!("offset {} ", tmps[i].alias.offset);
+    //     if tmps[i].alias.slot == TmpIdx::NONE {
+    //         print!("slot nil");
+    //     } else {
+    //         print!(
+    //             "slot {} {}",
+    //             tmps[i].alias.slot.0,
+    //             to_s(&tmps[tmps[i].alias.slot].name)
+    //         );
+    //     }
+    //     println!();
+    // }
+    // println!("\n------------------------------\n");
 }
