@@ -4,8 +4,8 @@ use std::cmp::Ordering;
 
 use crate::alias::{alias, escapes};
 use crate::all::{
-    bit, isload, isstore, kwide, Alias, AliasIdx, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn,
-    Ins, InsIdx, KExt, Phi, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, KX, O,
+    bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn, Ins,
+    InsIdx, KExt, Phi, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, KX, O,
 };
 use crate::cfg::dom;
 use crate::util::{getcon, newcon, newtmp, newtmpref};
@@ -182,9 +182,9 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
      * but its alias base ref will be
      * (see killsl() below) */
     if let Ref::RTmp(ti) = r {
-        let ai = f.tmp(ti).alias;
-        let a: Alias = *f.alias(ai); // Note - copy!
-        match a.type_ {
+        //let ai = f.tmp(ti).alias;
+        let a: Alias = f.tmps[ti].alias; //*f.alias(ai); // Note - copy!
+        match a.typ {
             AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => {
                 r = Ref::RTmp(a.base);
                 if a.offset != 0 {
@@ -217,9 +217,9 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
 fn killsl(f: &Fn, r: Ref, sl: &Slice) -> bool {
     if let Ref::RTmp(_ti) = r {
         if let Ref::RTmp(slti) = sl.r {
-            let ai: AliasIdx = f.tmp(slti).alias;
-            let a: &Alias = f.alias(ai);
-            return match a.type_ {
+            //let ai: AliasIdx = f.tmp(slti).alias;
+            let a: &Alias = &f.tmps[slti].alias;
+            return match a.typ {
                 AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => r == Ref::RTmp(a.base),
                 AliasT::ACon | AliasT::ASym => false,
                 _ => {

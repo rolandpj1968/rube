@@ -1,56 +1,63 @@
 use crate::all::{
-    astack, bit, isload, isstore, Alias, AliasIdx, AliasLoc, AliasT, AliasU, Bits, BlkIdx,
-    CanAlias, Con, ConBits, ConT, Fn, Ins, PhiIdx, Ref, Tmp, J, NBIT, O, OALLOC, OALLOC1,
+    astack, bit, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, BlkIdx, Blks, CanAlias,
+    Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
 };
 
 use crate::load::storesz;
 
-pub fn getalias(f: &Fn, a_in: &Alias, r: Ref) -> Alias {
+//pub fn getalias2(tmps:
+pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
     let mut a_out: Alias = a_in.clone();
+    assert!(matches!(r, Ref::RTmp(_)) || matches!(r, Ref::RCon(_)));
     match r {
         Ref::RTmp(ti) => {
-            let t: &Tmp = f.tmp(ti);
-            let a1: &Alias = f.alias(t.alias);
+            //let t: &Tmp = f.tmp(ti);
+            let a1: &Alias = &tmps[ti].alias; //f.alias(t.alias);
             a_out = a1.clone();
-            if astack(a_in.type_) != 0 {
-                a_out.type_ = f.alias(a_out.slot).type_;
+            if astack(a_in.typ) != 0 {
+                a_out.typ = tmps[a_out.slot].alias.typ;
             }
-            assert!(a_out.type_ != AliasT::ABot);
+            assert!(a_out.typ != AliasT::ABot);
         }
         Ref::RCon(ci) => {
-            let c: &Con = f.con(ci);
-            // println!(
-            //     "                                           getalias() RCon {:?}",
-            //     c
-            // );
+            let c: &Con = &cons[ci.0 as usize]; //f.con(ci);
+                                                // println!(
+                                                //     "                                           getalias() RCon {:?}",
+                                                //     c
+                                                // );
             match c.type_ {
                 ConT::CAddr => {
-                    a_out.type_ = AliasT::ASym;
+                    a_out.typ = AliasT::ASym;
                     a_out.u = AliasU::ASym(c.sym);
                 }
                 _ => {
-                    a_out.type_ = AliasT::ACon;
+                    a_out.typ = AliasT::ACon;
                 }
             }
+            assert!(matches!(c.bits, ConBits::I(_)));
             if let ConBits::I(i) = c.bits {
                 a_out.offset = i;
-            } else {
-                // Needed for CAddr where c.bits is None; ropy!
-                // Hrmm, changed CAddr to have I(0) by default now, check again...
-                a_out.offset = 0;
-                //assert!(false);
             }
-            a_out.slot = AliasIdx::NONE;
+            // else {
+            //     // Needed for CAddr where c.bits is None; ropy!
+            //     // Hrmm, changed CAddr to have I(0) by default now, check again...
+            //     a_out.offset = 0;
+            //     //assert!(false);
+            // }
+            a_out.slot = TmpIdx::NONE; //AliasIdx::NONE;
         }
-        _ => assert!(false), /*unreachable*/
+        _ => (),
     }
 
     a_out
 }
 
 pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i32) {
-    let mut ap: Alias = getalias(f, &Alias::default(), p);
-    let aq: Alias = getalias(f, &Alias::default(), q);
+    let tmps: &[Tmp] = &f.tmps;
+    let cons: &[Con] = &f.cons;
+
+    let mut ap: Alias = getalias(tmps, cons, &Alias::default(), p);
+    let aq: Alias = getalias(tmps, cons, &Alias::default(), q);
     // println!(
     //     "                        alias: p {:?} ap {:?} : q {:?} aq {:?}",
     //     p, ap, q, aq
@@ -63,7 +70,7 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
     let ovlap: bool = ap.offset < aq.offset + (sq as i64) && aq.offset < ap.offset + (sp as i64);
 
     let can_alias: CanAlias = {
-        if astack(ap.type_) != 0 && astack(aq.type_) != 0 {
+        if astack(ap.typ) != 0 && astack(aq.typ) != 0 {
             /* if both are offsets of the same
              * stack slot, they alias iif they
              * overlap */
@@ -72,7 +79,7 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
             } else {
                 CanAlias::No
             }
-        } else if ap.type_ == AliasT::ASym && aq.type_ == AliasT::ASym {
+        } else if ap.typ == AliasT::ASym && aq.typ == AliasT::ASym {
             // println!(
             //     "                                both ASym - ovlap is {}",
             //     ovlap
@@ -97,10 +104,10 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
                 assert!(false);
                 CanAlias::May
             }
-        } else if (ap.type_ == AliasT::ACon && aq.type_ == AliasT::ACon)
-            || (ap.type_ == aq.type_ && ap.base == aq.base)
+        } else if (ap.typ == AliasT::ACon && aq.typ == AliasT::ACon)
+            || (ap.typ == aq.typ && ap.base == aq.base)
         {
-            assert!(ap.type_ == AliasT::ACon || ap.type_ == AliasT::AUnk);
+            assert!(ap.typ == AliasT::ACon || ap.typ == AliasT::AUnk);
             /* if they have the same base, we
              * can rely on the offsets only */
             if ovlap {
@@ -108,8 +115,8 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
             } else {
                 CanAlias::No
             }
-        } else if (ap.type_ == AliasT::AUnk && aq.type_ != AliasT::ALoc)
-            || (aq.type_ == AliasT::AUnk && ap.type_ != AliasT::ALoc)
+        } else if (ap.typ == AliasT::AUnk && aq.typ != AliasT::ALoc)
+            || (aq.typ == AliasT::AUnk && ap.typ != AliasT::ALoc)
         {
             /* if one of the two is unknown
              * there may be aliasing unless
@@ -124,24 +131,24 @@ pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i3
 
 pub fn escapes(f: &Fn, r: Ref) -> bool {
     if let Ref::RTmp(ti) = r {
-        let ai: AliasIdx = f.tmp(ti).alias;
-        let a: &Alias = f.alias(ai);
-        astack(a.type_) == 0 || f.alias(a.slot).type_ == AliasT::AEsc
+        //let ai: AliasIdx = f.tmp(ti).alias;
+        let a: &Alias = &f.tmps[ti].alias;
+        astack(a.typ) == 0 || f.tmps[a.slot].alias.typ == AliasT::AEsc
     } else {
         true
     }
 }
 
-fn esc(f: &mut Fn, r: Ref) {
+fn esc(tmps: &mut [Tmp], r: Ref) {
     match r {
         Ref::RTmp(ti) => {
-            let ai: AliasIdx = f.tmp(ti).alias;
+            //let ai: AliasIdx = f.tmp(ti).alias;
             let (a_type, a_slot) = {
-                let a: &Alias = f.alias(ai);
-                (a.type_, a.slot)
+                let a: &Alias = &tmps[ti].alias;
+                (a.typ, a.slot)
             };
             if astack(a_type) != 0 {
-                f.alias_mut(a_slot).type_ = AliasT::AEsc;
+                tmps[a_slot].alias.typ = AliasT::AEsc;
             }
         }
         Ref::R | Ref::RCon(_) | Ref::RInt(_) | Ref::RTyp(_) => (), /*ok*/
@@ -149,14 +156,16 @@ fn esc(f: &mut Fn, r: Ref) {
     }
 }
 
-fn store(f: &mut Fn, r: Ref, sz: i32) {
+fn store(tmps: &mut [Tmp], r: Ref, sz: i32) {
     if let Ref::RTmp(ti) = r {
-        let ai: AliasIdx = f.tmp(ti).alias;
+        //let ai: AliasIdx = f.tmp(ti).alias;
         let (a_type, a_offset, a_slot) = {
-            let a: &Alias = f.alias(ai);
-            (a.type_, a.offset, a.slot)
+            let a: &Alias = &tmps[ti].alias;
+            (a.typ, a.offset, a.slot)
         };
-        if a_slot != AliasIdx::NONE {
+        if a_slot != TmpIdx::NONE
+        /*AliasIdx::NONE*/
+        {
             assert!(astack(a_type) != 0);
             let m: Bits = {
                 if sz >= (NBIT as i32) || (a_offset < 0 || a_offset >= (NBIT as i64)) {
@@ -165,25 +174,28 @@ fn store(f: &mut Fn, r: Ref, sz: i32) {
                     (bit(sz as usize) - 1) << a_offset
                 }
             };
-            let aslot: &mut Alias = f.alias_mut(a_slot);
+            let aslot: &mut Alias = &mut tmps[a_slot].alias;
+            assert!(matches!(aslot.u, AliasU::ALoc(_)));
             if let AliasU::ALoc(loc) = &mut aslot.u {
                 loc.m |= m;
-            } else {
-                assert!(false);
             }
         }
     }
 }
 
 pub fn fillalias(f: &mut Fn) {
+    let blks: &Blks = &f.blks;
+    let tmps: &mut [Tmp] = &mut f.tmps;
+    let cons: &[Con] = &f.cons;
+    let phis: &[Phi] = &f.phis;
     // println!("        fillalias:      function ${}", to_s(&f.name));
     //let aliases = &mut f.aliases;
 
     {
-        f.aliases.clear();
-        for ti in 0..f.tmps.len() {
-            let ai = f.add_alias(Alias::default());
-            f.tmps[ti].alias = ai;
+        //f.aliases.clear();
+        for ti in 0..tmps.len() {
+            //let ai = f.add_alias(Alias::default());
+            tmps[ti].alias = Alias::default(); // ai
         }
     }
 
@@ -193,19 +205,17 @@ pub fn fillalias(f: &mut Fn) {
         let bi: BlkIdx = f.rpo[n as usize];
         let mut pi: PhiIdx = f.blks.phi_of(bi);
         while pi != PhiIdx::NONE {
-            if let Ref::RTmp(ti) = f.phi(pi).to {
-                let ai = f.tmp(ti).alias;
-                let a: &mut Alias = f.alias_mut(ai);
-                assert!(a.type_ == AliasT::ABot);
-                a.type_ = AliasT::AUnk;
+            assert!(matches!(phis[pi].to, Ref::RTmp(_)));
+            if let Ref::RTmp(ti) = phis[pi].to {
+                //let ai = f.tmp(ti).alias;
+                let a: &mut Alias = &mut tmps[ti].alias; //f.alias_mut(ai);
+                assert!(a.typ == AliasT::ABot);
+                a.typ = AliasT::AUnk;
                 a.base = ti;
                 a.offset = 0;
-                a.slot = AliasIdx::NONE;
-            } else {
-                // Phi must define a Tmp
-                assert!(false);
+                a.slot = TmpIdx::NONE; // AliasIdx::NONE;
             }
-            pi = f.phi(pi).link;
+            pi = phis[pi].link;
         }
         let ins_len = f.blks.borrow(bi).ins().len();
         for ii in 0..ins_len
@@ -225,70 +235,74 @@ pub fn fillalias(f: &mut Fn) {
                 continue;
             }
 
-            let mut ai: AliasIdx = AliasIdx::NONE;
+            //let mut ai: AliasIdx = AliasIdx::NONE;
+            let mut ai: TmpIdx = TmpIdx::NONE;
 
+            assert!(i.to == Ref::R || matches!(i.to, Ref::RTmp(_)));
             if let Ref::RTmp(ti) = i_to {
-                ai = f.tmp(ti).alias;
-                let a_type: AliasT;
-                let a_slot: AliasIdx;
-                let maybe_a_u: Option<AliasU>;
+                ai = ti;
+                //ai = f.tmp(ti).alias;
+                let a: &mut Alias = &mut tmps[ti].alias;
+                // let a_type: AliasT;
+                // let a_slot: AliasIdx;
+                // let maybe_a_u: Option<AliasU>;
+                // TODO isalloc()
+                assert!(a.typ == AliasT::ABot);
                 if OALLOC <= i_op && i_op <= OALLOC1 {
-                    a_type = AliasT::ALoc;
-                    a_slot = ai;
+                    a.typ = AliasT::ALoc;
+                    a.slot = ti;
                     let mut sz: i32 = -1;
                     if let Ref::RCon(ci) = i_arg0 {
-                        let c: &Con = f.con(ci);
+                        let c: &Con = &cons[ci.0 as usize];
+                        assert!(matches!(c.bits, ConBits::I(_)));
                         if let ConBits::I(sz0) = c.bits {
                             if c.type_ == ConT::CBits && (0 <= sz0 && sz0 <= NBIT as i64) {
                                 sz = sz0 as i32;
                             }
-                        } else {
-                            // MUST be an integer constant
-                            assert!(false);
                         }
                     }
-                    maybe_a_u = Some(AliasU::ALoc(AliasLoc { sz, m: 0 }));
+                    a.u = AliasU::ALoc(AliasLoc { sz, m: 0 });
                 } else {
-                    a_type = AliasT::AUnk;
-                    a_slot = AliasIdx::NONE;
-                    maybe_a_u = None;
+                    a.typ = AliasT::AUnk;
+                    a.slot = TmpIdx::NONE; //AliasIdx::NONE;
+                    a.u = AliasU::None;
                 }
-                let a: &mut Alias = f.alias_mut(ai);
-                assert!(a.type_ == AliasT::ABot);
-                a.type_ = a_type;
-                a.slot = a_slot;
-                a.base = ti;
-                a.offset = 0;
-                if let Some(a_u) = maybe_a_u {
-                    a.u = a_u;
-                }
-            } else {
-                // Ins must define a Tmp or be void
-                assert!(i_to == Ref::R);
+                // let a: &mut Alias = f.alias_mut(ai);
+                // assert!(a.typ == AliasT::ABot);
+                // a.typ = a_type;
+                // a.slot = a_slot;
+                // a.base = ti;
+                // a.offset = 0;
+                // if let Some(a_u) = maybe_a_u {
+                //     a.u = a_u;
+                // }
             }
             if i_op == O::Ocopy {
-                assert!(ai != AliasIdx::NONE);
-                let a0: Alias = getalias(f, f.alias(ai), i_arg0);
-                *f.alias_mut(ai) = a0;
+                assert!(ai != TmpIdx::NONE /*AliasIdx::NONE*/);
+                let a0: Alias = getalias(tmps, cons, &tmps[ai].alias, i_arg0);
+                tmps[ai].alias = a0;
+                //*f.alias_mut(ai) = a0;
             }
+            // TODO - why not Osub too? QBE question
             if i_op == O::Oadd {
-                let a0: Alias = getalias(f, &Alias::default(), i_arg0);
-                let a1: Alias = getalias(f, &Alias::default(), i_arg1);
-                if a0.type_ == AliasT::ACon {
-                    *f.alias_mut(ai) = a1;
-                    f.alias_mut(ai).offset += a0.offset;
-                } else if a1.type_ == AliasT::ACon {
+                assert!(ai != TmpIdx::NONE /*AliasIdx::NONE*/); // not in QBE - too aggressive?
+                let a0: Alias = getalias(tmps, cons, &Alias::default(), i_arg0);
+                let a1: Alias = getalias(tmps, cons, &Alias::default(), i_arg1);
+                if a0.typ == AliasT::ACon {
+                    tmps[ai].alias = a1;
+                    tmps[ai].alias.offset += a0.offset;
+                } else if a1.typ == AliasT::ACon {
                     //println!("                               arg1 is a constant");
-                    *f.alias_mut(ai) = a0;
-                    f.alias_mut(ai).offset += a1.offset;
+                    tmps[ai].alias = a0;
+                    tmps[ai].alias.offset += a1.offset;
                 }
             }
-            if (i_to == Ref::R || f.alias(ai).type_ == AliasT::AUnk) && i_op != O::Oblit0 {
+            if (i_to == Ref::R || tmps[ai].alias.typ == AliasT::AUnk) && i_op != O::Oblit0 {
                 if !isload(i_op) {
-                    esc(f, i_arg0);
+                    esc(tmps, i_arg0);
                 }
                 if !isstore(i_op) && i_op != O::Oargc {
-                    esc(f, i_arg1);
+                    esc(tmps, i_arg1);
                 }
             }
             if i_op == O::Oblit0 {
@@ -301,30 +315,30 @@ pub fn fillalias(f: &mut Fn) {
                 };
                 assert!(blit1_op == O::Oblit1);
                 if let Ref::RInt(blit1_i) = blit1_arg0 {
-                    store(f, i_arg1, blit1_i.abs());
+                    store(tmps, i_arg1, blit1_i.abs());
                 } else {
                     // Oblit1 arg MUST be RInt
                     assert!(false);
                 }
             }
             if isstore(i_op) {
-                store(f, i_arg1, storesz(&i /*f.blks.borrow(bi).ins()[ii]*/));
+                store(tmps, i_arg1, storesz(&i /*f.blks.borrow(bi).ins()[ii]*/));
             }
         }
-        if f.blks.borrow(bi).jmp().type_ != J::Jretc {
-            let jmp_arg = f.blks.borrow(bi).jmp().arg;
-            esc(f, jmp_arg /*f.blks.borrow(bi).jmp().arg*/);
+        if blks.borrow(bi).jmp().type_ != J::Jretc {
+            let jmp_arg = blks.borrow(bi).jmp().arg;
+            esc(tmps, jmp_arg /*f.blks.borrow(bi).jmp().arg*/);
         }
     }
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
         let mut pi: PhiIdx = f.blks.phi_of(bi);
         while pi != PhiIdx::NONE {
-            for n in 0..f.phi(pi).args.len() {
-                esc(f, f.phi(pi).args[n]);
+            for n in 0..phis[pi].args.len() {
+                esc(tmps, phis[pi].args[n]);
             }
-            pi = f.phi(pi).link;
+            pi = phis[pi].link;
         }
-        bi = f.blks.borrow(bi).link;
+        bi = blks.borrow(bi).link;
     }
 }

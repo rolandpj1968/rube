@@ -4,9 +4,9 @@ use std::fmt;
 
 use crate::alias::getalias;
 use crate::all::{
-    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasIdx, AliasT, AliasU, Bits, BlkIdx,
-    Fn, Ins, InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, KL, KW, KX, NBIT, O,
-    OALLOC, OALLOC1, TMP0, UNDEF,
+    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Fn, Ins,
+    InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, KL, KW, KX, NBIT, O, OALLOC,
+    OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
@@ -216,8 +216,8 @@ fn slot(f: &Fn, r: Ref) -> Option<(SlotIdx, i64)> {
     // Alias a;
     // Tmp *t;
 
-    let a: Alias = getalias(f, &Alias::default(), r);
-    if a.type_ != AliasT::ALoc {
+    let a: Alias = getalias(&f.tmps, &f.cons, &Alias::default(), r);
+    if a.typ != AliasT::ALoc {
         return None;
     }
     let ti: TmpIdx = a.base;
@@ -288,9 +288,9 @@ pub fn coalesce(f: &mut Fn) {
     for n in TMP0..f.tmps.len() {
         let ti: TmpIdx = TmpIdx::new(n as usize);
         f.tmp_mut(ti).visit = TmpIdx::NONE; // Ugh, this is a slot index in sl here
-        let ai: AliasIdx = f.tmp(ti).alias;
-        let a: &Alias = f.alias(ai);
-        if a.type_ == AliasT::ALoc && a.slot == ai && f.tmp(ti).bid == f.blk(f.start).id {
+                                            //let ai: AliasIdx = f.tmp(ti).alias;
+        let a: &Alias = &f.tmps[ti].alias;
+        if a.typ == AliasT::ALoc && a.slot == ti/*ai*/ && f.tmp(ti).bid == f.blk(f.start).id {
             if let AliasU::ALoc(aloc) = a.u {
                 if aloc.sz != -1 {
                     f.tmp_mut(ti).visit = TmpIdx::new(sl.len()); // TODO - this is NOT a TmpIdx

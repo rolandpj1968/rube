@@ -1013,27 +1013,28 @@ pub struct AliasLoc {
 #[repr(u8)]
 // TODO - this is partially redundant with AliasT
 pub enum AliasU {
+    None,
     ASym(Sym),
     ALoc(AliasLoc),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct Alias {
-    pub type_: AliasT,
+    pub typ: AliasT,
     pub base: TmpIdx,
     pub offset: i64,
     pub u: AliasU,
-    pub slot: AliasIdx,
+    pub slot: TmpIdx, //AliasIdx,
 }
 
 impl Alias {
     pub fn default() -> Alias {
         Alias {
-            type_: AliasT::ABot,
+            typ: AliasT::ABot,
             base: TmpIdx::NONE,
             offset: 0,
-            u: AliasU::ALoc(AliasLoc { sz: 0, m: 0 }),
-            slot: AliasIdx::NONE,
+            u: AliasU::None,    // AliasU::ALoc(AliasLoc { sz: 0, m: 0 }),
+            slot: TmpIdx::NONE, //AliasIdx::NONE,
         }
     }
 }
@@ -1097,7 +1098,7 @@ pub struct Tmp {
     //     bits m; /* avoid these registers */
     // } hint;
     pub phi: TmpIdx,
-    pub alias: AliasIdx,
+    pub alias: Alias, //AliasIdx,
     pub width: TmpWdth,
     pub visit: TmpIdx, /*u32*/ // bool??? TmpIdx?? It's a slot index in mem::coalesce :(
 }
@@ -1113,8 +1114,8 @@ impl Tmp {
 
             slot,
             cls,
-            phi: TmpIdx::NONE,     // QBE inits to 0 in newtmp()
-            alias: AliasIdx::NONE, // QBE inits to 0 in newtmp()
+            phi: TmpIdx::NONE, // QBE inits to 0 in newtmp()
+            alias: Alias::default(),
             width: TmpWdth::WFull,
             visit: TmpIdx::NONE,
         }
