@@ -131,19 +131,13 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                             }
                         }
                     }
-                    match i.to {
-                        Ref::R => (),
-                        Ref::RTmp(ti) => {
-                            if bshas(&b.in_, ti.usize()) {
-                                nlv[kbase(tmps[ti].cls) as usize] -= 1;
-                            }
-                            bsset(&mut b.gen, ti.usize());
-                            bsclr(&mut b.in_, ti.usize());
+                    assert!(i.to == Ref::R || matches!(i.to, Ref::RTmp(_)));
+                    if let Ref::RTmp(ti) = i.to {
+                        if bshas(&b.in_, ti.usize()) {
+                            nlv[kbase(tmps[ti].cls) as usize] -= 1;
                         }
-                        _ => {
-                            // i.to MUST be R or RTmp
-                            assert!(false);
-                        }
+                        bsset(&mut b.gen, ti.usize());
+                        bsclr(&mut b.in_, ti.usize());
                     }
                     for k in 0..2 {
                         match i.args[k] {

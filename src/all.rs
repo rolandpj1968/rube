@@ -111,6 +111,7 @@ impl Blks {
     pub fn for_each_mut(&self, mut f: impl FnMut(&mut Blk)) {
         self.v.iter().for_each(|br| {
             let mut b = br.borrow_mut();
+            assert!(b.is_defined);
             if !b.is_dead {
                 f(&mut *b)
             }
@@ -124,6 +125,7 @@ impl Blks {
             bi = self.borrow(bi).link;
         }
         // TODO - this generates blks in a different order from the link chain :(
+        // Need to sort f.blks on link chain order to maintain behaviour parity with QBE
         // let len = self.len();
         // for bii in 0..len {
         //     let is_dead = self.v[bii].borrow().is_dead;
@@ -780,6 +782,7 @@ pub struct Blk {
     pub s2: BlkIdx,
     pub link: BlkIdx,
 
+    pub is_defined: bool,
     pub is_dead: bool,
     pub id: u32, // TODO BlkId wrapper
     pub visit: u32,
@@ -806,6 +809,7 @@ impl Blk {
             s1: BlkIdx::NONE,
             s2: BlkIdx::NONE,
             link: BlkIdx::NONE,
+            is_defined: false,
             is_dead: false,
 
             id,

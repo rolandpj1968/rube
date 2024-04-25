@@ -986,6 +986,7 @@ impl Parser<'_> {
 
     fn closeblk(&mut self, curf: &mut Fn) {
         let mut curb = curf.blk_mut(self.cur_bi);
+        curb.is_defined = true;
         // TODO - this is silly, just use Blk::ins directly
         curb.ins = cell::RefCell::new(self.insb.clone());
         self.blink = self.cur_bi;
