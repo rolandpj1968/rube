@@ -10,6 +10,7 @@ use std::ops::{Index, IndexMut};
 use derive_new::new;
 use strum_macros::FromRepr;
 
+use crate::mem::SlotIdx;
 use crate::util::InternId;
 
 use Ref::{RCon, R};
@@ -155,6 +156,9 @@ impl Blks {
     }
     pub fn dlink_of(&self, bi: BlkIdx) -> BlkIdx {
         self.borrow(bi).dlink
+    }
+    pub fn visit_of(&self, bi: BlkIdx) -> u32 {
+        self.borrow(bi).visit
     }
 }
 
@@ -747,14 +751,14 @@ impl IndexMut<PhiIdx> for Vec<Phi> {
 
 #[derive(Clone, Copy)]
 pub struct BlkJmp {
-    pub type_: J,
+    pub typ: J,
     pub arg: Ref,
 }
 
 impl BlkJmp {
     pub fn new() -> BlkJmp {
         BlkJmp {
-            type_: J::Jxxx,
+            typ: J::Jxxx,
             arg: R,
         }
     }
@@ -1079,7 +1083,9 @@ pub struct Tmp {
     pub phi: TmpIdx,
     pub alias: Alias,
     pub width: TmpWdth,
-    pub visit: TmpIdx, /*u32*/ // bool??? TmpIdx?? It's a slot index in mem::coalesce :(
+    pub tvisit: TmpIdx, /*u32*/
+    // bool??? TmpIdx?? It's a slot index in mem::coalesce :(
+    pub svisit: SlotIdx,
 }
 
 impl Tmp {
@@ -1096,7 +1102,8 @@ impl Tmp {
             phi: TmpIdx::NONE, // QBE inits to 0 in newtmp()
             alias: Alias::default(),
             width: TmpWdth::WFull,
-            visit: TmpIdx::NONE,
+            tvisit: TmpIdx::NONE,
+            svisit: SlotIdx::NONE,
         }
     }
 }

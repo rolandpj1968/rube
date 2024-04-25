@@ -1,14 +1,15 @@
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
+use std::ops::{Index, IndexMut};
 
 use crate::alias::getalias;
 use crate::all::Ref::{RInt, RTmp, R};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{
-    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Fn, Ins,
-    InsIdx, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, K, NBIT, O, OALLOC, OALLOC1, TMP0,
-    UNDEF,
+    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Blks,
+    Con, Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, K, NBIT, O,
+    OALLOC, OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
@@ -187,13 +188,35 @@ struct Slot {
     //nst: i32,
 }
 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SlotTag();
 // Index into coalesce::sl vector
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SlotIdx(pub u32);
+pub type SlotIdx = Idx<SlotTag>;
 
-impl SlotIdx {
-    pub const NONE: SlotIdx = SlotIdx(u32::MAX);
+impl Index<SlotIdx> for [Slot] {
+    type Output = Slot;
+    fn index(&self, index: SlotIdx) -> &Self::Output {
+        debug_assert!(index != SlotIdx::NONE);
+        self.index(index.0 as usize)
+    }
 }
+
+impl IndexMut<SlotIdx> for [Slot] {
+    fn index_mut(&mut self, index: SlotIdx) -> &mut Self::Output {
+        debug_assert!(index != SlotIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+// // Index into coalesce::sl vector
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// pub struct SlotIdx(pub u32);
+
+// impl SlotIdx {
+//     pub const NONE: SlotIdx = SlotIdx(u32::MAX);
+
+//     fn new(i: usize
+// }
 
 fn rin(r: &Range, n: i32) -> bool {
     r.a <= n && n < r.b
@@ -214,26 +237,21 @@ fn radd(r: &mut Range, n: i32) {
 }
 
 // Return maybe slot-idx, off
-fn slot(f: &Fn, r: Ref) -> Option<(SlotIdx, i64)> {
-    // Alias a;
-    // Tmp *t;
-
-    let a: Alias = getalias(&f.tmps, &f.cons, &Alias::default(), r);
+fn slot(tmps: &[Tmp], cons: &[Con], r: Ref) -> Option<(SlotIdx, i64)> {
+    let a: Alias = getalias(tmps, cons, &Alias::default(), r);
     if a.typ != AliasT::ALoc {
         return None;
     }
-    let ti: TmpIdx = a.base;
-    let vi: TmpIdx = f.tmp(ti).visit; // TODO should be SlotIdx here
-    if f.tmp(ti).visit == TmpIdx::NONE {
+    let tvsi: SlotIdx = tmps[a.base].svisit;
+    if tvsi == SlotIdx::NONE {
         return None;
     }
-
-    Some((SlotIdx(vi.0), a.offset))
+    Some((tvsi, a.offset))
 }
 
-fn load(f: &Fn, r: Ref, x: Bits, ip: i32, sl: &mut [Slot]) {
-    if let Some((si, off)) = slot(f, r) {
-        let s: &mut Slot = &mut sl[si.0 as usize];
+fn load(tmps: &[Tmp], cons: &[Con], r: Ref, x: Bits, ip: i32, sl: &mut [Slot]) {
+    if let Some((si, off)) = slot(tmps, cons, r) {
+        let s: &mut Slot = &mut sl[si];
         s.l |= x << off;
         s.l &= s.m;
         if s.l != 0 {
@@ -242,9 +260,18 @@ fn load(f: &Fn, r: Ref, x: Bits, ip: i32, sl: &mut [Slot]) {
     }
 }
 
-fn store(f: &Fn, r: Ref, x: Bits, ip: i32, bi: BlkIdx, ii: InsIdx, sl: &mut [Slot]) {
-    if let Some((si, off)) = slot(f, r) {
-        let s: &mut Slot = &mut sl[si.0 as usize];
+fn store(
+    tmps: &[Tmp],
+    cons: &[Con],
+    r: Ref,
+    x: Bits,
+    ip: i32,
+    bi: BlkIdx,
+    ii: InsIdx,
+    sl: &mut [Slot],
+) {
+    if let Some((si, off)) = slot(tmps, cons, r) {
+        let s: &mut Slot = &mut sl[si];
         if s.l != 0 {
             radd(&mut s.r, ip);
             s.l &= !(x << off);
@@ -261,15 +288,22 @@ fn scmp(a: &Slot, b: &Slot) -> Ordering {
     a.r.a.cmp(&b.r.a)
 }
 
-fn maxrpo(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx) {
-    let bid = f.blk(bi).id;
-    let mut hd = f.blk_mut(hdi);
-    if hd.loop_ < (bid as i32) {
-        hd.loop_ = bid as i32;
-    }
+fn maxrpo(blks: &Blks, hdi: BlkIdx, bi: BlkIdx) {
+    let b_id = blks.id_of(bi);
+    blks.with_mut(hdi, |hd| {
+        if hd.loop_ < (b_id as i32) {
+            hd.loop_ = b_id as i32;
+        }
+    });
 }
 
 pub fn coalesce(f: &mut Fn) {
+    let blks: &Blks = &f.blks;
+    let rpo: &[BlkIdx] = &f.rpo;
+    let nblk = rpo.len();
+    assert!(nblk == f.nblk as usize);
+    let tmps: &mut [Tmp] = &mut f.tmps;
+    let cons: &[Con] = &f.cons;
     // Range r, *br;
     // Slot *s, *s0, *sl;
     // Blk *b, **ps, *succ[3];
@@ -287,14 +321,15 @@ pub fn coalesce(f: &mut Fn) {
      */
     // nsl = 0;
     let mut sl: Vec<Slot> = vec![];
-    for n in TMP0..f.tmps.len() {
-        let ti: TmpIdx = TmpIdx::new(n as usize);
-        f.tmp_mut(ti).visit = TmpIdx::NONE; // Ugh, this is a slot index in sl here
-        let a: &Alias = &f.tmps[ti].alias;
-        if a.typ == AliasT::ALoc && a.slot == ti/*ai*/ && f.tmp(ti).bid == f.blk(f.start).id {
-            if let AliasU::ALoc(aloc) = a.u {
+    let start_id = blks.borrow(f.start).id;
+    for n in TMP0..tmps.len() {
+        let ti: TmpIdx = TmpIdx::new(n);
+        let t: &mut Tmp = &mut tmps[ti];
+        t.svisit = SlotIdx::NONE;
+        if t.alias.typ == AliasT::ALoc && t.alias.slot == ti && t.bid == start_id {
+            if let AliasU::ALoc(aloc) = t.alias.u {
                 if aloc.sz != -1 {
-                    f.tmp_mut(ti).visit = TmpIdx::new(sl.len()); // TODO - this is NOT a TmpIdx
+                    t.svisit = SlotIdx::new(sl.len());
                     sl.push(Slot {
                         ti,
                         sz: aloc.sz,
@@ -310,89 +345,84 @@ pub fn coalesce(f: &mut Fn) {
     }
 
     /* one-pass liveness analysis */
-    {
-        let mut bi: BlkIdx = f.start;
-        while bi != BlkIdx::NONE {
-            let mut b = f.blk_mut(bi);
-            b.loop_ = -1;
-            bi = b.link;
-        }
-    }
-    loopiter(f, maxrpo);
+    blks.for_each_mut(|b| b.loop_ = -1);
+    loopiter(blks, rpo, maxrpo);
     let mut bl: Vec<(BlkIdx, InsIdx)> = vec![]; // Mmm
     {
-        let mut br: Vec<Range> = vec![Range { a: 0, b: 0 }; f.nblk as usize];
+        let mut br: Vec<Range> = vec![Range { a: 0, b: 0 }; nblk];
         let mut ip: i32 = i32::MAX - 1; // ???
-        for n in (0..f.nblk).rev() {
-            let bi: BlkIdx = f.rpo[n as usize];
-            let (s1, s2) = f.blk(bi).s1_s2();
-            let succ: [BlkIdx; 3] = [s1, s2, BlkIdx::NONE];
-            br[n as usize].b = ip;
-            ip -= 1;
-            for s in &mut sl {
-                s.l = 0;
-                for psi in succ {
-                    if psi == BlkIdx::NONE {
-                        break;
-                    }
-                    let m = f.blk(psi).id;
-                    if m > n && rin(&s.r, br[m as usize].a) {
-                        s.l = s.m;
-                        radd(&mut s.r, ip);
-                    }
-                }
-            }
-            if f.blk(bi).jmp().type_ == J::Jretc {
+        for n in (0..nblk).rev() {
+            let bi: BlkIdx = rpo[n];
+            blks.with(bi, |b| {
+                // TODO - this dedups s1, s2 - does it matter?
+                let succs = b.succs();
+                br[n].b = ip;
                 ip -= 1;
-                load(f, f.blk(bi).jmp().arg, u64::MAX, ip, &mut sl);
-            }
-            for iii in (0..f.blk(bi).ins().len()).rev() {
-                let i: Ins = f.blk(bi).ins()[iii]; // note copy
-                let ii: InsIdx = InsIdx::new(iii);
-                if i.op == O::Oargc {
-                    ip -= 1;
-                    load(f, i.args[1], u64::MAX, ip, &mut sl);
+                for s in &mut sl {
+                    s.l = 0;
+                    for psi in succs {
+                        if psi == BlkIdx::NONE {
+                            break;
+                        }
+                        let m = blks.id_of(psi);
+                        if (m as usize) > n && rin(&s.r, br[m as usize].a) {
+                            s.l = s.m;
+                            radd(&mut s.r, ip);
+                        }
+                    }
                 }
-                if isload(i.op) {
-                    let x: Bits = bit(loadsz(&i) as usize) - 1;
+                if b.jmp().typ == J::Jretc {
                     ip -= 1;
-                    load(f, i.args[0], x, ip, &mut sl);
+                    load(tmps, cons, b.jmp().arg, u64::MAX, ip, &mut sl);
                 }
-                if isstore(i.op) {
-                    let x: Bits = bit(storesz(&i) as usize) - 1;
-                    store(f, i.args[1], x, ip, bi, ii, &mut sl);
-                    ip -= 1;
-                }
-                if i.op == O::Oblit0 {
-                    assert!(f.blk(bi).ins()[iii + 1].op == O::Oblit1); // TODO bounds check
-                    if let RInt(rsval) = f.blk(bi).ins()[iii + 1].args[0] {
-                        let sz: i32 = rsval.abs();
-                        let x: Bits = if sz >= (NBIT as i32) {
-                            u64::MAX
-                        } else {
-                            bit(sz as usize) - 1
-                        };
-                        store(f, i.args[1], x, ip, bi, ii, &mut sl);
+                for iii in (0..b.ins().len()).rev() {
+                    let i: Ins = b.ins()[iii]; // note copy
+                    let ii: InsIdx = InsIdx::new(iii);
+                    if i.op == O::Oargc {
                         ip -= 1;
-                        load(f, i.args[0], x, ip, &mut sl);
-                        bl.push((bi, ii));
-                    } else {
-                        // Oblit1 arg0 MUST be an RInt
-                        assert!(false);
+                        load(tmps, cons, i.args[1], u64::MAX, ip, &mut sl);
+                    }
+                    if isload(i.op) {
+                        let x: Bits = bit(loadsz(&i) as usize) - 1;
+                        ip -= 1;
+                        load(tmps, cons, i.args[0], x, ip, &mut sl);
+                    }
+                    if isstore(i.op) {
+                        let x: Bits = bit(storesz(&i) as usize) - 1;
+                        store(tmps, cons, i.args[1], x, ip, bi, ii, &mut sl);
+                        ip -= 1;
+                    }
+                    if i.op == O::Oblit0 {
+                        assert!(b.ins()[iii + 1].op == O::Oblit1); // TODO bounds check
+                        if let RInt(rsval) = b.ins()[iii + 1].args[0] {
+                            let sz: i32 = rsval.abs();
+                            let x: Bits = if sz >= (NBIT as i32) {
+                                u64::MAX
+                            } else {
+                                bit(sz as usize) - 1
+                            };
+                            store(tmps, cons, i.args[1], x, ip, bi, ii, &mut sl);
+                            ip -= 1;
+                            load(tmps, cons, i.args[0], x, ip, &mut sl);
+                            bl.push((bi, ii));
+                        } else {
+                            // Oblit1 arg0 MUST be an RInt
+                            assert!(false);
+                        }
                     }
                 }
-            }
-            let bloop = f.blk(bi).loop_;
-            for s in &mut sl {
-                if s.l != 0 {
-                    radd(&mut s.r, ip);
-                    if bloop != -1 {
-                        assert!(bloop > n as i32);
-                        radd(&mut s.r, br[bloop as usize].b - 1);
+                let bloop = b.loop_;
+                for s in &mut sl {
+                    if s.l != 0 {
+                        radd(&mut s.r, ip);
+                        if bloop != -1 {
+                            assert!(bloop > n as i32);
+                            radd(&mut s.r, br[bloop as usize].b - 1);
+                        }
                     }
                 }
-            }
-            br[n as usize].a = ip;
+                br[n as usize].a = ip;
+            });
         }
     }
 
@@ -468,8 +498,8 @@ pub fn coalesce(f: &mut Fn) {
                         UseT::UJmp => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
                             let b = f.blk_mut(bi);
-                            assert!(isret(b.jmp().type_));
-                            b.jmp_mut().type_ = J::Jret0;
+                            assert!(isret(b.jmp().typ));
+                            b.jmp_mut().typ = J::Jret0;
                             b.jmp_mut().arg = R;
                         }
                         UseT::UIns(ii) => {
@@ -515,7 +545,7 @@ pub fn coalesce(f: &mut Fn) {
         if sl[s0i].si != SlotIdx::NONE {
             continue;
         }
-        sl[s0i].si = SlotIdx(s0i as u32);
+        sl[s0i].si = SlotIdx::new(s0i);
         let mut r: Range = sl[s0i].r;
         for si in (s0i + 1)..sl.len() {
             if sl[si].si != SlotIdx::NONE || sl[si].r.b == 0 {
@@ -526,14 +556,14 @@ pub fn coalesce(f: &mut Fn) {
                  * by 'goto Skip;' if need be
                  */
                 for mi in s0i..si {
-                    if sl[mi].si == SlotIdx(s0i as u32) && rovlap(&sl[mi].r, &sl[si].r) {
+                    if sl[mi].si == SlotIdx::new(s0i) && rovlap(&sl[mi].r, &sl[si].r) {
                         continue 'outer;
                     }
                 }
             }
             radd(&mut r, sl[si].r.a);
             radd(&mut r, sl[si].r.b - 1);
-            sl[si].si = SlotIdx(s0i as u32);
+            sl[si].si = SlotIdx::new(s0i);
             _fused += sl[si].sz;
         }
     }
@@ -548,12 +578,12 @@ pub fn coalesce(f: &mut Fn) {
              * reset it before the slot()
              * calls below
              */
-            t.visit = TmpIdx::new(si); // Not actually a TmpIdx here :(
+            t.svisit = SlotIdx::new(si); // Not actually a TmpIdx here :(
             assert!(t.ndef == 1 && t.def != InsIdx::NONE);
             (t.def, t.bid)
         };
         let t_def_bi: BlkIdx = f.rpo[t_bid as usize];
-        if sl[si].si == SlotIdx(si as u32) {
+        if sl[si].si == SlotIdx::new(si) {
             continue;
         }
         f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, R);

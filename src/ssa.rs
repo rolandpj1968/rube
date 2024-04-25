@@ -148,7 +148,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         let ti: TmpIdx = TmpIdx::new(tii);
         {
             let t: &mut Tmp = &mut tmps[ti];
-            t.visit = TmpIdx::NONE;
+            t.tvisit = TmpIdx::NONE;
             if t.phi != TmpIdx::NONE {
                 continue;
             }
@@ -204,7 +204,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         }
         let defs: BSet = u.clone();
         while bp != be {
-            tmps[ti].visit = ti;
+            tmps[ti].tvisit = ti;
             let bi: BlkIdx = blist[bp];
             bp += 1;
             bsclr(&mut u, blks.borrow(bi).id as usize);
@@ -278,12 +278,12 @@ fn rendef(
     assert!(r == R || matches!(r, RTmp(_)));
     match r {
         RTmp(ti) => {
-            if tmps[ti].visit == TmpIdx::NONE {
+            if tmps[ti].tvisit == TmpIdx::NONE {
                 return r;
             }
             let r1: Ref = refindex(tmps, ti);
             if let RTmp(t1i) = r1 {
-                tmps[t1i].visit = ti;
+                tmps[t1i].tvisit = ti;
                 let ni: NameIdx = nnew(r1, bi, namel, names, stk[ti.0 as usize]);
                 stk[ti.0 as usize] = ni;
             }
@@ -339,7 +339,7 @@ fn renblk(
             for m in 0..2 {
                 let arg = b.ins()[ii].args[m];
                 if let RTmp(ti) = arg {
-                    if tmps[ti].visit != TmpIdx::NONE {
+                    if tmps[ti].tvisit != TmpIdx::NONE {
                         let new_arg = getstk(blks, bi, ti, namel, names, stk);
                         b.ins_mut()[ii].args[m] = new_arg;
                     }
@@ -350,7 +350,7 @@ fn renblk(
         }
         let jmp_arg: Ref = b.jmp().arg;
         if let RTmp(ti) = jmp_arg {
-            if tmps[ti].visit != TmpIdx::NONE {
+            if tmps[ti].tvisit != TmpIdx::NONE {
                 b.jmp_mut().arg = getstk(blks, bi, ti, namel, names, stk);
             }
         }
@@ -366,7 +366,7 @@ fn renblk(
             let p: &mut Phi = &mut phis[pi];
             assert!(matches!(p.to, RTmp(_)));
             if let RTmp(to_ti) = p.to {
-                let ti: TmpIdx = tmps[to_ti].visit;
+                let ti: TmpIdx = tmps[to_ti].tvisit;
                 if ti != TmpIdx::NONE {
                     let arg: Ref = getstk(blks, bi, ti, namel, names, stk);
                     p.args.push(arg);
@@ -540,7 +540,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
 
 fn ssacheck_err(f: &Fn, t: &Tmp, bui: BlkIdx) -> Box<SsaError> {
     Box::new(SsaError::new(&{
-        if t.visit != TmpIdx::NONE {
+        if t.tvisit != TmpIdx::NONE {
             format!("%{} violates ssa invariant", to_s(&t.name))
         } else {
             format!(

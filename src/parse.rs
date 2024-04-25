@@ -1040,15 +1040,15 @@ impl Parser<'_> {
             // New block
             Token::Tlbl => {
                 let new_bi: BlkIdx = self.findblk(curf, &tv.as_str());
-                if self.cur_bi != BlkIdx::NONE && curf.blk(self.cur_bi).jmp().type_ == J::Jxxx {
+                if self.cur_bi != BlkIdx::NONE && curf.blk(self.cur_bi).jmp().typ == J::Jxxx {
                     self.closeblk(curf);
                     let mut curb = curf.blk_mut(self.cur_bi);
-                    curb.jmp_mut().type_ = J::Jjmp;
+                    curb.jmp_mut().typ = J::Jjmp;
                     curb.s1 = new_bi;
                 }
                 {
                     let new_b = curf.blk(new_bi);
-                    if new_b.jmp().type_ != J::Jxxx {
+                    if new_b.jmp().typ != J::Jxxx {
                         return Err(self.err(&format!(
                             "multiple definitions of block @{}",
                             to_s(&new_b.name),
@@ -1069,14 +1069,14 @@ impl Parser<'_> {
             }
             // Return instruction - ends block
             Token::Tret => {
-                curf.blk_mut(self.cur_bi).jmp_mut().type_ = match ret_for_cls(self.rcls) {
+                curf.blk_mut(self.cur_bi).jmp_mut().typ = match ret_for_cls(self.rcls) {
                     None => {
                         return Err(self.err(&format!("BUG: invalid type {:?} for ret", self.rcls)))
                     }
                     Some(j) => j,
                 };
                 if self.peek_tok()? == Token::Tnl {
-                    curf.blk_mut(self.cur_bi).jmp_mut().type_ = J::Jret0; // is this necessary?
+                    curf.blk_mut(self.cur_bi).jmp_mut().typ = J::Jret0; // is this necessary?
                 } else if self.rcls != K0 {
                     let r: Ref = self.parseref(curf)?;
                     if r == R {
@@ -1089,9 +1089,9 @@ impl Parser<'_> {
             // Jump instruction - ends block
             Token::Tjmp | Token::Tjnz => {
                 if t == Token::Tjmp {
-                    curf.blk_mut(self.cur_bi).jmp_mut().type_ = J::Jjmp;
+                    curf.blk_mut(self.cur_bi).jmp_mut().typ = J::Jjmp;
                 } else {
-                    curf.blk_mut(self.cur_bi).jmp_mut().type_ = J::Jjnz;
+                    curf.blk_mut(self.cur_bi).jmp_mut().typ = J::Jjnz;
                     let r: Ref = self.parseref(curf)?;
                     if let R = r {
                         return Err(self.err("invalid argument for jnz jump"));
@@ -1101,7 +1101,7 @@ impl Parser<'_> {
                 }
                 let name = self.expect(Token::Tlbl)?.as_str();
                 curf.blk_mut(self.cur_bi).s1 = self.findblk(curf, &name);
-                if curf.blk(self.cur_bi).jmp().type_ != J::Jjmp {
+                if curf.blk(self.cur_bi).jmp().typ != J::Jjmp {
                     self.expect(Token::Tcomma)?;
                     let name = self.expect(Token::Tlbl)?.as_str();
                     curf.blk_mut(self.cur_bi).s2 = self.findblk(curf, &name);
@@ -1114,7 +1114,7 @@ impl Parser<'_> {
             }
             // Halt instruction - ends block
             Token::Thlt => {
-                curf.blk_mut(self.cur_bi).jmp_mut().type_ = J::Jhlt;
+                curf.blk_mut(self.cur_bi).jmp_mut().typ = J::Jhlt;
                 goto_close = true;
             }
             // Debug line/column location tag
@@ -1442,17 +1442,17 @@ impl Parser<'_> {
 
             let mut goto_jerr: bool = false;
             let r: &Ref = &b.jmp().arg;
-            if isret(b.jmp().type_) {
+            if isret(b.jmp().typ) {
                 // This must succeed after isret()
                 // TODO - QBE handling of jret0 seems odd
-                if b.jmp().type_ != J::Jret0 {
-                    let k: K = cls_for_ret(b.jmp().type_).unwrap();
+                if b.jmp().typ != J::Jret0 {
+                    let k: K = cls_for_ret(b.jmp().typ).unwrap();
                     if !usecheck(fn_, r, k) {
                         goto_jerr = true;
                     }
                 }
             }
-            if b.jmp().type_ == J::Jjnz && !usecheck(fn_, r, Kw) {
+            if b.jmp().typ == J::Jjnz && !usecheck(fn_, r, Kw) {
                 goto_jerr = true;
             }
             if goto_jerr {
@@ -1468,13 +1468,13 @@ impl Parser<'_> {
                 }
             }
 
-            if b.s1 != BlkIdx::NONE && fn_.blk(b.s1).jmp().type_ == J::Jxxx {
+            if b.s1 != BlkIdx::NONE && fn_.blk(b.s1).jmp().typ == J::Jxxx {
                 return Err(self.err(&format!(
                     "block @{} is used undefined",
                     to_s(&fn_.blk(b.s1).name)
                 )));
             }
-            if b.s2 != BlkIdx::NONE && fn_.blk(b.s2).jmp().type_ == J::Jxxx {
+            if b.s2 != BlkIdx::NONE && fn_.blk(b.s2).jmp().typ == J::Jxxx {
                 return Err(self.err(&format!(
                     "block @{} is used undefined",
                     to_s(&fn_.blk(b.s2).name)
@@ -1538,7 +1538,7 @@ impl Parser<'_> {
         }
         if self.cur_bi == BlkIdx::NONE {
             return Err(self.err("empty function"));
-        } else if curf.blk(self.cur_bi).jmp().type_ == J::Jxxx {
+        } else if curf.blk(self.cur_bi).jmp().typ == J::Jxxx {
             return Err(self.err("last block misses jump"));
         }
 
@@ -2119,7 +2119,7 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             let _ = writeln!(f);
         }
         let mut skip_writeln: bool = false;
-        match b.jmp().type_ {
+        match b.jmp().typ {
             J::Jret0
             | J::Jretsb
             | J::Jretub
@@ -2130,12 +2130,12 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             | J::Jrets
             | J::Jretd
             | J::Jretc => {
-                let _ = write!(f, "\t{}", JTOA[b.jmp().type_ as usize]);
-                if b.jmp().type_ != J::Jret0 || b.jmp().arg != R {
+                let _ = write!(f, "\t{}", JTOA[b.jmp().typ as usize]);
+                if b.jmp().typ != J::Jret0 || b.jmp().arg != R {
                     let _ = write!(f, " ");
                     printref(f, fn_, typ, itbl, b.jmp().arg);
                 }
-                if b.jmp().type_ == J::Jretc {
+                if b.jmp().typ == J::Jretc {
                     let _ = write!(f, ", :{}", to_s(&typ[fn_.retty.0 as usize].name));
                 }
             }
@@ -2150,8 +2150,8 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                 }
             }
             _ => {
-                let _ = write!(f, "\t{} ", JTOA[b.jmp().type_ as usize]);
-                if b.jmp().type_ == J::Jjnz {
+                let _ = write!(f, "\t{} ", JTOA[b.jmp().typ as usize]);
+                if b.jmp().typ == J::Jjnz {
                     printref(f, fn_, typ, itbl, b.jmp().arg);
                     let _ = write!(f, ", ");
                 }

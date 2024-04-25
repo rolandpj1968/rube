@@ -1,5 +1,3 @@
-use std::cell;
-
 use crate::all::{Blk, BlkIdx, Blks, Fn, Phi, PhiIdx};
 
 // Not pretty - would be better if s1, s2 were [BlkIndex; 2]
@@ -249,42 +247,30 @@ pub fn fillfron(f: &mut Fn) {
     }
 }
 
-fn loopmark(f: &mut Fn, hdi: BlkIdx, bi: BlkIdx, func: fn(&mut Fn, BlkIdx, BlkIdx)) {
-    {
-        let hd = f.blk(hdi);
-        let b = f.blk(bi);
-        if b.id < hd.id || b.visit == hd.id {
-            return;
-        }
+fn loopmark(blks: &Blks, hdi: BlkIdx, bi: BlkIdx, func: fn(&Blks, BlkIdx, BlkIdx)) {
+    let (hd_id, b_id, b_visit) = (blks.id_of(hdi), blks.id_of(bi), blks.visit_of(bi));
+    if b_id < hd_id || b_visit == hd_id {
+        return;
     }
-    f.blk_mut(bi).visit = f.blk(hdi).id;
-    func(f, hdi, bi);
-    let preds_len = f.blk(bi).preds.len();
-    for p in 0..preds_len
-    /*f.blk(bi).preds.len()*/
-    {
-        let predi: BlkIdx = f.blk(bi).preds[p];
-        loopmark(f, hdi, predi, func);
+    blks.with_mut(bi, |b| b.visit = hd_id);
+    func(blks, hdi, bi);
+    let preds_len = blks.with(bi, |b| b.preds.len());
+    for p in 0..preds_len {
+        let predi: BlkIdx = blks.with(bi, |b| b.preds[p]);
+        loopmark(blks, hdi, predi, func);
     }
 }
 
-pub fn loopiter(f: &mut Fn, func: fn(&mut Fn, BlkIdx, BlkIdx)) {
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
-        let mut b: cell::RefMut<Blk> = f.blk_mut(bi);
-        b.visit = u32::MAX;
-        bi = b.link;
-    }
+pub fn loopiter(blks: &Blks, rpo: &[BlkIdx], func: fn(&Blks, BlkIdx, BlkIdx)) {
+    blks.for_each_mut(|b| b.visit = u32::MAX);
 
-    for n in 0..f.rpo.len() {
-        let bi: BlkIdx = f.rpo[n];
-        let preds_len = f.blk(bi).preds.len();
-        for p in 0..preds_len
-        /*0..f.blk(bi).preds.len()*/
-        {
-            let predi: BlkIdx = f.blk(bi).preds[p];
-            if f.blk(predi).id >= n as u32 {
-                loopmark(f, bi, predi, func);
+    for n in 0..rpo.len() {
+        let bi: BlkIdx = rpo[n];
+        let preds_len = blks.with(bi, |b| b.preds.len());
+        for p in 0..preds_len {
+            let predi: BlkIdx = blks.with(bi, |b| b.preds[p]);
+            if blks.id_of(predi) >= n as u32 {
+                loopmark(blks, bi, predi, func);
             }
         }
     }

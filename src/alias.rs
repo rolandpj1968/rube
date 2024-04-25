@@ -257,7 +257,7 @@ pub fn fillalias(f: &mut Fn) {
                 store(tmps, i.args[1], storesz(&i));
             }
         }
-        if b.jmp().type_ != J::Jretc {
+        if b.jmp().typ != J::Jretc {
             let jmp_arg = b.jmp().arg;
             esc(tmps, jmp_arg);
         }
