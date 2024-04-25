@@ -118,13 +118,19 @@ impl Blks {
     }
 
     pub fn for_each_bi(&self, mut f: impl FnMut(BlkIdx)) {
-        let len = self.len();
-        for bii in 0..len {
-            let is_dead = self.v[bii].borrow().is_dead;
-            if !is_dead {
-                f(BlkIdx::new(bii));
-            }
+        let mut bi = BlkIdx::START;
+        while bi != BlkIdx::NONE {
+            f(bi);
+            bi = self.borrow(bi).link;
         }
+        // TODO - this generates blks in a different order from the link chain :(
+        // let len = self.len();
+        // for bii in 0..len {
+        //     let is_dead = self.v[bii].borrow().is_dead;
+        //     if !is_dead {
+        //         f(BlkIdx::new(bii));
+        //     }
+        // }
     }
 
     pub fn id_of(&self, bi: BlkIdx) -> u32 {
@@ -867,6 +873,10 @@ impl Blk {
 pub struct BlkTag();
 // Index into Fn::blks
 pub type BlkIdx = Idx<BlkTag>;
+
+impl BlkIdx {
+    const START: BlkIdx = BlkIdx::new(0);
+}
 
 impl Index<BlkIdx> for [Blk] {
     type Output = Blk;

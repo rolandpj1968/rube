@@ -80,6 +80,31 @@ fn rporec(blks: &Blks, bi: BlkIdx, mut x: u32) -> u32 {
     x.wrapping_sub(1)
 }
 
+use crate::all::to_s;
+fn printlives(start: BlkIdx, blks: &Blks) {
+    //let blks = &f.blks;
+    println!("live blocks according to is_dead");
+    blks.for_each_bi(|bi| {
+        println!(
+            "    {:?} id {} {}",
+            bi,
+            blks.borrow(bi).id,
+            to_s(&blks.borrow(bi).name)
+        );
+    });
+    println!("live blocks according to link");
+    let mut bi = start;
+    while bi != BlkIdx::NONE {
+        println!(
+            "    {:?} id {} {}",
+            bi,
+            blks.borrow(bi).id,
+            to_s(&blks.borrow(bi).name)
+        );
+        bi = blks.borrow(bi).link;
+    }
+}
+
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
     let blks = &f.blks;
@@ -92,8 +117,7 @@ pub fn fillrpo(f: &mut Fn) {
     f.nblk -= n;
     f.rpo = vec![BlkIdx::NONE; f.nblk as usize];
     let mut prev_bi = BlkIdx::NONE;
-    let mut bi = f.start;
-    while bi != BlkIdx::NONE {
+    blks.for_each_bi(|bi| {
         let (id, succs, link) = blks.with(bi, |b| (b.id, b.succs(), b.link));
         if id == u32::MAX {
             // Unreachable Blk
@@ -107,8 +131,7 @@ pub fn fillrpo(f: &mut Fn) {
                 prev_bi = bi;
             });
         }
-        bi = link;
-    }
+    });
 }
 
 /* for dominators computation, read
