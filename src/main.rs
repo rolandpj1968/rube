@@ -31,7 +31,7 @@ use all::{Dat, Fn, Target, Typ};
 use amd64::targ::T_AMD64_SYSV;
 use cfg::fillrpo;
 use load::loadopt;
-use mem::promote;
+use mem::{coalesce, promote};
 use parse::{parse, printfn};
 use ssa::{filluse, ssa};
 use util::Bucket;
@@ -65,6 +65,7 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     loadopt(f /*, typ, itbl*/);
     filluse(f);
     fillalias(f);
+    coalesce(f);
 
     printfn(&mut stdout(), f, typ, itbl);
 }

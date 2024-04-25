@@ -98,7 +98,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
         }
 
         /* get rid of the alloc and replace uses */
-        blks.borrow_mut(bi).ins_mut()[ii] = Ins::new0(O::Onop, Kw, R);
+        blks.borrow_mut(bi).ins_mut()[ii] = Ins::NOP;
         t.ndef -= 1;
 
         for u in &t.uses {
@@ -303,6 +303,10 @@ pub fn coalesce(f: &mut Fn) {
     assert!(nblk == f.nblk as usize);
     let cons: &[Con] = &f.cons;
 
+    let mut total: i32 = 0;
+    let mut freed: i32 = 0;
+    let mut fused: i32 = 0;
+
     /* minimize the stack usage
      * by coalescing slots
      */
@@ -433,17 +437,15 @@ pub fn coalesce(f: &mut Fn) {
         }
 
         /* kill slots with an empty live range */
-        let mut _total: i32 = 0;
-        let mut _freed: i32 = 0;
         let mut stk: Vec<TmpIdx> = vec![];
         //let n: usize = 0;
         let mut s0: usize = 0;
         // TODO - use retain_mut()
         for s in 0..sl.len() {
-            _total += sl[s].sz;
+            total += sl[s].sz;
             if sl[s].r.b == 0 {
                 stk.push(sl[s].ti);
-                _freed += sl[s].sz;
+                freed += sl[s].sz;
             } else {
                 sl[s0] = sl[s].clone(); // Ugh, cloning for vec st
                 s0 += 1;
@@ -532,7 +534,6 @@ pub fn coalesce(f: &mut Fn) {
         // /* fuse slots by decreasing size */
         sl.sort_by(scmp);
         // qsort(sl, nsl, sizeof *sl, scmp);
-        let mut _fused: i32 = 0;
         'outer: for s0i in 0..sl.len() {
             if sl[s0i].si != SlotIdx::NONE {
                 continue;
@@ -556,7 +557,7 @@ pub fn coalesce(f: &mut Fn) {
                 radd(&mut r, sl[si].r.a);
                 radd(&mut r, sl[si].r.b - 1);
                 sl[si].si = SlotIdx::new(s0i);
-                _fused += sl[si].sz;
+                fused += sl[si].sz;
             }
         }
     }
@@ -663,31 +664,31 @@ pub fn coalesce(f: &mut Fn) {
             }
         });
     }
-    // vfree(bl);
 
-    // if (debug['M']) {
-    //     for (s0=sl; s0<&sl[nsl]; s0++) {
-    //         if (s0.s != s0)
-    //             continue;
-    //         fprintf(stderr, "\tfuse (% 3db) [", s0.sz);
-    //         for (s=s0; s<&sl[nsl]; s++) {
-    //             if (s.s != s0)
-    //                 continue;
-    //             fprintf(stderr, " %%%s", f.tmp[s.t].name);
-    //             if (s.r.b)
-    //                 fprintf(stderr, "[%d,%d)",
-    //                     s.r.a-ip, s.r.b-ip);
-    //             else
-    //                 fputs("{}", stderr);
-    //         }
-    //         fputs(" ]\n", stderr);
-    //     }
-    //     fprintf(stderr, "\tsums %u/%u/%u (killed/fused/total)\n\n",
-    //         freed, fused, total);
-    //     printfn(f, stderr);
-    // }
-
-    // for (s=sl; s<&sl[nsl]; s++)
-    //     vfree(s.st);
-    // vfree(sl);
+    if true
+    /*TODO debug['M']*/
+    {
+        // for (s0=sl; s0<&sl[nsl]; s0++) {
+        //     if (s0.s != s0)
+        //         continue;
+        //     fprintf(stderr, "\tfuse (% 3db) [", s0.sz);
+        //     for (s=s0; s<&sl[nsl]; s++) {
+        //         if (s.s != s0)
+        //             continue;
+        //         fprintf(stderr, " %%%s", f.tmp[s.t].name);
+        //         if (s.r.b)
+        //             fprintf(stderr, "[%d,%d)",
+        //                 s.r.a-ip, s.r.b-ip);
+        //         else
+        //             fputs("{}", stderr);
+        //     }
+        //     fputs(" ]\n", stderr);
+        // }
+        /*e*/
+        println!(
+            "\tsums {}/{}/{} (killed/fused/total)\n",
+            freed, fused, total
+        );
+        //printfn(f, stderr);
+    }
 }
