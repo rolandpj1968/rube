@@ -71,7 +71,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
             }
 
             for u in &t.uses {
-                if let UseT::UIns(li) = u.type_ {
+                if let UseT::UIns(li) = u.typ {
                     let ub = blks.borrow(u.bi);
                     let l: &Ins = &ub.ins()[li];
                     if isload(l.op) {
@@ -105,8 +105,8 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
             let ub = blks.borrow_mut(u.bi);
             let mut ub_ins = ub.ins_mut();
             let l: &mut Ins = {
-                assert!(matches!(u.type_, UseT::UIns(_)));
-                if let UseT::UIns(li) = u.type_ {
+                assert!(matches!(u.typ, UseT::UIns(_)));
+                if let UseT::UIns(li) = u.typ {
                     &mut ub_ins/*ub.ins_mut()*/[li]
                 } else {
                     continue;
@@ -483,29 +483,25 @@ pub fn coalesce(f: &mut Fn) {
         match stk.pop() {
             None => break,
             Some(ti) => {
-                let (t_def_ii, t_def_bi) = {
-                    let t: &Tmp = &tmps[ti];
-                    assert!(t.ndef == 1 && t.def != InsIdx::NONE);
-                    (t.def, f.rpo[t.bid as usize])
-                };
+                let t: &Tmp = &tmps[ti];
+                assert!(t.ndef == 1 && t.def != InsIdx::NONE);
+                let def_bi = f.rpo[t.bid as usize];
                 let mut is_load = false;
-                blks.with_mut(t_def_bi, |b| {
-                    let i: Ins = b.ins()[t_def_ii]; /* Note - copy */
+                blks.with_mut(def_bi, |b| {
+                    let i: &mut Ins = &mut b.ins_mut()[t.def];
                     if isload(i.op) {
-                        f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] =
-                            Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
+                        *i = Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
                         is_load = true;
                     } else {
-                        f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] =
-                            Ins::new0(O::Onop, Kx, R);
+                        *i = Ins::new0(O::Onop, Kx, R);
                     }
                 });
                 if is_load {
                     continue;
                 }
-                for ui in 0..tmps[ti].uses.len() {
-                    let u: Use = tmps[ti].uses[ui]; // Note - copy
-                    match u.type_ {
+                for u in &t.uses {
+                    assert!(!matches!(u.typ, UseT::UPhi(_)));
+                    match u.typ {
                         UseT::UJmp => {
                             let bi: BlkIdx = f.rpo[u.bid as usize];
                             let b = f.blk_mut(bi);
@@ -539,9 +535,7 @@ pub fn coalesce(f: &mut Fn) {
                                 }
                             }
                         }
-                        _ => {
-                            assert!(false);
-                        }
+                        _ => (),
                     }
                 }
             }

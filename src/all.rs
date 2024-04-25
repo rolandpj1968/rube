@@ -918,6 +918,41 @@ impl IndexMut<BlkIdx> for Vec<Blk> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RpoTag();
+// Index into Fn::rpj
+pub type RpoIdx = Idx<RpoTag>;
+
+impl Index<RpoIdx> for [BlkIdx] {
+    type Output = BlkIdx;
+    fn index(&self, index: RpoIdx) -> &Self::Output {
+        debug_assert!(index != RpoIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl Index<&RpoIdx> for [BlkIdx] {
+    type Output = BlkIdx;
+    fn index(&self, index: &RpoIdx) -> &Self::Output {
+        debug_assert!(*index != RpoIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<RpoIdx> for [BlkIdx] {
+    fn index_mut(&mut self, index: RpoIdx) -> &mut Self::Output {
+        debug_assert!(index != RpoIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+impl IndexMut<&RpoIdx> for [BlkIdx] {
+    fn index_mut(&mut self, index: &RpoIdx) -> &mut Self::Output {
+        debug_assert!(*index != RpoIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
 /*
 struct Use {
     enum {
@@ -946,7 +981,7 @@ pub enum UseT {
 
 #[derive(new, Clone, Copy, Debug)]
 pub struct Use {
-    pub type_: UseT,
+    pub typ: UseT,
     pub bi: BlkIdx, // TODO - need this to access type_ PhiIdx or InsIdx, but now bid is redundant
     pub bid: u32,
 }

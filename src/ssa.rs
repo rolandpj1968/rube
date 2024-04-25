@@ -493,7 +493,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                 for u in &t.uses {
                     let bui: BlkIdx = rpo[u.bid as usize];
 
-                    if let UseT::UPhi(upi) = u.type_ {
+                    if let UseT::UPhi(upi) = u.typ {
                         if phicheck(blks, &phis[upi], bi, r) {
                             return Err(ssacheck_err(f, t, bui));
                         }
@@ -508,7 +508,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                         let t: &Tmp = &tmps[ti];
                         for u in &t.uses {
                             let bui: BlkIdx = rpo[u.bid as usize];
-                            match u.type_ {
+                            match u.typ {
                                 UseT::UPhi(upi) => {
                                     if phicheck(blks, &phis[upi], bi, r) {
                                         return Err(ssacheck_err(f, t, bui));
