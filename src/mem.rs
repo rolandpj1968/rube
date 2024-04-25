@@ -8,8 +8,8 @@ use crate::all::Ref::{RInt, RTmp, R};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{
     bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Blks,
-    Con, Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, K, NBIT, O,
-    OALLOC, OALLOC1, TMP0, UNDEF,
+    Con, Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, UseT, CON_Z, J, K, NBIT, O, OALLOC,
+    OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
@@ -291,8 +291,9 @@ fn scmp(a: &Slot, b: &Slot) -> Ordering {
 fn maxrpo(blks: &Blks, hdi: BlkIdx, bi: BlkIdx) {
     let b_id = blks.id_of(bi);
     blks.with_mut(hdi, |hd| {
-        if hd.loop_ < (b_id as i32) {
-            hd.loop_ = b_id as i32;
+        // Ugh, fixme
+        if hd.loop_ < (b_id.usize() as i32) {
+            hd.loop_ = b_id.usize() as i32;
         }
     });
 }
@@ -368,7 +369,7 @@ pub fn coalesce(f: &mut Fn) {
                             break;
                         }
                         let m = blks.id_of(psi);
-                        if (m as usize) > n && rin(&s.r, br[m as usize].a) {
+                        if (m.usize()) > n && rin(&s.r, br[m.usize()].a) {
                             s.l = s.m;
                             radd(&mut s.r, ip);
                         }
@@ -485,7 +486,7 @@ pub fn coalesce(f: &mut Fn) {
             Some(ti) => {
                 let t: &Tmp = &tmps[ti];
                 assert!(t.ndef == 1 && t.def != InsIdx::NONE);
-                let def_bi = f.rpo[t.bid as usize];
+                let def_bi = f.rpo[t.bid];
                 let mut is_load = false;
                 blks.with_mut(def_bi, |b| {
                     let i: &mut Ins = &mut b.ins_mut()[t.def];
@@ -503,14 +504,14 @@ pub fn coalesce(f: &mut Fn) {
                     assert!(!matches!(u.typ, UseT::UPhi(_)));
                     match u.typ {
                         UseT::UJmp => {
-                            let bi: BlkIdx = f.rpo[u.bid as usize];
+                            let bi: BlkIdx = f.rpo[u.bid];
                             let b = f.blk_mut(bi);
                             assert!(isret(b.jmp().typ));
                             b.jmp_mut().typ = J::Jret0;
                             b.jmp_mut().arg = R;
                         }
                         UseT::UIns(ii) => {
-                            let bi: BlkIdx = f.rpo[u.bid as usize];
+                            let bi: BlkIdx = f.rpo[u.bid];
                             let b = f.blk_mut(bi);
                             let i: Ins = b.ins()[ii.0 as usize]; // Note - copy
                             match i.to {

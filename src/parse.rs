@@ -14,8 +14,8 @@ use crate::all::Ref::{RCall, RCon, RInt, RMem, RSlot, RTmp, RTyp, R};
 use crate::all::K::{Kc, Kd, Ke, Kl, Ks, Ksb, Ksh, Kub, Kuh, Kw, Kx, K0};
 use crate::all::{
     bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT,
-    Dat, DatT, DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp,
-    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0, TMP0IDX,
+    Dat, DatT, DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx, RubeResult, Sym, SymT,
+    Target, Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0, TMP0IDX,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -978,7 +978,7 @@ impl Parser<'_> {
             bi = b.dlink;
         }
 
-        let id: u32 = curf.blks.len() as u32; // TODO - is this value used???
+        let id = RpoIdx::new(curf.blks.len()); // TODO - is this value used???
         bi = curf.add_blk(Blk::new(name, id, self.blkh[h as usize]));
         self.blkh[h as usize] = bi;
 

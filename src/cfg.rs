@@ -1,4 +1,4 @@
-use crate::all::{Blk, BlkIdx, Blks, Fn, Phi, PhiIdx};
+use crate::all::{Blk, BlkIdx, Blks, Fn, Phi, PhiIdx, RpoIdx};
 
 // Not pretty - would be better if s1, s2 were [BlkIndex; 2]
 fn succsdel(b: &mut Blk, bdi: BlkIdx) {
@@ -48,8 +48,8 @@ pub fn fillpreds(f: &Fn) {
     });
 }
 
-fn rporec(blks: &Blks, bi: BlkIdx, mut x: u32) -> u32 {
-    if bi == BlkIdx::NONE || blks.borrow(bi).id != u32::MAX {
+fn rporec(blks: &Blks, bi: BlkIdx, mut x: RpoIdx) -> RpoIdx {
+    if bi == BlkIdx::NONE || blks.id_of(bi) != RpoIdx::NONE {
         return x;
     }
 
@@ -63,19 +63,19 @@ fn rporec(blks: &Blks, bi: BlkIdx, mut x: u32) -> u32 {
     });
 
     let succs = blks.with_mut(bi, |b| {
-        b.id = 1;
+        b.id = RpoIdx::new(1); // placeholder
         if swap_succs {
             (b.s1, b.s2) = (b.s2, b.s1);
         }
         b.succs()
     });
     succs.iter().for_each(|si| x = rporec(blks, *si, x));
-    assert!(x != u32::MAX);
+    assert!(x != RpoIdx::NONE);
 
     blks.with_mut(bi, |b| b.id = x);
 
     // Deliberately wraps to u32:MAX
-    x.wrapping_sub(1)
+    x.prev()
 }
 
 use crate::all::to_s;
@@ -86,7 +86,7 @@ fn printlives(start: BlkIdx, blks: &Blks) {
         println!(
             "    {:?} id {} {}",
             bi,
-            blks.borrow(bi).id,
+            blks.id_of(bi).0,
             to_s(&blks.borrow(bi).name)
         );
     });
@@ -96,7 +96,7 @@ fn printlives(start: BlkIdx, blks: &Blks) {
         println!(
             "    {:?} id {} {}",
             bi,
-            blks.borrow(bi).id,
+            blks.id_of(bi).0,
             to_s(&blks.borrow(bi).name)
         );
         bi = blks.borrow(bi).link;
@@ -108,24 +108,26 @@ pub fn fillrpo(f: &mut Fn) {
     let blks = &f.blks;
     let phis: &mut [Phi] = &mut f.phis;
 
-    blks.for_each_mut(|b| b.id = u32::MAX);
+    blks.for_each_mut(|b| b.id = RpoIdx::NONE);
 
+    let mut x = RpoIdx::new((f.nblk as usize) - 1);
     // Deliberately wraps from u32::MAX
-    let n: u32 = rporec(blks, f.start, f.nblk - 1).wrapping_add(1);
-    f.nblk -= n;
+    x = rporec(blks, f.start, x);
+    let n = x.next().usize();
+    f.nblk -= n as u32;
     f.rpo = vec![BlkIdx::NONE; f.nblk as usize];
     let mut prev_bi = BlkIdx::NONE;
     blks.for_each_bi(|bi| {
         let (id, succs, link) = blks.with(bi, |b| (b.id, b.succs(), b.link));
-        if id == u32::MAX {
+        if id == RpoIdx::NONE {
             // Unreachable Blk
             succs.iter().for_each(|si| edgedel(blks, phis, bi, *si));
             blks.with_mut(prev_bi, |pb| pb.link = link);
             blks.with_mut(bi, |b| b.is_dead = true);
         } else {
             blks.with_mut(bi, |b| {
-                b.id -= n;
-                f.rpo[b.id as usize] = bi;
+                b.id = RpoIdx::new(b.id.usize() - n);
+                f.rpo[b.id] = bi;
                 prev_bi = bi;
             });
         }
@@ -262,14 +264,14 @@ fn loopmark(blks: &Blks, hdi: BlkIdx, bi: BlkIdx, func: fn(&Blks, BlkIdx, BlkIdx
 }
 
 pub fn loopiter(blks: &Blks, rpo: &[BlkIdx], func: fn(&Blks, BlkIdx, BlkIdx)) {
-    blks.for_each_mut(|b| b.visit = u32::MAX);
+    blks.for_each_mut(|b| b.visit = RpoIdx::NONE);
 
     for n in 0..rpo.len() {
         let bi: BlkIdx = rpo[n];
         let preds_len = blks.with(bi, |b| b.preds.len());
         for p in 0..preds_len {
             let predi: BlkIdx = blks.with(bi, |b| b.preds[p]);
-            if blks.id_of(predi) >= n as u32 {
+            if blks.id_of(predi).usize() >= n {
                 loopmark(blks, bi, predi, func);
             }
         }

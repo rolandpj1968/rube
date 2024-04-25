@@ -139,7 +139,7 @@ impl Blks {
         // }
     }
 
-    pub fn id_of(&self, bi: BlkIdx) -> u32 {
+    pub fn id_of(&self, bi: BlkIdx) -> RpoIdx {
         self.borrow(bi).id
     }
     pub fn dom_of(&self, bi: BlkIdx) -> BlkIdx {
@@ -157,7 +157,7 @@ impl Blks {
     pub fn dlink_of(&self, bi: BlkIdx) -> BlkIdx {
         self.borrow(bi).dlink
     }
-    pub fn visit_of(&self, bi: BlkIdx) -> u32 {
+    pub fn visit_of(&self, bi: BlkIdx) -> RpoIdx {
         self.borrow(bi).visit
     }
 }
@@ -184,6 +184,14 @@ impl<T> Idx<T> {
     // Implement cast???
     pub fn usize(self) -> usize {
         self.0 as usize
+    }
+    pub fn next(self) -> Idx<T> {
+        // Wrapping for RpoIdx in rporec et al
+        Self(self.0.wrapping_add(1), PhantomData)
+    }
+    pub fn prev(self) -> Idx<T> {
+        // Wrapping for RpoIdx in rporec et al
+        Self(self.0.wrapping_sub(1), PhantomData)
     }
 }
 
@@ -775,8 +783,9 @@ pub struct Blk {
 
     pub is_defined: bool,
     pub is_dead: bool,
-    pub id: u32, // TODO BlkId wrapper
-    pub visit: u32,
+    pub id: RpoIdx,
+    pub visit: RpoIdx, // TODO - this is probs not always...
+    pub ivisit: i32,   // TODO - for ssa.rs ... fixme
 
     pub idom: BlkIdx,
     pub dom: BlkIdx,
@@ -792,7 +801,7 @@ pub struct Blk {
 }
 
 impl Blk {
-    pub fn new(name: &[u8], id: u32, dlink: BlkIdx) -> Blk {
+    pub fn new(name: &[u8], id: RpoIdx, dlink: BlkIdx) -> Blk {
         Blk {
             phi: PhiIdx::NONE,
             ins: cell::RefCell::new(vec![]),
@@ -804,7 +813,8 @@ impl Blk {
             is_dead: false,
 
             id,
-            visit: 0,
+            visit: RpoIdx::NONE,
+            ivisit: -1, // TODO ... fixme
 
             idom: BlkIdx::NONE,
             dom: BlkIdx::NONE,
@@ -953,6 +963,21 @@ impl IndexMut<&RpoIdx> for [BlkIdx] {
     }
 }
 
+impl Index<RpoIdx> for Vec<BlkIdx> {
+    type Output = BlkIdx;
+    fn index(&self, index: RpoIdx) -> &Self::Output {
+        debug_assert!(index != RpoIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<RpoIdx> for Vec<BlkIdx> {
+    fn index_mut(&mut self, index: RpoIdx) -> &mut Self::Output {
+        debug_assert!(index != RpoIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
 /*
 struct Use {
     enum {
@@ -983,7 +1008,7 @@ pub enum UseT {
 pub struct Use {
     pub typ: UseT,
     pub bi: BlkIdx, // TODO - need this to access type_ PhiIdx or InsIdx, but now bid is redundant
-    pub bid: u32,
+    pub bid: RpoIdx,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1106,7 +1131,7 @@ pub struct Tmp {
     pub uses: Vec<Use>,
     pub ndef: u32,
     // pub nuse: u32,
-    pub bid: u32, /* id of a defining block - TODO: retread to BlkIdx??? It's not the same number always tho! */
+    pub bid: RpoIdx,
     // uint cost;
     pub slot: i32, /* -1 for unset */
     pub cls: K,
@@ -1128,9 +1153,9 @@ impl Tmp {
         Tmp {
             name,
             def: InsIdx::NONE, // ??? QBE sets ndef to 1 initially in parse.c
-            uses: vec![Use::new(UseT::UXXX, BlkIdx::NONE, 0)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
-            ndef: 1,       // TODO??? QBE sets ndef to 1 initially in parse.c
-            bid: u32::MAX, // QBE inits to 0 in newtmp()
+            uses: vec![Use::new(UseT::UXXX, BlkIdx::NONE, RpoIdx::NONE)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
+            ndef: 1, // TODO??? QBE sets ndef to 1 initially in parse.c
+            bid: RpoIdx::NONE,
 
             slot,
             cls,

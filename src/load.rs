@@ -7,7 +7,7 @@ use crate::all::Ref::{RCon, RInt, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw, Kx};
 use crate::all::{
     bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn, Ins,
-    InsIdx, Phi, PhiIdx, Ref, TmpIdx, K, O,
+    InsIdx, Phi, PhiIdx, Ref, RpoIdx, TmpIdx, K, O,
 };
 use crate::cfg::dom;
 use crate::util::{getcon, newcon, newtmp, newtmpref};
@@ -67,19 +67,11 @@ enum InsertU {
 
 #[derive(Debug, new)]
 struct Insert {
-    // isphi: bool, covered by InsertU
     num: TmpIdx, // TODO rename to ti
-    bid: u32,
+    bid: RpoIdx,
     off: InsIdx, // TODO rename to ii
     new: InsertU,
 }
-
-/*
-static Fn *curf;
-static uint inum;    /* current insertion number */
-static Insert *ilog; /* global insertion log */
-static uint nlog;    /* number of entries in the log */
- */
 
 pub fn loadsz(l: &Ins) -> i32 {
     assert!(isload(l.op));
@@ -720,17 +712,19 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
     ilog.sort_by(icmp);
     let sentinal_ins = Ins::new0(O::Oxxx, Kx, R);
     /* add a sentinel */
+    // TODO - why???
     ilog.push(Insert::new(
         TmpIdx::NONE,
-        f.nblk,
+        RpoIdx::new(f.nblk as usize), // RpoIdx::NONE???
         InsIdx::NONE,
         InsertU::Ins(sentinal_ins),
     ));
     let mut isti: usize = 0;
-    let mut n: u32 = 0;
-    while n < f.nblk {
+    let mut n: RpoIdx = RpoIdx::new(0);
+    // Ugh, fixme
+    while n.usize() < f.nblk as usize {
         let mut ist: &mut Insert = &mut ilog[isti];
-        let bi: BlkIdx = f.rpo[n as usize];
+        let bi: BlkIdx = f.rpo[n];
         while ist.bid == n {
             if let InsertU::Phi(uphi) = &mut ist.new {
                 let pi = f.blk(bi).phi;
@@ -795,7 +789,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             ib.push(i);
         }
         f.blk_mut(bi).ins = cell::RefCell::new(ib);
-        n += 1;
+        n = n.next();
     }
     // TODO
     // if (debug['M']) {

@@ -6,7 +6,7 @@ use std::io::stdout;
 use crate::all::Ref::{RTmp, R};
 use crate::all::K::{Kw, Kx};
 use crate::all::{
-    bshas, isext, isload, isparbh, to_s, BSet, BlkIdx, Blks, Fn, InsIdx, Phi, PhiIdx, Ref,
+    bshas, isext, isload, isparbh, to_s, BSet, BlkIdx, Blks, Fn, InsIdx, Phi, PhiIdx, Ref, RpoIdx,
     RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, K, O, TMP0, UNDEF,
 };
 use crate::cfg::{dom, filldom, fillfron, sdom};
@@ -39,7 +39,7 @@ impl Error for SsaError {
     }
 }
 
-fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: u32) {
+fn adduse(tmp: &mut Tmp, ty: UseT, bi: BlkIdx, bid: RpoIdx) {
     tmp.uses.push(Use::new(ty, bi, bid));
 }
 
@@ -54,7 +54,7 @@ pub fn filluse(f: &mut Fn) {
     /* todo, is this the correct file? */
     for tmp in tmps.iter_mut().skip(TMP0 as usize) {
         tmp.def = InsIdx::NONE;
-        tmp.bid = u32::MAX;
+        tmp.bid = RpoIdx::NONE;
         tmp.ndef = 0;
         tmp.cls = Kw;
         tmp.phi = TmpIdx::NONE;
@@ -143,7 +143,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     let mut blist: Vec<BlkIdx> = vec![BlkIdx::NONE; blks.len()];
     let be: usize = blks.len();
     let nt: usize = tmps.len();
-    let start_id: u32 = blks.id_of(f.start);
+    let start_id: RpoIdx = blks.id_of(f.start);
     for tii in TMP0..nt {
         let ti: TmpIdx = TmpIdx::new(tii);
         {
@@ -153,7 +153,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                 continue;
             }
             if t.ndef == 1 {
-                let defb: u32 = t.bid;
+                let defb: RpoIdx = t.bid;
                 let ok = t.uses.iter().all(|u| u.bid == defb);
                 if ok || defb == start_id {
                     continue;
@@ -167,7 +167,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         let mut bi = f.start;
         while bi != BlkIdx::NONE {
             blks.with_mut(bi, |b| {
-                b.visit = 0;
+                b.ivisit = 0;
                 let mut r: Ref = R;
                 for i in b.ins_mut().iter_mut() {
                     if r != R {
@@ -182,8 +182,8 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                             r = refindex(tmps, ti);
                             i.to = r;
                         } else {
-                            if !bshas(&u, b.id as usize) {
-                                bsset(&mut u, b.id as usize);
+                            if !bshas(&u, b.id.usize()) {
+                                bsset(&mut u, b.id.usize());
                                 bp -= 1;
                                 blist[bp] = bi;
                             }
@@ -207,18 +207,18 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             tmps[ti].tvisit = ti;
             let bi: BlkIdx = blist[bp];
             bp += 1;
-            bsclr(&mut u, blks.borrow(bi).id as usize);
+            bsclr(&mut u, blks.borrow(bi).id.usize());
             let frons_len = blks.borrow(bi).frons.len();
             for n in 0..frons_len {
                 let ai: BlkIdx = blks.borrow(bi).frons[n];
                 blks.with_mut(ai, |a| {
-                    a.visit += 1;
-                    if a.visit == 1 && bshas(&a.in_, ti.usize()) {
+                    a.ivisit += 1;
+                    if a.ivisit == 1 && bshas(&a.in_, ti.usize()) {
                         let pi: PhiIdx = PhiIdx::new(phis.len());
                         phis.push(Phi::new(rt, vec![], vec![], k, a.phi));
                         a.phi = pi;
-                        if !bshas(&defs, a.id as usize) && !bshas(&u, a.id as usize) {
-                            bsset(&mut u, a.id as usize);
+                        if !bshas(&defs, a.id.usize()) && !bshas(&u, a.id.usize()) {
+                            bsset(&mut u, a.id.usize());
                             bp -= 1;
                             blist[bp] = ai;
                         }
@@ -470,7 +470,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
             ))));
         }
         if !t.uses.is_empty() && t.ndef == 0 {
-            let bui: BlkIdx = rpo[t.uses[0].bid as usize];
+            let bui: BlkIdx = rpo[t.uses[0].bid];
             return Err(ssacheck_err(f, t, bui));
         }
     }
@@ -491,7 +491,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                 };
                 let t: &Tmp = &tmps[ti];
                 for u in &t.uses {
-                    let bui: BlkIdx = rpo[u.bid as usize];
+                    let bui: BlkIdx = rpo[u.bid];
 
                     if let UseT::UPhi(upi) = u.typ {
                         if phicheck(blks, &phis[upi], bi, r) {
@@ -507,7 +507,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
                     if let RTmp(ti) = i.to {
                         let t: &Tmp = &tmps[ti];
                         for u in &t.uses {
-                            let bui: BlkIdx = rpo[u.bid as usize];
+                            let bui: BlkIdx = rpo[u.bid];
                             match u.typ {
                                 UseT::UPhi(upi) => {
                                     if phicheck(blks, &phis[upi], bi, r) {
