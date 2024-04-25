@@ -201,6 +201,14 @@ impl Index<SlotIdx> for [Slot] {
     }
 }
 
+impl Index<SlotIdx> for Vec<Slot> {
+    type Output = Slot;
+    fn index(&self, index: SlotIdx) -> &Self::Output {
+        debug_assert!(index != SlotIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
 impl IndexMut<SlotIdx> for [Slot] {
     fn index_mut(&mut self, index: SlotIdx) -> &mut Self::Output {
         debug_assert!(index != SlotIdx::NONE);
@@ -326,12 +334,12 @@ pub fn coalesce(f: &mut Fn) {
         }
     }
 
+    let mut bl: Vec<(BlkIdx, InsIdx)> = vec![]; // Mmm
     {
         let tmps: &[Tmp] = &f.tmps;
         /* one-pass liveness analysis */
         blks.for_each_mut(|b| b.loop_ = -1);
         loopiter(blks, rpo, maxrpo);
-        let mut bl: Vec<(BlkIdx, InsIdx)> = vec![]; // Mmm
         {
             let mut br: Vec<Range> = vec![Range { a: 0, b: 0 }; nblk];
             let mut ip: i32 = i32::MAX - 1; // ???
@@ -416,9 +424,9 @@ pub fn coalesce(f: &mut Fn) {
                     blks.with_mut(s.st[n].bi, |b| {
                         let ii: InsIdx = s.st[n].ii;
                         if b.ins()[ii].op == O::Oblit0 {
-                            b.ins_mut()[(ii.0 as usize) + 1] = Ins::new0(O::Onop, Kx, R);
+                            b.ins_mut()[(ii.0 as usize) + 1] = Ins::NOP;
                         }
-                        b.ins_mut()[ii] = Ins::new0(O::Onop, Kx, R);
+                        b.ins_mut()[ii] = Ins::NOP;
                     });
                 }
             }
@@ -474,7 +482,7 @@ pub fn coalesce(f: &mut Fn) {
                             *i = Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
                             is_load = true;
                         } else {
-                            *i = Ins::new0(O::Onop, Kx, R);
+                            *i = Ins::NOP;
                         }
                     });
                     if is_load {
@@ -501,11 +509,10 @@ pub fn coalesce(f: &mut Fn) {
                                             } else {
                                                 if i.op == O::Oblit0 {
                                                     // This is not gonna work :(
-                                                    panic!("fixme");
-                                                    b.ins_mut()[(ii.0 + 1) as usize] =
-                                                        Ins::new0(O::Onop, Kx, R);
+                                                    //panic!("fixme");
+                                                    b.ins_mut()[ii.next()] = Ins::NOP;
                                                 }
-                                                *i = Ins::new0(O::Onop, Kx, R);
+                                                *i = Ins::NOP;
                                             }
                                         }
                                         RTmp(ti) => {
@@ -574,10 +581,8 @@ pub fn coalesce(f: &mut Fn) {
             if sl[si].si == SlotIdx::new(si) {
                 continue;
             }
-            blks.with_mut(t_def_bi, |b| {
-                b.ins_mut()[t_def_ii] = Ins::new0(O::Onop, Kx, R)
-            });
-            //f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::new0(O::Onop, Kx, R);
+            blks.with_mut(t_def_bi, |b| b.ins_mut()[t_def_ii] = Ins::NOP);
+            //f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::NOP;
             let ssi: SlotIdx = sl[si].si;
             let ssti: TmpIdx = sl[ssi.0 as usize].ti;
             let (ts_def_ii, ts_bid) = {
@@ -595,7 +600,7 @@ pub fn coalesce(f: &mut Fn) {
                                                                           /*f.blk_mut(t_def_bi)*/
                     b.ins_mut()[t_def_ii] = tsi;
                     /*f.blk_mut(t_def_bi)*/
-                    b.ins_mut()[ts_def_ii] = Ins::new0(O::Onop, Kx, R);
+                    b.ins_mut()[ts_def_ii] = Ins::NOP;
                 });
                 tmps[ssti].def = t_def_ii;
             }
@@ -625,23 +630,39 @@ pub fn coalesce(f: &mut Fn) {
         }
     }
 
-    // /* fix newly overlapping blits */
-    // for (n=0; n<nbl; n++) {
-    //     i = bl[n];
-    //     if (i.op == Oblit0)
-    //     if (slot(&s, &off0, i.arg[0], f, sl))
-    //     if (slot(&s0, &off1, i.arg[1], f, sl))
-    //     if (s.s == s0.s) {
-    //         if (off0 < off1) {
-    //             sz = rsval((i+1).arg[0]);
-    //             assert(sz >= 0);
-    //             (i+1).arg[0] = INT(-sz);
-    //         } else if (off0 == off1) {
-    //             *i = (Ins){.op = Onop};
-    //             *(i+1) = (Ins){.op = Onop};
-    //         }
-    //     }
-    // }
+    let tmps: &[Tmp] = &f.tmps;
+    /* fix newly overlapping blits */
+    for (bi, ii) in bl {
+        blks.with_mut(bi, |b| {
+            //for (n=0; n<nbl; n++) {
+            // i = bl[n];
+            let i: Ins = b.ins_mut()[ii]; // Note - copy Ugh fixme
+            if i.op == O::Oblit0 {
+                if let Some((s0, off0)) = slot(tmps, cons, i.args[0]) {
+                    if let Some((s1, off1)) = slot(tmps, cons, i.args[1]) {
+                        if sl[s0].si == sl[s1].si {
+                            if off0 < off1 {
+                                assert!(ii.next().usize() < b.ins().len());
+                                let blit1: &mut Ins = &mut b.ins_mut()[ii.next()];
+                                assert!(blit1.op == O::Oblit1 && matches!(blit1.args[0], RInt(_)));
+                                if let RInt(sz) = blit1.args[0] {
+                                    //sz = rsval((i+1).arg[0]);
+                                    assert!(sz >= 0);
+                                    blit1.args[0] = RInt(-sz); // What are you doing Quentin???
+                                                               //(i+1).arg[0] = INT(-sz);
+                                }
+                            } else if off0 == off1 {
+                                b.ins_mut()[ii] = Ins::NOP;
+                                //*i = (Ins){.op = Onop};
+                                b.ins_mut()[ii.next()] = Ins::NOP;
+                                //*(i+1) = (Ins){.op = Onop};
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
     // vfree(bl);
 
     // if (debug['M']) {

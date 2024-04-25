@@ -14,7 +14,7 @@ use crate::mem::SlotIdx;
 use crate::util::InternId;
 
 use Ref::{RCon, R};
-use K::{Kd, Kl, Ks, Kw, K0};
+use K::{Kd, Kl, Ks, Kw, Kx, K0};
 
 // Generic Result
 pub type RubeError = Box<dyn std::error::Error>;
@@ -651,6 +651,12 @@ pub struct Ins {
 }
 
 impl Ins {
+    pub const NOP: Ins = Ins {
+        op: O::Onop,
+        cls: Kx,
+        to: R,
+        args: [R, R],
+    };
     pub fn new0(op: O, cls: K, to: Ref) -> Ins {
         Ins::new(op, cls, to, [R, R])
     }
