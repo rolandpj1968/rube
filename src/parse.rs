@@ -12,9 +12,9 @@ use strum_macros::{EnumIter, FromRepr};
 
 use crate::all::{
     bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT,
-    Dat, DatT, DatU, Fn, Ins, KExt, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target,
-    Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW,
-    KX, NPUBOP, O, TMP0, TMP0IDX,
+    Dat, DatT, DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RubeResult, Sym, SymT, Target, Tmp,
+    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, K0, KC, KD, KE, KL, KS, KSB, KSH, KUB, KUH, KW, KX,
+    NPUBOP, O, TMP0, TMP0IDX,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -379,7 +379,7 @@ pub struct Parser<'a> {
     cur_bi: BlkIdx, // BlkIdx::INVALID before start parsing first blk
     blink: BlkIdx,  // BlkIdx::INVALID before finished parsing first blk, else prev blk
     blkh: [BlkIdx; (BMASK + 1) as usize],
-    rcls: KExt,
+    rcls: K,
     typ: Vec<Typ>,                            // from util.c
     insb: Vec<Ins>,                           // from util.c
     pub itbl: [Bucket; (IMASK + 1) as usize], // from util.c; string interning table; ugh pub for util::intern
@@ -834,7 +834,7 @@ impl Parser<'_> {
         Err(self.err(&format!("undefined type :{}", to_s(name))))
     }
 
-    fn parsecls(&mut self) -> RubeResult<(KExt, TypIdx)> {
+    fn parsecls(&mut self) -> RubeResult<(K, TypIdx)> {
         let (t, tv) = self.next()?;
         match t {
             Token::Ttyp => Ok((KC, self.findtyp(&tv.as_str())?)),
@@ -851,7 +851,7 @@ impl Parser<'_> {
     }
 }
 
-fn op_arg_bh(k: KExt) -> O {
+fn op_arg_bh(k: K) -> O {
     match k {
         KSB => O::Oargsb,
         KUB => O::Oargub,
@@ -861,7 +861,7 @@ fn op_arg_bh(k: KExt) -> O {
     }
 }
 
-fn op_par_bh(k: KExt) -> O {
+fn op_par_bh(k: K) -> O {
     match k {
         KSB => O::Oparsb,
         KUB => O::Oparub,
@@ -874,7 +874,7 @@ fn op_par_bh(k: KExt) -> O {
 impl Parser<'_> {
     fn parserefl(&mut self, arg: bool, curf: &mut Fn) -> RubeResult<bool> {
         let mut ty: TypIdx = TypIdx::NONE;
-        let mut k: KExt = KE; // KW???
+        let mut k: K = KE; // KW???
         let mut env: bool = false;
         let mut hasenv: bool = false;
         let mut vararg: bool = false;
@@ -999,7 +999,7 @@ impl Parser<'_> {
         // Phi targets
         let mut blk: Vec<BlkIdx> = vec![];
         let mut r: Ref = Ref::R;
-        let mut k: KExt = KE; // KW???
+        let mut k: K = KE; // KW???
         let mut ty: TypIdx = TypIdx::NONE;
 
         let mut op_tok: Token = Token::Txxx;
@@ -1295,10 +1295,10 @@ impl Parser<'_> {
     }
 }
 
-fn usecheck(fn_: &Fn, r: &Ref, k: KExt) -> bool {
+fn usecheck(fn_: &Fn, r: &Ref, k: K) -> bool {
     match r {
         Ref::RTmp(ti) => {
-            let cls: KExt = fn_.tmp(*ti).cls;
+            let cls: K = fn_.tmp(*ti).cls;
             cls == k || (cls == KL && k == KW)
         }
         _ => true,
@@ -1328,7 +1328,7 @@ impl Parser<'_> {
             {
                 let i: Ins = fn_.blk(bi).ins()[ii]; // Note - copy
                 if let Ref::RTmp(ti) = /*fn_.blk(bi).ins()[ii]*/ i.to {
-                    let ins_cls: KExt = /*fn_.blk(bi).ins()[ii]*/i.cls;
+                    let ins_cls: K = /*fn_.blk(bi).ins()[ii]*/i.cls;
                     let t: &mut Tmp = fn_.tmp_mut(ti);
                     if clsmerge(&mut t.cls, ins_cls) {
                         return Err(self.err(&format!(
@@ -1355,7 +1355,7 @@ impl Parser<'_> {
                 let p: &Phi = fn_.phi(pi);
                 if let Ref::RTmp(ti) = p.to {
                     let t: &Tmp = fn_.tmp(ti);
-                    let k: KExt = t.cls;
+                    let k: K = t.cls;
                     let mut ppb: BSet = bsinit(fn_.blks.len());
                     for n in 0..fn_.phi(pi).args.len() {
                         let pbi: BlkIdx = p.blks[n];
@@ -1398,7 +1398,7 @@ impl Parser<'_> {
             for i in b.ins().iter() {
                 for n in 0..2 {
                     let op: &Op = &OPTAB[i.op as usize];
-                    let k: KExt = op.argcls[n][i.cls as usize];
+                    let k: K = op.argcls[n][i.cls as usize];
                     let r: &Ref = &i.args[n];
                     if k == KE {
                         return Err(
@@ -1445,7 +1445,7 @@ impl Parser<'_> {
                 // This must succeed after isret()
                 // TODO - QBE handling of jret0 seems odd
                 if b.jmp().type_ != J::Jret0 {
-                    let k: KExt = cls_for_ret(b.jmp().type_).unwrap();
+                    let k: K = cls_for_ret(b.jmp().type_).unwrap();
                     if !usecheck(fn_, r, k) {
                         goto_jerr = true;
                     }

@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use crate::all::{
-    bit, to_s, BSet, Bits, Con, ConIdx, Fn, KExt, Ref, Tmp, TmpIdx, KL, KW, KX, NBIT, TMP0,
+    bit, to_s, BSet, Bits, Con, ConIdx, Fn, Ref, Tmp, TmpIdx, K, KL, KW, KX, NBIT, TMP0,
 };
 use crate::parse::Parser; // ugh for intern()
 
@@ -407,8 +407,8 @@ clsmerge(short *pk, short k)
 }
  */
 
-pub fn clsmerge(pk: &mut KExt, k: KExt) -> bool {
-    let k1: KExt = *pk;
+pub fn clsmerge(pk: &mut K, k: K) -> bool {
+    let k1: K = *pk;
     if k1 == KX {
         *pk = k;
         return false;
@@ -467,7 +467,7 @@ newtmp(char *prfx, int k,  Fn *fn)
 }
  */
 
-pub fn newtmp(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> TmpIdx {
+pub fn newtmp(prfx: &[u8], sufx: bool, k: K, fn_: &mut Fn) -> TmpIdx {
     return newtmp2(&mut fn_.tmps, prfx, sufx, k);
     // TODO why a globally unique name?
     static mut N: i32 = 0;
@@ -483,11 +483,11 @@ pub fn newtmp(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> TmpIdx {
     // fn_.add_tmp(Tmp::new(name, /*slot*/ -1, /*cls*/ k))
 }
 
-pub fn newtmpref(prfx: &[u8], sufx: bool, k: KExt, fn_: &mut Fn) -> Ref {
+pub fn newtmpref(prfx: &[u8], sufx: bool, k: K, fn_: &mut Fn) -> Ref {
     Ref::RTmp(newtmp(prfx, sufx, k, fn_))
 }
 
-pub fn newtmp2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: KExt) -> TmpIdx {
+pub fn newtmp2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> TmpIdx {
     // TODO why a globally unique name?
     static mut N: i32 = 0;
     let mut name: Vec<u8> = prfx.to_vec();
@@ -505,7 +505,7 @@ pub fn newtmp2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: KExt) -> TmpIdx 
     //fn_.add_tmp(Tmp::new(name, /*slot*/ -1, /*cls*/ k))
 }
 
-pub fn newtmpref2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: KExt) -> Ref {
+pub fn newtmpref2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> Ref {
     Ref::RTmp(newtmp2(tmps, prfx, sufx, k))
 }
 

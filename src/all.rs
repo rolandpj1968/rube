@@ -484,7 +484,7 @@ pub enum J {
     NJmp,
 }
 
-pub fn ret_for_cls(k: KExt) -> Option<J> {
+pub fn ret_for_cls(k: K) -> Option<J> {
     if KW <= k && k <= K0 {
         J::from_repr((J::Jretw) as u8 + (k as u8))
     } else {
@@ -492,13 +492,13 @@ pub fn ret_for_cls(k: KExt) -> Option<J> {
     }
 }
 
-pub fn cls_for_ret(j: J) -> Option<KExt> {
+pub fn cls_for_ret(j: J) -> Option<K> {
     if j == J::Jretc {
         Some(KL)
     } else if in_range_j(j, J::Jretsb, J::Jretuh) {
         Some(KW)
     } else if in_range_j(j, J::Jretw, J::Jretd) {
-        KExt::from_repr((j as i8) - (J::Jretw as i8))
+        K::from_repr((j as i8) - (J::Jretw as i8))
     } else {
         None
     }
@@ -572,7 +572,7 @@ pub fn isretbh(j: J) -> bool {
 
 #[derive(Clone, Copy, Debug, FromRepr, PartialEq, PartialOrd)]
 #[repr(i8)]
-pub enum KExt {
+pub enum K {
     // Duplicated here from Kbase cos optab etc. uses the everythings.
     // This is going to cause grief?
     // Really want to extend KBase
@@ -593,32 +593,32 @@ pub enum KExt {
              //Km = KBase::Kl as isize, /* memory pointer */
 }
 
-pub fn kwide(k: KExt) -> i32 {
+pub fn kwide(k: K) -> i32 {
     (k as i32) & 1
 }
 
-pub fn kbase(k: KExt) -> i32 {
+pub fn kbase(k: K) -> i32 {
     (k as i32) >> 1
 }
 
-pub const KX: KExt = KExt::Kx;
-pub const KW: KExt = KExt::Kw;
-pub const KL: KExt = KExt::Kl;
-pub const KS: KExt = KExt::Ks;
-pub const KD: KExt = KExt::Kd;
+pub const KX: K = K::Kx;
+pub const KW: K = K::Kw;
+pub const KL: K = K::Kl;
+pub const KS: K = K::Ks;
+pub const KD: K = K::Kd;
 
 // Alias
-pub const KM: KExt = KExt::Kl;
+pub const KM: K = K::Kl;
 
-pub const KSB: KExt = KExt::Ksb;
-pub const KUB: KExt = KExt::Kub;
-pub const KSH: KExt = KExt::Ksh;
-pub const KUH: KExt = KExt::Kuh;
+pub const KSB: K = K::Ksb;
+pub const KUB: K = K::Kub;
+pub const KSH: K = K::Ksh;
+pub const KUH: K = K::Kuh;
 
-pub const KC: KExt = KExt::Kc;
-pub const K0: KExt = KExt::K0;
+pub const KC: K = K::Kc;
+pub const K0: K = K::K0;
 
-pub const KE: KExt = KExt::Ke;
+pub const KE: K = K::Ke;
 
 // Used as array indices in OPTAB init
 const_assert_eq!(KW as usize, 0);
@@ -629,12 +629,12 @@ const_assert_eq!(KD as usize, 3);
 #[derive(Clone, Copy)]
 pub struct Op {
     pub name: &'static [u8],
-    pub argcls: [[KExt; 4]; 2],
+    pub argcls: [[K; 4]; 2],
     pub canfold: bool,
 }
 
 impl Op {
-    pub const fn new(name: &'static [u8], argcls: [[KExt; 4]; 2], canfold: bool) -> Op {
+    pub const fn new(name: &'static [u8], argcls: [[K; 4]; 2], canfold: bool) -> Op {
         Op {
             name,
             argcls,
@@ -646,21 +646,21 @@ impl Op {
 #[derive(Clone, Copy, Debug, new)]
 pub struct Ins {
     pub op: O,
-    pub cls: KExt, // Must be one of Kw, Kl, Ks, Kd
+    pub cls: K, // Must be one of Kw, Kl, Ks, Kd
     pub to: Ref,
     pub args: [Ref; 2],
 }
 
 impl Ins {
-    pub fn new0(op: O, cls: KExt, to: Ref) -> Ins {
+    pub fn new0(op: O, cls: K, to: Ref) -> Ins {
         Ins::new(op, cls, to, [Ref::R, Ref::R])
     }
 
-    pub fn new1(op: O, cls: KExt, to: Ref, args1: [Ref; 1]) -> Ins {
+    pub fn new1(op: O, cls: K, to: Ref, args1: [Ref; 1]) -> Ins {
         Ins::new(op, cls, to, [args1[0], Ref::R])
     }
 
-    pub fn new2(op: O, cls: KExt, to: Ref, args2: [Ref; 2]) -> Ins {
+    pub fn new2(op: O, cls: K, to: Ref, args2: [Ref; 2]) -> Ins {
         Ins::new(op, cls, to, args2)
     }
 }
@@ -712,7 +712,7 @@ pub struct Phi {
     pub to: Ref,
     pub args: Vec<Ref>, // TODO would be cool to just have one Vec<(Ref, BlkIdx)>
     pub blks: Vec<BlkIdx>,
-    pub cls: KExt,
+    pub cls: K,
     pub link: PhiIdx,
 }
 
@@ -1024,7 +1024,7 @@ pub struct Alias {
     pub base: TmpIdx,
     pub offset: i64,
     pub u: AliasU,
-    pub slot: TmpIdx, //AliasIdx,
+    pub slot: TmpIdx,
 }
 
 impl Alias {
@@ -1033,18 +1033,10 @@ impl Alias {
             typ: AliasT::ABot,
             base: TmpIdx::NONE,
             offset: 0,
-            u: AliasU::None,    // AliasU::ALoc(AliasLoc { sz: 0, m: 0 }),
-            slot: TmpIdx::NONE, //AliasIdx::NONE,
+            u: AliasU::None,
+            slot: TmpIdx::NONE,
         }
     }
-}
-
-// Index into Fn::aliases
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct AliasIdx(pub u32);
-
-impl AliasIdx {
-    pub const NONE: AliasIdx = AliasIdx(u32::MAX);
 }
 
 #[derive(Debug, FromRepr, PartialEq)]
@@ -1091,20 +1083,20 @@ pub struct Tmp {
     pub bid: u32, /* id of a defining block - TODO: retread to BlkIdx??? It's not the same number always tho! */
     // uint cost;
     pub slot: i32, /* -1 for unset */
-    pub cls: KExt,
+    pub cls: K,
     // struct {
     //     int r;  /* register or -1 */
     //     int w;  /* weight */
     //     bits m; /* avoid these registers */
     // } hint;
     pub phi: TmpIdx,
-    pub alias: Alias, //AliasIdx,
+    pub alias: Alias,
     pub width: TmpWdth,
     pub visit: TmpIdx, /*u32*/ // bool??? TmpIdx?? It's a slot index in mem::coalesce :(
 }
 
 impl Tmp {
-    pub fn new(name: Vec<u8>, /*ndef: u32, nuse: u32,*/ slot: i32, cls: KExt) -> Tmp {
+    pub fn new(name: Vec<u8>, /*ndef: u32, nuse: u32,*/ slot: i32, cls: K) -> Tmp {
         Tmp {
             name,
             def: InsIdx::NONE, // ??? QBE sets ndef to 1 initially in parse.c
@@ -1352,22 +1344,6 @@ impl Fn {
         let pi: PhiIdx = PhiIdx::new(self.phis.len());
         self.phis.push(p);
         pi
-    }
-
-    pub fn alias(&self, ai: AliasIdx) -> &Alias {
-        assert!(ai != AliasIdx::NONE);
-        &self.aliases[ai.0 as usize]
-    }
-
-    pub fn alias_mut(&mut self, ai: AliasIdx) -> &mut Alias {
-        assert!(ai != AliasIdx::NONE);
-        &mut self.aliases[ai.0 as usize]
-    }
-
-    pub fn add_alias(&mut self, a: Alias) -> AliasIdx {
-        let ai: AliasIdx = AliasIdx(self.aliases.len() as u32);
-        self.aliases.push(a);
-        ai
     }
 
     pub fn tmp(&self, ti: TmpIdx) -> &Tmp {

@@ -4,8 +4,8 @@ use std::fmt;
 use std::io::stdout;
 
 use crate::all::{
-    bshas, isext, isload, isparbh, to_s, BSet, BlkIdx, Blks, Fn, InsIdx, KExt, Phi, PhiIdx, Ref,
-    RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, KW, KX, O, TMP0, UNDEF,
+    bshas, isext, isload, isparbh, to_s, BSet, BlkIdx, Blks, Fn, InsIdx, Phi, PhiIdx, Ref,
+    RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, K, KW, KX, O, TMP0, UNDEF,
 };
 use crate::cfg::{dom, filldom, fillfron, sdom};
 use crate::live::filllive;
@@ -129,7 +129,7 @@ pub fn filluse(f: &mut Fn) {
 
 fn refindex(tmps: &mut Vec<Tmp>, ti: TmpIdx) -> Ref {
     let prfx: Vec<u8> = tmps[ti].name.clone();
-    let cls: KExt = tmps[ti].cls;
+    let cls: K = tmps[ti].cls;
     newtmpref2(tmps, &prfx, true, cls)
 }
 
@@ -159,7 +159,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             }
         }
         let mut u: BSet = bsinit(blks.len());
-        let mut k: KExt = KX;
+        let mut k: K = KX;
         let mut bp: usize = be;
         let rt: Ref = Ref::RTmp(ti);
         let mut bi = f.start;

@@ -5,7 +5,7 @@ use std::fmt;
 use crate::alias::getalias;
 use crate::all::{
     bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Fn, Ins,
-    InsIdx, KExt, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, KL, KW, KX, NBIT, O, OALLOC,
+    InsIdx, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, K, KL, KW, KX, NBIT, O, OALLOC,
     OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
@@ -46,7 +46,7 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
     let ins_len = blks.borrow(bi).ins().len();
     'ins_loop: for ii in 0..ins_len {
         let t: &mut Tmp;
-        let mut k: KExt = KX;
+        let mut k: K = KX;
         let mut s: i32 = -1; // TODO sz types in general :(
         {
             let b = blks.borrow(bi);
@@ -288,7 +288,6 @@ pub fn coalesce(f: &mut Fn) {
     for n in TMP0..f.tmps.len() {
         let ti: TmpIdx = TmpIdx::new(n as usize);
         f.tmp_mut(ti).visit = TmpIdx::NONE; // Ugh, this is a slot index in sl here
-                                            //let ai: AliasIdx = f.tmp(ti).alias;
         let a: &Alias = &f.tmps[ti].alias;
         if a.typ == AliasT::ALoc && a.slot == ti/*ai*/ && f.tmp(ti).bid == f.blk(f.start).id {
             if let AliasU::ALoc(aloc) = a.u {

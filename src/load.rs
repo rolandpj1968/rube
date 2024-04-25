@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use crate::alias::{alias, escapes};
 use crate::all::{
     bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, BlkIdx, CanAlias, Con, Fn, Ins,
-    InsIdx, KExt, Phi, PhiIdx, Ref, TmpIdx, KD, KL, KS, KW, KX, O,
+    InsIdx, Phi, PhiIdx, Ref, TmpIdx, K, KD, KL, KS, KW, KX, O,
 };
 use crate::cfg::dom;
 use crate::util::{getcon, newcon, newtmp, newtmpref};
@@ -46,8 +46,8 @@ struct Loc {
 struct Slice {
     r: Ref,
     off: i32,
-    sz: i16,   // Dodgy i16
-    cls: KExt, /* load class */
+    sz: i16, // Dodgy i16
+    cls: K,  /* load class */
 }
 
 #[derive(Debug)]
@@ -113,7 +113,7 @@ pub fn storesz(s: &Ins) -> i32 {
     }
 }
 
-fn iins(f: &mut Fn, ilog: &mut Vec<Insert>, cls: KExt, op: O, a0: Ref, a1: Ref, l: &Loc) -> Ref {
+fn iins(f: &mut Fn, ilog: &mut Vec<Insert>, cls: K, op: O, a0: Ref, a1: Ref, l: &Loc) -> Ref {
     let ti: TmpIdx = newtmp(b"ld", true, cls, f);
     let to: Ref = Ref::RTmp(ti);
     let ins: Ins = Ins::new2(op, cls, to, [a0, a1]);
@@ -121,11 +121,11 @@ fn iins(f: &mut Fn, ilog: &mut Vec<Insert>, cls: KExt, op: O, a0: Ref, a1: Ref, 
     to
 }
 
-fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: KExt, l: &Loc) {
+fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
     match *r {
         Ref::RCon(_) => (), /*ok*/
         Ref::RTmp(ti) => {
-            let cls0: KExt = f.tmp(ti).cls;
+            let cls0: K = f.tmp(ti).cls;
             if cls0 == cls || (cls == KW && cls0 == KL) {
                 return;
             }
@@ -150,7 +150,7 @@ fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: KExt, l: &Loc) {
     }
 }
 
-fn mask(f: &mut Fn, ilog: &mut Vec<Insert>, cls: KExt, r: &mut Ref, msk: Bits, l: &Loc) {
+fn mask(f: &mut Fn, ilog: &mut Vec<Insert>, cls: K, r: &mut Ref, msk: Bits, l: &Loc) {
     cast(f, ilog, r, cls, l);
     let c = getcon(f, msk as i64);
     *r = iins(f, ilog, cls, O::Oand, *r, c, l);
@@ -168,7 +168,7 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
         }
     };
     let all: bool = msk == genmask(sl.sz as i32);
-    let cls: KExt = if all {
+    let cls: K = if all {
         sl.cls
     } else {
         if sl.sz > 4 {
@@ -217,7 +217,6 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
 fn killsl(f: &Fn, r: Ref, sl: &Slice) -> bool {
     if let Ref::RTmp(_ti) = r {
         if let Ref::RTmp(slti) = sl.r {
-            //let ai: AliasIdx = f.tmp(slti).alias;
             let a: &Alias = &f.tmps[slti].alias;
             return match a.typ {
                 AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => r == Ref::RTmp(a.base),
@@ -299,7 +298,7 @@ fn def(
         // Bit naughty - this is out of range
         ii = InsIdx::new(f.blk(bi).ins().len());
     }
-    let cls: KExt = if sl.sz > 4 { KL } else { KW };
+    let cls: K = if sl.sz > 4 { KL } else { KW };
     let msks: Bits = genmask(sl.sz as i32);
 
     let mut goto_load: bool = false;
@@ -392,7 +391,7 @@ fn def(
                     }
                 }
                 if off != 0 {
-                    let cls1: KExt = if op == O::Oshr && off + (sl.sz as i32) > 4 {
+                    let cls1: K = if op == O::Oshr && off + (sl.sz as i32) > 4 {
                         KL
                     } else {
                         cls
