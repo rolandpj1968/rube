@@ -314,7 +314,7 @@ fn def(
         //     );
         // }
         let mut i: Ins = f.blk(bi).ins()[ii.0 as usize]; /* Note: copy! */
-        if killsl(f, i.to, &sl) || (i.op == O::Ocall && escapes(f, sl.r)) {
+        if killsl(f, i.to, &sl) || (i.op == O::Ocall && escapes(&f.tmps, sl.r)) {
             // println!("                              killsl or escaping call");
             goto_load = true;
             continue;
