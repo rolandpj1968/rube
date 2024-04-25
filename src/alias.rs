@@ -1,6 +1,7 @@
 use crate::all::{
-    astack, bit, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, BlkIdx, Blks, CanAlias,
-    Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
+    astack, bit, isload, isstore, to_s, Alias, AliasLoc, AliasT, AliasU, Bits, BlkIdx, Blks,
+    CanAlias, Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC,
+    OALLOC1, TMP0,
 };
 
 use crate::load::storesz;
@@ -14,7 +15,7 @@ pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
             //let t: &Tmp = f.tmp(ti);
             let a1: &Alias = &tmps[ti].alias; //f.alias(t.alias);
             a_out = a1.clone();
-            if astack(a_in.typ) != 0 {
+            if astack(a_out.typ) != 0 {
                 a_out.typ = tmps[a_out.slot].alias.typ;
             }
             assert!(a_out.typ != AliasT::ABot);
@@ -34,16 +35,16 @@ pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
                     a_out.typ = AliasT::ACon;
                 }
             }
-            assert!(matches!(c.bits, ConBits::I(_)));
+            // TODO - get this right
+            //assert!(matches!(c.bits, ConBits::I(_)));
             if let ConBits::I(i) = c.bits {
                 a_out.offset = i;
+            } else {
+                // Needed for CAddr where c.bits is None; ropy!
+                // Hrmm, changed CAddr to have I(0) by default now, check again...
+                a_out.offset = 0;
+                //assert!(false);
             }
-            // else {
-            //     // Needed for CAddr where c.bits is None; ropy!
-            //     // Hrmm, changed CAddr to have I(0) by default now, check again...
-            //     a_out.offset = 0;
-            //     //assert!(false);
-            // }
             a_out.slot = TmpIdx::NONE; //AliasIdx::NONE;
         }
         _ => (),
@@ -271,8 +272,8 @@ pub fn fillalias(f: &mut Fn) {
                 // assert!(a.typ == AliasT::ABot);
                 // a.typ = a_type;
                 // a.slot = a_slot;
-                // a.base = ti;
-                // a.offset = 0;
+                a.base = ti;
+                a.offset = 0;
                 // if let Some(a_u) = maybe_a_u {
                 //     a.u = a_u;
                 // }
@@ -341,4 +342,36 @@ pub fn fillalias(f: &mut Fn) {
         }
         bi = blks.borrow(bi).link;
     }
+
+    println!("\nAfter fillalias:\n");
+    const TYPENAMES: [&str; 7] = ["ABot", "ALoc", "ACon", "AEsc", "ASym", "<5>", "AUnk"];
+    for i in TMP0..tmps.len() {
+        print!(
+            "    tmp {} {} - alias: type {} ",
+            i,
+            to_s(&tmps[i].name),
+            TYPENAMES[tmps[i].alias.typ as usize]
+        );
+        if tmps[i].alias.base == TmpIdx::NONE {
+            print!("base nil ");
+        } else {
+            print!(
+                "base {} {} ",
+                tmps[i].alias.base.0,
+                to_s(&tmps[tmps[i].alias.base].name)
+            );
+        }
+        print!("offset {} ", tmps[i].alias.offset);
+        if tmps[i].alias.slot == TmpIdx::NONE {
+            print!("slot nil");
+        } else {
+            print!(
+                "slot {} {}",
+                tmps[i].alias.slot.0,
+                to_s(&tmps[tmps[i].alias.slot].name)
+            );
+        }
+        println!();
+    }
+    println!("\n------------------------------\n");
 }
