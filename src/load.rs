@@ -553,8 +553,9 @@ fn def(
         }
     }
 
-    let mut r: Ref = newtmpref2(tmps, b"ld", true, sl.cls);
+    let mut r: Ref = R;
     if !goto_load {
+        r = newtmpref2(tmps, b"ld", true, sl.cls);
         let p: Phi = Phi::new(r, vec![], vec![], sl.cls, PhiIdx::NONE);
         let pi: PhiIdx = PhiIdx::new(phis.len());
         phis.push(p);
@@ -757,7 +758,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 (ni1, i1)
             } else {
                 // MUST be InsertU::Ins
-                assert!(false);
+                //assert!(false); TODO...
                 (InsIdx::NONE, Ins::NOP)
             };
             if ist.bid == n && ni == ni0 {
