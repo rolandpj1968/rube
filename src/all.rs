@@ -108,6 +108,15 @@ impl Blks {
         // });
     }
 
+    pub fn for_each(&self, mut f: impl FnMut(&Blk)) {
+        let mut bi = BlkIdx::START;
+        while bi != BlkIdx::NONE {
+            let b = self.borrow_mut(bi);
+            f(&*b);
+            bi = b.link;
+        }
+    }
+
     pub fn for_each_bi(&self, mut f: impl FnMut(BlkIdx)) {
         let mut bi = BlkIdx::START;
         while bi != BlkIdx::NONE {

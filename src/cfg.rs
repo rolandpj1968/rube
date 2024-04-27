@@ -78,30 +78,30 @@ fn rporec(blks: &Blks, bi: BlkIdx, mut x: RpoIdx) -> RpoIdx {
     x.prev()
 }
 
-use crate::all::to_s;
-fn printlives(start: BlkIdx, blks: &Blks) {
-    //let blks = &f.blks;
-    println!("live blocks according to is_dead");
-    blks.for_each_bi(|bi| {
-        println!(
-            "    {:?} id {} {}",
-            bi,
-            blks.id_of(bi).0,
-            to_s(&blks.borrow(bi).name)
-        );
-    });
-    println!("live blocks according to link");
-    let mut bi = start;
-    while bi != BlkIdx::NONE {
-        println!(
-            "    {:?} id {} {}",
-            bi,
-            blks.id_of(bi).0,
-            to_s(&blks.borrow(bi).name)
-        );
-        bi = blks.borrow(bi).link;
-    }
-}
+// use crate::all::to_s;
+// fn printlives(start: BlkIdx, blks: &Blks) {
+//     //let blks = &f.blks;
+//     println!("live blocks according to is_dead");
+//     blks.for_each_bi(|bi| {
+//         println!(
+//             "    {:?} id {} {}",
+//             bi,
+//             blks.id_of(bi).0,
+//             to_s(&blks.borrow(bi).name)
+//         );
+//     });
+//     println!("live blocks according to link");
+//     let mut bi = start;
+//     while bi != BlkIdx::NONE {
+//         println!(
+//             "    {:?} id {} {}",
+//             bi,
+//             blks.id_of(bi).0,
+//             to_s(&blks.borrow(bi).name)
+//         );
+//         bi = blks.borrow(bi).link;
+//     }
+// }
 
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
@@ -185,8 +185,7 @@ pub fn filldom(f: &mut Fn) {
             break;
         }
     }
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
+    blks.for_each_bi(|bi| {
         blks.with_mut(bi, |b| {
             let di: BlkIdx = b.idom;
             if di != BlkIdx::NONE {
@@ -196,10 +195,8 @@ pub fn filldom(f: &mut Fn) {
                     d.dom = bi;
                 });
             }
-
-            bi = b.link;
         });
-    }
+    });
 }
 
 pub fn sdom(blks: &Blks, b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
