@@ -145,13 +145,13 @@ fn phisimpl(
 }
 
 fn subst(tmps: &[Tmp], pr: &mut Ref, cpy: &[Ref]) {
-    if let RTmp(ti) = *pr {
-        println!(
-            "             substing %{}, cpy is {:?}",
-            to_s(&tmps[ti].name),
-            cpy[ti.usize()]
-        );
-    }
+    // if let RTmp(ti) = *pr {
+    //     println!(
+    //         "             substing %{}, cpy is {:?}",
+    //         to_s(&tmps[ti].name),
+    //         cpy[ti.usize()]
+    //     );
+    // }
     assert!({
         if let RTmp(ti) = *pr {
             cpy[ti.usize()] != R
@@ -177,17 +177,17 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     for n in 0..rpo.len() {
         let bi: BlkIdx = rpo[n];
         blks.with(bi, |b| {
-            println!("Building copy-map using @{}", to_s(&b.name));
+            // println!("Building copy-map using @{}", to_s(&b.name));
             let mut pi: PhiIdx = b.phi;
             while pi != PhiIdx::NONE {
                 let p: &Phi = &phis[pi];
                 assert!(matches!(p.to, RTmp(_)));
-                println!("  phi for {:?}", p.to);
+                // println!("  phi for {:?}", p.to);
                 if let RTmp(ti) = p.to {
-                    println!("      it is for %{}", to_s(&tmps[ti].name));
+                    // println!("      it is for %{}", to_s(&tmps[ti].name));
                     if cpy[ti.0 as usize] != R {
                         // are we gonna allow TmpIdx indexing???
-                        println!("        ... cpy is already {:?}", cpy[ti.0 as usize]);
+                        // println!("        ... cpy is already {:?}", cpy[ti.0 as usize]);
                         pi = p.link;
                         continue;
                     }
@@ -225,7 +225,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             for i in b.ins().iter() {
                 assert!(i.to == R || matches!(i.to, RTmp(_)));
                 if let RTmp(ti) = i.to {
-                    println!("  ins for {:?} %{}", i.to, to_s(&tmps[ti].name));
+                    // println!("  ins for {:?} %{}", i.to, to_s(&tmps[ti].name));
                     let r: Ref = copyof(i.args[0], &cpy);
                     if iscopy(tmps, cons, i, r) {
                         cpy[ti.usize()] = r;
@@ -241,20 +241,20 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
      * and rewrite their uses */
     let mut ppi: PhiIdx = PhiIdx::NONE;
     blks.for_each_mut(|b| {
-        println!("Copy elimination on @{}", to_s(&b.name));
+        // println!("Copy elimination on @{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
             let p_to: Ref = phis[pi].to;
-            println!("  phi for {:?}", p_to);
+            // println!("  phi for {:?}", p_to);
             let p_link: PhiIdx = phis[pi].link;
             assert!(matches!(p_to, RTmp(_)));
             if let RTmp(ti) = p_to {
-                println!("      it is for %{}", to_s(&tmps[ti].name));
+                // println!("      it is for %{}", to_s(&tmps[ti].name));
                 let r: Ref = cpy[ti.usize()];
-                println!("          copy r is {:?}", r);
+                // println!("          copy r is {:?}", r);
                 if r == p_to {
                     for a in &mut phis[pi].args {
-                        println!("          arg subst for {:?}", *a);
+                        // println!("          arg subst for {:?}", *a);
                         subst(tmps, a, &cpy);
                     }
                 } else {
@@ -277,9 +277,9 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     *i = Ins::NOP;
                     continue;
                 }
-                subst(tmps, &mut i.args[0], &cpy);
-                subst(tmps, &mut i.args[1], &cpy);
             }
+            subst(tmps, &mut i.args[0], &cpy);
+            subst(tmps, &mut i.args[1], &cpy);
         }
         subst(tmps, &mut b.jmp.borrow_mut().arg, &cpy);
     });
@@ -293,7 +293,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             if cpy[tii] == R {
                 /*e*/
                 print!("\n{:>10} not seen!", to_s(&tmps[tii].name));
-            } else if !matches!(cpy[tii], RTmp(_)) {
+            } else if cpy[tii] != RTmp(TmpIdx::new(tii)) {
                 /*e*/
                 print!("\n{:>10} copy of ", to_s(&tmps[tii].name));
                 printref(/*stderr*/ &mut stdout(), f, typ, itbl, cpy[tii]);
