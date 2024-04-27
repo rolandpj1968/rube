@@ -170,7 +170,7 @@ pub fn filldom(f: &mut Fn) {
             let di = blks.with(*bi, |b| {
                 let mut di0: BlkIdx = BlkIdx::NONE;
                 for pi in &b.preds {
-                    if blks.idom_of(*pi) != BlkIdx::NONE || *pi == f.start {
+                    if blks.idom_of(*pi) != BlkIdx::NONE || *pi == BlkIdx::START {
                         di0 = inter(blks, di0, *pi);
                     }
                 }

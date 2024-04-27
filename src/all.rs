@@ -881,7 +881,7 @@ pub struct BlkTag();
 pub type BlkIdx = Idx<BlkTag>;
 
 impl BlkIdx {
-    const START: BlkIdx = BlkIdx::new(0);
+    pub const START: BlkIdx = BlkIdx::new(0);
 }
 
 impl Index<BlkIdx> for [Blk] {
