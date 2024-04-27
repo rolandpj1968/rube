@@ -65,7 +65,7 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     loadopt(f /*, typ, itbl*/);
     filluse(f);
     fillalias(f);
-    // coalesce(f, typ, itbl);
+    coalesce(f, typ, itbl);
 
     printfn(&mut stdout(), f, typ, itbl);
 }

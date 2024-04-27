@@ -454,6 +454,7 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 s0 += 1;
             }
         }
+        sl.truncate(s0);
 
         // TODO
         if true
@@ -534,7 +535,8 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
         }
 
-        // /* fuse slots by decreasing size */
+        /* fuse slots by decreasing size */
+        println!("              fusing: {} candidates", sl.len());
         sl.sort_by(scmp);
         // qsort(sl, nsl, sizeof *sl, scmp);
         'outer: for s0i in 0..sl.len() {
