@@ -46,9 +46,17 @@ pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
     a_out
 }
 
-pub fn alias(f: &Fn, p: Ref, op: i32, sp: i32, q: Ref, sq: i32) -> (CanAlias, i32) {
-    let tmps: &[Tmp] = &f.tmps;
-    let cons: &[Con] = &f.cons;
+pub fn alias(
+    tmps: &[Tmp],
+    cons: &[Con],
+    /*f: &Fn, */ p: Ref,
+    op: i32,
+    sp: i32,
+    q: Ref,
+    sq: i32,
+) -> (CanAlias, i32) {
+    // let tmps: &[Tmp] = &f.tmps;
+    // let cons: &[Con] = &f.cons;
 
     let mut ap: Alias = getalias(tmps, cons, &Alias::default(), p);
     let aq: Alias = getalias(tmps, cons, &Alias::default(), q);

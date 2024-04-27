@@ -470,7 +470,7 @@ newtmp(char *prfx, int k,  Fn *fn)
 pub fn newtmp(prfx: &[u8], sufx: bool, k: K, fn_: &mut Fn) -> TmpIdx {
     return newtmp2(&mut fn_.tmps, prfx, sufx, k);
     // TODO why a globally unique name?
-    static mut N: i32 = 0;
+    //static mut N: i32 = 0;
     // let mut name: Vec<u8> = prfx.to_vec();
     // if sufx {
     //     name.push(b'.');
@@ -542,15 +542,29 @@ newcon(Con *c0, Fn *fn)
 }
  */
 
-pub fn newcon(f: &mut Fn, c0: Con) -> Ref {
-    for i in 1..f.cons.len() {
-        if c0 == f.cons[i] {
+pub fn newcon2(cons: &mut Vec<Con>, c0: Con) -> Ref {
+    for i in 1..cons.len() {
+        if c0 == cons[i] {
             return RCon(ConIdx(i as u32));
         }
     }
-    let ci = f.add_con(c0);
+    let ci = ConIdx(cons.len() as u32);
+    cons.push(c0);
+    //let ci = f.add_con(c0);
 
     RCon(ci)
+}
+
+pub fn newcon(f: &mut Fn, c0: Con) -> Ref {
+    newcon2(&mut f.cons, c0)
+    // for i in 1..f.cons.len() {
+    //     if c0 == f.cons[i] {
+    //         return RCon(ConIdx(i as u32));
+    //     }
+    // }
+    // let ci = f.add_con(c0);
+
+    // RCon(ci)
 }
 
 /*
@@ -571,6 +585,10 @@ getcon(int64_t val, Fn *fn)
 
 pub fn getcon(f: &mut Fn, i: i64) -> Ref {
     newcon(f, Con::new_bits(crate::all::ConBits::I(i)))
+}
+
+pub fn getcon2(cons: &mut Vec<Con>, i: i64) -> Ref {
+    newcon2(cons, Con::new_bits(crate::all::ConBits::I(i)))
 }
 
 /*

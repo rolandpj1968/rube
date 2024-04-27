@@ -10,7 +10,7 @@ use crate::all::{
     InsIdx, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, K, O,
 };
 use crate::cfg::dom;
-use crate::util::{getcon, newcon, newtmp, newtmpref};
+use crate::util::{getcon2, newcon2, newtmp2, newtmpref2};
 
 // TODO remove
 // use crate::all::{to_s, Typ};
@@ -35,7 +35,7 @@ enum LocT {
 
 #[derive(Clone, Copy, Debug)]
 struct Loc {
-    type_: LocT,
+    typ: LocT,
     off: InsIdx,
     bi: BlkIdx,
 }
@@ -103,36 +103,49 @@ pub fn storesz(s: &Ins) -> i32 {
     }
 }
 
-fn iins(f: &mut Fn, ilog: &mut Vec<Insert>, cls: K, op: O, a0: Ref, a1: Ref, l: &Loc) -> Ref {
-    let ti: TmpIdx = newtmp(b"ld", true, cls, f);
+fn iins(
+    blks: &Blks,
+    tmps: &mut Vec<Tmp>,
+    ilog: &mut Vec<Insert>,
+    cls: K,
+    op: O,
+    a0: Ref,
+    a1: Ref,
+    l: &Loc,
+) -> Ref {
+    let ti: TmpIdx = newtmp2(tmps, b"ld", true, cls);
     let to: Ref = RTmp(ti);
     let ins: Ins = Ins::new2(op, cls, to, [a0, a1]);
-    ilog.push(Insert::new(ti, f.blk(l.bi).id, InsertU::Ins(l.off, ins)));
+    ilog.push(Insert::new(
+        ti,
+        blks.borrow(l.bi).id,
+        InsertU::Ins(l.off, ins),
+    ));
     to
 }
 
-fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
+fn cast(blks: &Blks, tmps: &mut Vec<Tmp>, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
     match *r {
         RCon(_) => (), /*ok*/
         RTmp(ti) => {
-            let cls0: K = f.tmp(ti).cls;
+            let cls0: K = tmps[ti].cls;
             if cls0 == cls || (cls == Kw && cls0 == Kl) {
                 return;
             }
             if kwide(cls0) < kwide(cls) {
                 if cls0 == Ks {
-                    *r = iins(f, ilog, Kw, O::Ocast, *r, R, l);
+                    *r = iins(blks, tmps, ilog, Kw, O::Ocast, *r, R, l);
                 }
-                *r = iins(f, ilog, Kl, O::Oextuw, *r, R, l);
+                *r = iins(blks, tmps, ilog, Kl, O::Oextuw, *r, R, l);
                 if cls == Kd {
-                    *r = iins(f, ilog, Kd, O::Ocast, *r, R, l);
+                    *r = iins(blks, tmps, ilog, Kd, O::Ocast, *r, R, l);
                 }
             } else {
                 if cls0 == Kd && cls != Kl {
-                    *r = iins(f, ilog, Kl, O::Ocast, *r, R, l);
+                    *r = iins(blks, tmps, ilog, Kl, O::Ocast, *r, R, l);
                 }
                 if cls0 != Kd || cls != Kw {
-                    *r = iins(f, ilog, cls, O::Ocast, *r, R, l);
+                    *r = iins(blks, tmps, ilog, cls, O::Ocast, *r, R, l);
                 }
             }
         }
@@ -140,13 +153,30 @@ fn cast(f: &mut Fn, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
     }
 }
 
-fn mask(f: &mut Fn, ilog: &mut Vec<Insert>, cls: K, r: &mut Ref, msk: Bits, l: &Loc) {
-    cast(f, ilog, r, cls, l);
-    let c = getcon(f, msk as i64);
-    *r = iins(f, ilog, cls, O::Oand, *r, c, l);
+fn mask(
+    blks: &Blks,
+    tmps: &mut Vec<Tmp>,
+    cons: &mut Vec<Con>,
+    ilog: &mut Vec<Insert>,
+    cls: K,
+    r: &mut Ref,
+    msk: Bits,
+    l: &Loc,
+) {
+    cast(blks, tmps, ilog, r, cls, l);
+    let c = getcon2(cons, msk as i64);
+    *r = iins(blks, tmps, ilog, cls, O::Oand, *r, c, l);
 }
 
-fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> Ref {
+fn load(
+    blks: &Blks,
+    tmps: &mut Vec<Tmp>,
+    cons: &mut Vec<Con>,
+    ilog: &mut Vec<Insert>,
+    sl: &Slice,
+    msk: Bits,
+    l: &Loc,
+) -> Ref {
     let ld: O = match sl.sz {
         1 => O::Oloadub,
         2 => O::Oloaduh,
@@ -173,18 +203,18 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
      * (see killsl() below) */
     if let RTmp(ti) = r {
         //let ai = f.tmp(ti).alias;
-        let a: Alias = f.tmps[ti].alias; //*f.alias(ai); // Note - copy!
+        let a: Alias = tmps[ti].alias; //*f.alias(ai); // Note - copy!
         match a.typ {
             AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => {
                 r = RTmp(a.base);
                 if a.offset != 0 {
-                    let r1: Ref = getcon(f, a.offset);
-                    r = iins(f, ilog, Kl, O::Oadd, r, r1, l);
+                    let r1: Ref = getcon2(cons, a.offset);
+                    r = iins(blks, tmps, ilog, Kl, O::Oadd, r, r1, l);
                 }
             }
             AliasT::ACon | AliasT::ASym => {
                 if let AliasU::ASym(sym) = a.u {
-                    r = newcon(f, Con::new_sym(sym, crate::all::ConBits::I(a.offset)));
+                    r = newcon2(cons, Con::new_sym(sym, crate::all::ConBits::I(a.offset)));
                 } else {
                     assert!(false);
                     r = R; // Ugh, TODO
@@ -197,9 +227,9 @@ fn load(f: &mut Fn, ilog: &mut Vec<Insert>, sl: &Slice, msk: Bits, l: &Loc) -> R
             }
         }
     }
-    r = iins(f, ilog, cls, ld, r, R, l);
+    r = iins(blks, tmps, ilog, cls, ld, r, R, l);
     if !all {
-        mask(f, ilog, cls, &mut r, msk, l);
+        mask(blks, tmps, cons, ilog, cls, &mut r, msk, l);
     }
     r
 }
@@ -237,7 +267,10 @@ fn killsl(tmps: &[Tmp], r: Ref, sl: &Slice) -> bool {
  * otherwise, it has class sl.cls
  * the procedure returns R when it fails */
 fn def(
-    f: &mut Fn,
+    blks: &Blks,
+    phis: &mut Vec<Phi>,
+    tmps: &mut Vec<Tmp>,
+    cons: &mut Vec<Con>,
     ilog: &mut Vec<Insert>,
     sl: &Slice,
     msk: Bits,
@@ -247,9 +280,10 @@ fn def(
     // indent: usize,
     // debug: bool,
 ) -> Ref {
-    let blks: &Blks = &f.blks;
-    let phis: &mut Vec<Phi> = &mut f.phis;
-    let tmps: &mut Vec<Tmp> = &mut f.tmps;
+    // let blks: &Blks = &f.blks;
+    // let phis: &mut Vec<Phi> = &mut f.phis;
+    // let tmps: &mut Vec<Tmp> = &mut f.tmps;
+    // let cons: &mut Vec<Con> = &mut f.cons;
     // if debug {
     //     prindent(indent);
     //     println!(
@@ -323,7 +357,7 @@ fn def(
                 continue;
             }
         };
-        let (can_alias, mut off) = alias(f, sl.r, sl.off, sl.sz as i32, r1, sz);
+        let (can_alias, mut off) = alias(tmps, cons, sl.r, sl.off, sl.sz as i32, r1, sz);
         match can_alias {
             CanAlias::Must => {
                 // if debug {
@@ -360,7 +394,10 @@ fn def(
                 }
                 if i.op == O::Oblit0 {
                     r = def(
-                        f,
+                        blks,
+                        phis,
+                        tmps,
+                        cons,
                         ilog,
                         &sl1,
                         genmask(sz),
@@ -379,16 +416,19 @@ fn def(
                     } else {
                         cls
                     };
-                    cast(f, ilog, &mut r, cls1, il);
-                    r1 = getcon(f, 8 * (off as i64));
-                    r = iins(f, ilog, cls1, op, r, r1, il);
+                    cast(blks, tmps, ilog, &mut r, cls1, il);
+                    r1 = getcon2(cons, 8 * (off as i64));
+                    r = iins(blks, tmps, ilog, cls1, op, r, r1, il);
                 }
                 if (msk1 & msk) != msk1 || off + sz < sl.sz as i32 {
-                    mask(f, ilog, cls, &mut r, msk1 & msk, il);
+                    mask(blks, tmps, cons, ilog, cls, &mut r, msk1 & msk, il);
                 }
                 if (msk & !msk1) != 0 {
                     r1 = def(
-                        f,
+                        blks,
+                        phis,
+                        tmps,
+                        cons,
                         ilog,
                         sl,
                         msk & !msk1,
@@ -400,10 +440,10 @@ fn def(
                         goto_load = true;
                         continue;
                     }
-                    r = iins(f, ilog, cls, O::Oor, r, r1, il);
+                    r = iins(blks, tmps, ilog, cls, O::Oor, r, r1, il);
                 }
                 if msk == msks {
-                    cast(f, ilog, &mut r, sl.cls, il);
+                    cast(blks, tmps, ilog, &mut r, sl.cls, il);
                 }
                 return r;
             }
@@ -455,11 +495,11 @@ fn def(
             if let InsertU::Phi(uphi) = &ist.new {
                 if ist.bid == bid && uphi.m.r == sl.r && uphi.m.off == sl.off && uphi.m.sz == sl.sz
                 {
-                    let mut r = f.phi(uphi.pi).to;
+                    let mut r = phis[uphi.pi].to;
                     if msk != msks {
-                        mask(f, ilog, cls, &mut r, msk, il);
+                        mask(blks, tmps, cons, ilog, cls, &mut r, msk, il);
                     } else {
-                        cast(f, ilog, &mut r, sl.cls, il);
+                        cast(blks, tmps, ilog, &mut r, sl.cls, il);
                     }
                     return r;
                 }
@@ -468,14 +508,14 @@ fn def(
 
         let mut pi = blks.borrow(bi).phi;
         while pi != PhiIdx::NONE {
-            let p_to: Ref = f.phi(pi).to;
+            let p_to: Ref = phis[pi].to;
             if killsl(tmps, p_to, &sl) {
                 /* scanning predecessors in that
                  * case would be unsafe */
                 goto_load = true;
                 break;
             }
-            pi = f.phi(pi).link;
+            pi = phis[pi].link;
         }
     }
 
@@ -488,13 +528,16 @@ fn def(
     if !goto_load {
         if blks.borrow(bi).preds.len() == 1 {
             let bpi = blks.borrow(bi).preds[0];
-            assert!(f.blk(bpi).loop_ >= f.blk(il.bi).loop_);
+            assert!(blks.borrow(bpi).loop_ >= blks.borrow(il.bi).loop_);
             let mut l: Loc = *il;
-            if f.blk(bpi).s2 != BlkIdx::NONE {
-                l.type_ = LocT::LNoLoad;
+            if blks.borrow(bpi).s2 != BlkIdx::NONE {
+                l.typ = LocT::LNoLoad;
             }
             let r1: Ref = def(
-                f,
+                blks,
+                phis,
+                tmps,
+                cons,
                 ilog,
                 &sl,
                 msk,
@@ -510,11 +553,11 @@ fn def(
         }
     }
 
-    let mut r: Ref = R;
+    let mut r: Ref = newtmpref2(tmps, b"ld", true, sl.cls);
     if !goto_load {
-        r = newtmpref(b"ld", true, sl.cls, f); // TODO - this needs to be outside the if
         let p: Phi = Phi::new(r, vec![], vec![], sl.cls, PhiIdx::NONE);
-        let pi: PhiIdx = f.add_phi(p);
+        let pi: PhiIdx = PhiIdx::new(phis.len());
+        phis.push(p);
         // TODO - notify QBE? QBE doesn't seem to set ist.num (i.e. ti). Nor off
         // I suspect to should be r's ti, not 0???
         // Maybe for phi's, QBE gets "to" from UPhi(p.to)
@@ -530,21 +573,24 @@ fn def(
         {
             let bpi: BlkIdx = blks.borrow(bi).preds[np];
             let l_type: LocT;
-            if f.blk(bpi).s2 == BlkIdx::NONE
-                && il.type_ != LocT::LNoLoad
-                && f.blk(bpi).loop_ < f.blk(il.bi).loop_
+            if blks.borrow(bpi).s2 == BlkIdx::NONE
+                && il.typ != LocT::LNoLoad
+                && blks.borrow(bpi).loop_ < blks.borrow(il.bi).loop_
             {
                 l_type = LocT::LLoad;
             } else {
                 l_type = LocT::LNoLoad;
             }
             let l: Loc = Loc {
-                type_: l_type,
+                typ: l_type,
                 bi: bpi,
-                off: InsIdx::new(f.blk(bpi).ins().len()),
+                off: InsIdx::new(blks.borrow(bpi).ins().len()),
             };
             let r1: Ref = def(
-                f,
+                blks,
+                phis,
+                tmps,
+                cons,
                 ilog,
                 &sl,
                 msks,
@@ -556,21 +602,21 @@ fn def(
                 goto_load = true;
                 break;
             }
-            f.phi_mut(pi).args.push(r1);
-            f.phi_mut(pi).blks.push(bpi);
+            phis[pi].args.push(r1);
+            phis[pi].blks.push(bpi);
         }
     }
 
     if goto_load {
         tmps.truncate(oldt);
         ilog.truncate(oldl);
-        if il.type_ != LocT::LLoad {
+        if il.typ != LocT::LLoad {
             return R;
         }
-        load(f, ilog, sl, msk, il)
+        load(blks, tmps, cons, ilog, sl, msk, il)
     } else {
         if msk != msks {
-            mask(f, ilog, cls, &mut r, msk, il);
+            mask(blks, tmps, cons, ilog, cls, &mut r, msk, il);
         }
         r
     }
@@ -612,7 +658,7 @@ fn icmp(a: &Insert, b: &Insert) -> Ordering {
 /* require rpo ssa alias */
 // TODO remove type, itbl - just for debug
 pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
-    let blks: &Blks = &f.blks;
+    // TODO... let blks: &Blks = &f.blks;
     let mut ilog: Vec<Insert> = vec![];
 
     let mut bi: BlkIdx = f.start;
@@ -641,13 +687,16 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 };
                 let ii: InsIdx = InsIdx::new(iii);
                 let l: Loc = Loc {
-                    type_: LocT::LRoot,
+                    typ: LocT::LRoot,
                     off: ii,
                     bi,
                 };
                 // let debug: bool = bi.0 == 183 && iii == 1;
                 def(
-                    f,
+                    &f.blks,
+                    &mut f.phis,
+                    &mut f.tmps,
+                    &mut f.cons,
                     &mut ilog,
                     &sl,
                     genmask(sz),
@@ -704,7 +753,15 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
         let mut ib: Vec<Ins> = vec![];
         loop {
             let mut i: Ins;
-            if ist.bid == n && matches!(ist.new, InsertU::Ins(ni, _)) {
+            let (ni0, i0) = if let InsertU::Ins(ni1, i1) = ist.new {
+                (ni1, i1)
+            } else {
+                // MUST be InsertU::Ins
+                assert!(false);
+                (InsIdx::NONE, Ins::NOP)
+            };
+            if ist.bid == n && ni == ni0 {
+                // Broken ni pattern match
                 if let InsertU::Ins(_, i0) = &ist.new {
                     i = *i0; // Copy
                 } else {
@@ -719,7 +776,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                     break;
                 }
                 i = f.blk(bi).ins()[ni.0 as usize];
-                ni = InsIdx::new(ni.usize() + 1);
+                ni = ni.next(); //InsIdx::new(ni.usize() + 1);
                 if isload(i.op) && i.args[1] != R {
                     // TODO same code in mem.rs
                     let ext: O =
