@@ -536,7 +536,6 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         }
 
         /* fuse slots by decreasing size */
-        println!("              fusing: {} candidates", sl.len());
         sl.sort_by(scmp);
         // qsort(sl, nsl, sizeof *sl, scmp);
         'outer: for s0i in 0..sl.len() {
