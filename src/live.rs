@@ -175,9 +175,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     {
         /*e*/
         println!("\n> Liveness analysis:");
-        let mut bi = f.start;
-        while bi != BlkIdx::NONE {
-            let b: &Blk = &blks.borrow(bi);
+        blks.for_each(|b| {
             /*e*/
             print!("\t{:<10}in:   ", to_s(&b.name));
             dumpts(&b.in_, &f.tmps, &mut stdout() /*stderr*/);
@@ -191,8 +189,6 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             print!("\t          live: ");
             /*e*/
             println!("{} {}", b.nlive[0], b.nlive[1]);
-
-            bi = b.link;
-        }
+        });
     }
 }
