@@ -113,13 +113,21 @@ impl Blks {
     //         })
     // }
     pub fn for_each_mut(&self, mut f: impl FnMut(&mut Blk)) {
-        self.v.iter().for_each(|br| {
-            let mut b = br.borrow_mut();
-            assert!(b.is_defined);
-            if !b.is_dead {
-                f(&mut *b)
-            }
-        });
+        let mut bi = BlkIdx::START;
+        while bi != BlkIdx::NONE {
+            let mut b = self.borrow_mut(bi);
+            f(&mut *b);
+            bi = b.link;
+        }
+        // TODO - this generates blks in a different order from the link chain :(
+        // Need to sort f.blks on link chain order to maintain behaviour parity with QBE
+        // self.v.iter().for_each(|br| {
+        //     let mut b = br.borrow_mut();
+        //     assert!(b.is_defined);
+        //     if !b.is_dead {
+        //         f(&mut *b)
+        //     }
+        // });
     }
 
     pub fn for_each_bi(&self, mut f: impl FnMut(BlkIdx)) {
