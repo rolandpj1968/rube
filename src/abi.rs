@@ -10,8 +10,7 @@ use crate::all::{isargbh, isparbh, isretbh, BlkIdx, Blks, Fn, J, O};
 pub fn elimsb(f: &mut Fn) {
     let blks: &Blks = &f.blks;
 
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
+    blks.for_each_bi(|bi| {
         blks.with_mut(bi, |b| {
             for i in b.ins_mut().iter_mut() {
                 if isargbh(i.op) {
@@ -23,8 +22,6 @@ pub fn elimsb(f: &mut Fn) {
             if isretbh(b.jmp().typ) {
                 b.jmp_mut().typ = J::Jretw;
             }
-
-            bi = b.link;
         });
-    }
+    });
 }
