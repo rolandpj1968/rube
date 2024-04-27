@@ -44,14 +44,14 @@ fn dump_dbgfile(name: &[u8]) {
 
 fn dump_data(dat: &Dat, _typ: &[Typ]) {
     println!(
-        "Got dat {:?} {:?}",
+        "Got dat \"{}\" {:?}",
         String::from_utf8_lossy(&dat.name),
         dat.type_
     );
 }
 
 fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
-    println!("Got fn {:?}:", String::from_utf8_lossy(&f.name));
+    println!("Got fn \"{}\":", String::from_utf8_lossy(&f.name));
     println!();
     (targ.abi0)(f);
     fillrpo(f);

@@ -73,13 +73,6 @@ pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
                 continue;
             }
 
-            println!(
-                "           promote: blk {} ins {} tmp {} has {} uses",
-                to_s(&b.name),
-                ii,
-                to_s(&t.name),
-                t.uses.len()
-            );
             for u in &t.uses {
                 if let UseT::UIns(li) = u.typ {
                     let ub = blks.borrow(u.bi);
@@ -103,12 +96,6 @@ pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
                 continue 'ins_loop;
             }
         }
-
-        println!(
-            "                              ins {} tmp {} for promotion",
-            ii,
-            to_s(&t.name)
-        );
 
         /* get rid of the alloc and replace uses */
         blks.borrow_mut(bi).ins_mut()[ii] = Ins::NOP;
