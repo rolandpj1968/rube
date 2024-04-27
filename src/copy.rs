@@ -240,7 +240,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     /* 2. remove redundant phis/copies
      * and rewrite their uses */
     blks.for_each_mut(|b| {
-        println!("Copy elimination on @{}", to_s(&b.name));
+        // println!("Copy elimination on @{}", to_s(&b.name));
         let mut ppi: PhiIdx = PhiIdx::NONE;
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
@@ -248,20 +248,20 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             let p_link: PhiIdx = phis[pi].link;
             assert!(matches!(p_to, RTmp(_)));
             if let RTmp(ti) = p_to {
-                println!("  phi for %{}", to_s(&tmps[ti].name));
+                // println!("  phi for %{}", to_s(&tmps[ti].name));
                 // println!("      it is for %{}", to_s(&tmps[ti].name));
                 let r: Ref = cpy[ti.usize()];
-                if let RTmp(rti) = r {
-                    println!("          copy r is %{}", to_s(&tmps[rti].name))
-                }
+                // if let RTmp(rti) = r {
+                //     println!("          copy r is %{}", to_s(&tmps[rti].name))
+                // }
                 // println!("          copy r is {:?}", r);
                 if r != p_to {
-                    println!("              removing phi!");
+                    // println!("              removing phi!");
                     if ppi == PhiIdx::NONE {
-                        println!("              ... it is the first phi!");
+                        // println!("              ... it is the first phi!");
                         b.phi = p_link;
                     } else {
-                        println!("              ... it is not the first phi!");
+                        // println!("              ... it is not the first phi!");
                         phis[ppi].link = p_link;
                     }
                     pi = p_link;
