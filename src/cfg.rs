@@ -238,15 +238,11 @@ fn fillfron_for_succ(blks: &Blks, bi: BlkIdx, si: BlkIdx) {
 /* fill the dominance frontier */
 pub fn fillfron(f: &mut Fn) {
     let blks: &Blks = &f.blks;
-
     blks.for_each_mut(|b| b.frons.clear());
-
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
-        let (succs, link) = blks.with(bi, |b| (b.succs(), b.link));
+    blks.for_each_bi(|bi| {
+        let succs = blks.succs_of(bi);
         succs.iter().for_each(|si| fillfron_for_succ(blks, bi, *si));
-        bi = link;
-    }
+    });
 }
 
 fn loopmark(blks: &Blks, hdi: BlkIdx, bi: BlkIdx, func: fn(&Blks, BlkIdx, BlkIdx)) {
