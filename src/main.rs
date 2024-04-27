@@ -31,6 +31,7 @@ use alias::fillalias;
 use all::{Dat, Fn, Target, Typ};
 use amd64::targ::T_AMD64_SYSV;
 use cfg::fillrpo;
+use copy::copy;
 use load::loadopt;
 use mem::{coalesce, promote};
 use parse::{parse, printfn};
@@ -69,7 +70,7 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     coalesce(f, typ, itbl);
     filluse(f);
     ssacheck(f).unwrap();
-    // copy(f);
+    copy(f, typ, itbl);
 
     printfn(&mut stdout(), f, typ, itbl);
 }

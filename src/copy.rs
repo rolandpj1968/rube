@@ -144,7 +144,14 @@ fn phisimpl(
     }
 }
 
-fn subst(pr: &mut Ref, cpy: &[Ref]) {
+fn subst(tmps: &[Tmp], pr: &mut Ref, cpy: &[Ref]) {
+    if let RTmp(ti) = *pr {
+        println!(
+            "             substing %{}, cpy is {:?}",
+            to_s(&tmps[ti].name),
+            cpy[ti.usize()]
+        );
+    }
     assert!({
         if let RTmp(ti) = *pr {
             cpy[ti.usize()] != R
@@ -162,38 +169,30 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let phis: &mut [Phi] = &mut f.phis;
     let tmps: &[Tmp] = &f.tmps;
     let cons: &[Con] = &f.cons;
-    // BSet ts[1], as[1];
-    // Use **stk;
-    // Phi *p, **pp;
-    // Ins *i;
-    // Blk *b;
-    // uint n, a, eq;
-    // Ref *cpy, r, r1;
-    // int t;
 
     let mut cpy: Vec<Ref> = vec![R; tmps.len()];
 
     assert!(f.nblk as usize == rpo.len());
     /* 1. build the copy-of map */
-    // for (n=0; n<fn->nblk; n++) {
     for n in 0..rpo.len() {
-        //     b = fn->rpo[n];
         let bi: BlkIdx = rpo[n];
         blks.with(bi, |b| {
-            //     for (p=b->phi; p; p=p->link) {
+            println!("Building copy-map using @{}", to_s(&b.name));
             let mut pi: PhiIdx = b.phi;
             while pi != PhiIdx::NONE {
                 let p: &Phi = &phis[pi];
-                //         assert(rtype(p->to) == RTmp);
                 assert!(matches!(p.to, RTmp(_)));
+                println!("  phi for {:?}", p.to);
                 if let RTmp(ti) = p.to {
+                    println!("      it is for %{}", to_s(&tmps[ti].name));
                     if cpy[ti.0 as usize] != R {
                         // are we gonna allow TmpIdx indexing???
+                        println!("        ... cpy is already {:?}", cpy[ti.0 as usize]);
+                        pi = p.link;
                         continue;
                     }
                     let mut eq: usize = 0;
                     let mut r: Ref = R;
-                    //         for (a=0; a<p->narg; a++)
                     for a in 0..p.args.len() {
                         let abi: BlkIdx = p.blks[a];
                         let ab = blks.borrow(abi);
@@ -213,26 +212,27 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                         rti = rti0;
                     }
                     if rti != TmpIdx::NONE && !dom(blks, rpo[tmps[rti].bid], bi) {
-                        cpy[rti.usize()] = p.to;
+                        cpy[ti.usize()] = p.to;
                     } else if eq == p.args.len() {
                         cpy[ti.usize()] = r;
                     } else {
                         cpy[ti.usize()] = p.to;
                         phisimpl(blks, tmps, phis, cons, pi, r, &mut cpy);
                     }
-                    for i in b.ins().iter() {
-                        assert!(i.to == R || matches!(i.to, RTmp(_)));
-                        if let RTmp(ti) = i.to {
-                            r = copyof(i.args[0], &cpy);
-                            if iscopy(tmps, cons, i, r) {
-                                cpy[ti.usize()] = r;
-                            } else {
-                                cpy[ti.usize()] = i.to;
-                            }
-                        }
-                    }
                 }
                 pi = p.link;
+            }
+            for i in b.ins().iter() {
+                assert!(i.to == R || matches!(i.to, RTmp(_)));
+                if let RTmp(ti) = i.to {
+                    println!("  ins for {:?} %{}", i.to, to_s(&tmps[ti].name));
+                    let r: Ref = copyof(i.args[0], &cpy);
+                    if iscopy(tmps, cons, i, r) {
+                        cpy[ti.usize()] = r;
+                    } else {
+                        cpy[ti.usize()] = i.to;
+                    }
+                }
             }
         });
     }
@@ -241,17 +241,21 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
      * and rewrite their uses */
     let mut ppi: PhiIdx = PhiIdx::NONE;
     blks.for_each_mut(|b| {
+        println!("Copy elimination on @{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
-            //let p: &mut Phi = &mut phis[pi];
             let p_to: Ref = phis[pi].to;
+            println!("  phi for {:?}", p_to);
             let p_link: PhiIdx = phis[pi].link;
             assert!(matches!(p_to, RTmp(_)));
             if let RTmp(ti) = p_to {
+                println!("      it is for %{}", to_s(&tmps[ti].name));
                 let r: Ref = cpy[ti.usize()];
+                println!("          copy r is {:?}", r);
                 if r == p_to {
                     for a in &mut phis[pi].args {
-                        subst(a, &cpy);
+                        println!("          arg subst for {:?}", *a);
+                        subst(tmps, a, &cpy);
                     }
                 } else {
                     if ppi == PhiIdx::NONE {
@@ -273,11 +277,11 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     *i = Ins::NOP;
                     continue;
                 }
-                subst(&mut i.args[0], &cpy);
-                subst(&mut i.args[1], &cpy);
+                subst(tmps, &mut i.args[0], &cpy);
+                subst(tmps, &mut i.args[1], &cpy);
             }
         }
-        subst(&mut b.jmp.borrow_mut().arg, &cpy);
+        subst(tmps, &mut b.jmp.borrow_mut().arg, &cpy);
     });
 
     if true
