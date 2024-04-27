@@ -1,12 +1,15 @@
+use std::io::stdout;
+
 use crate::all::Ref::{RCon, RTmp, R};
 use crate::all::TmpWdth::{Wsb, Wsh, Wsw, Wub, Wuh, Wuw};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{
-    bit, bshas, isext, kbase, BSet, Bits, BlkIdx, Blks, Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx,
-    Ref, RpoIdx, Tmp, TmpIdx, Use, UseT, O, UNDEF,
+    bit, bshas, isext, kbase, to_s, BSet, Bits, BlkIdx, Blks, Con, ConBits, ConT, Fn, Ins, Phi,
+    PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, O, TMP0, UNDEF,
 };
 use crate::cfg::dom;
-use crate::util::{bscount, bsdiff, bsinit, bsiter, bsset};
+use crate::parse::{printfn, printref};
+use crate::util::{bscount, bsdiff, bsinit, bsiter, bsset, Bucket};
 
 fn iscon(cons: &[Con], r: Ref, bits: i64) -> bool {
     if let RCon(ci) = r {
@@ -140,20 +143,23 @@ fn phisimpl(
         }
     }
 }
-/*
-static void
-subst(Ref *pr, Ref *cpy)
-{
-    assert(rtype(*pr) != RTmp || !req(cpy[pr->val], R));
+
+fn subst(pr: &mut Ref, cpy: &[Ref]) {
+    assert!({
+        if let RTmp(ti) = *pr {
+            cpy[ti.usize()] != R
+        } else {
+            true
+        }
+    });
     *pr = copyof(*pr, cpy);
 }
- */
 
 /* requires use and dom, breaks use */
-pub fn copy(f: &mut Fn) {
+pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let blks: &Blks = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
-    let phis: &[Phi] = &f.phis;
+    let phis: &mut [Phi] = &mut f.phis;
     let tmps: &[Tmp] = &f.tmps;
     let cons: &[Con] = &f.cons;
     // BSet ts[1], as[1];
@@ -214,7 +220,6 @@ pub fn copy(f: &mut Fn) {
                         cpy[ti.usize()] = p.to;
                         phisimpl(blks, tmps, phis, cons, pi, r, &mut cpy);
                     }
-                    //     for (i=b->ins; i<&b->ins[b->nins]; i++) {
                     for i in b.ins().iter() {
                         assert!(i.to == R || matches!(i.to, RTmp(_)));
                         if let RTmp(ti) = i.to {
@@ -232,47 +237,66 @@ pub fn copy(f: &mut Fn) {
         });
     }
 
-    // /* 2. remove redundant phis/copies
-    //  * and rewrite their uses */
-    // for (b=fn->start; b; b=b->link) {
-    //     for (pp=&b->phi; (p=*pp);) {
-    //         r = cpy[p->to.val];
-    //         if (!req(r, p->to)) {
-    //             *pp = p->link;
-    //             continue;
-    //         }
-    //         for (a=0; a<p->narg; a++)
-    //             subst(&p->arg[a], cpy);
-    //         pp=&p->link;
-    //     }
-    //     for (i=b->ins; i<&b->ins[b->nins]; i++) {
-    //         r = cpy[i->to.val];
-    //         if (!req(r, i->to)) {
-    //             *i = (Ins){.op = Onop};
-    //             continue;
-    //         }
-    //         subst(&i->arg[0], cpy);
-    //         subst(&i->arg[1], cpy);
-    //     }
-    //     subst(&b->jmp.arg, cpy);
-    // }
+    /* 2. remove redundant phis/copies
+     * and rewrite their uses */
+    let mut ppi: PhiIdx = PhiIdx::NONE;
+    blks.for_each_mut(|b| {
+        let mut pi: PhiIdx = b.phi;
+        while pi != PhiIdx::NONE {
+            //let p: &mut Phi = &mut phis[pi];
+            let p_to: Ref = phis[pi].to;
+            let p_link: PhiIdx = phis[pi].link;
+            assert!(matches!(p_to, RTmp(_)));
+            if let RTmp(ti) = p_to {
+                let r: Ref = cpy[ti.usize()];
+                if r == p_to {
+                    for a in &mut phis[pi].args {
+                        subst(a, &cpy);
+                    }
+                } else {
+                    if ppi == PhiIdx::NONE {
+                        b.phi = p_link;
+                    } else {
+                        phis[ppi].link = p_link;
+                    }
+                }
+            }
+            ppi = pi;
+            pi = p_link;
+        }
+        for i in &mut b.ins_mut().iter_mut() {
+            // Hrmmm, this only works for RTmp - what about QBE and void ops?
+            // assert!(matches!(i.to, RTmp(_)));
+            if let RTmp(ti) = i.to {
+                let r: Ref = cpy[ti.usize()];
+                if r != i.to {
+                    *i = Ins::NOP;
+                    continue;
+                }
+                subst(&mut i.args[0], &cpy);
+                subst(&mut i.args[1], &cpy);
+            }
+        }
+        subst(&mut b.jmp.borrow_mut().arg, &cpy);
+    });
 
-    // if (debug['C']) {
-    //     fprintf(stderr, "\n> Copy information:");
-    //     for (t=Tmp0; t<fn->ntmp; t++) {
-    //         if (req(cpy[t], R)) {
-    //             fprintf(stderr, "\n%10s not seen!",
-    //                 fn->tmp[t].name);
-    //         }
-    //         else if (!req(cpy[t], TMP(t))) {
-    //             fprintf(stderr, "\n%10s copy of ",
-    //                 fn->tmp[t].name);
-    //             printref(cpy[t], fn, stderr);
-    //         }
-    //     }
-    //     fprintf(stderr, "\n\n> After copy elimination:\n");
-    //     printfn(fn, stderr);
-    // }
-    // vfree(stk);
-    // free(cpy);
+    if true
+    /*debug['C']*/
+    {
+        /*e*/
+        print!("\n> Copy information:");
+        for tii in TMP0..tmps.len() {
+            if cpy[tii] == R {
+                /*e*/
+                print!("\n{:>10} not seen!", to_s(&tmps[tii].name));
+            } else if !matches!(cpy[tii], RTmp(_)) {
+                /*e*/
+                print!("\n{:>10} copy of ", to_s(&tmps[tii].name));
+                printref(/*stderr*/ &mut stdout(), f, typ, itbl, cpy[tii]);
+            }
+        }
+        /*e*/
+        println!("\n\n> After copy elimination:");
+        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
+    }
 }

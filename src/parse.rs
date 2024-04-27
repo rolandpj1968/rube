@@ -1961,7 +1961,6 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
     }
 }
 
-// TODO - remove pub
 pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Ref) {
     match r {
         R => assert!(false),
