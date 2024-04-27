@@ -741,7 +741,16 @@ pub fn bsunion(a: &mut BSet, b: &BSet) {
 /*
 BSOP(bsinter, &=)
 BSOP(bsdiff, &= ~)
+*/
 
+pub fn bsdiff(a: &mut BSet, b: &BSet) {
+    assert!(a.len() == b.len());
+    for i in 0..a.len() {
+        a[i] &= !b[i];
+    }
+}
+
+/*
 int
 bsequal(BSet *a, BSet *b)
 {

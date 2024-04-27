@@ -1096,7 +1096,7 @@ impl Alias {
     }
 }
 
-#[derive(Debug, FromRepr, PartialEq)]
+#[derive(Clone, Copy, Debug, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum TmpWdth {
     WFull,
@@ -1236,7 +1236,7 @@ pub enum ConBits {
 
 #[derive(new, Debug, PartialEq)]
 pub struct Con {
-    pub type_: ConT,
+    pub typ: ConT,
     pub sym: Sym,
     pub bits: ConBits,
 }

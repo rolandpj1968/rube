@@ -19,7 +19,7 @@ pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
         }
         RCon(ci) => {
             let c: &Con = &cons[ci.0 as usize];
-            match c.type_ {
+            match c.typ {
                 ConT::CAddr => {
                     a_out.typ = AliasT::ASym;
                     a_out.u = AliasU::ASym(c.sym);
@@ -204,7 +204,7 @@ pub fn fillalias(f: &mut Fn) {
                         let c: &Con = &cons[ci.0 as usize];
                         assert!(matches!(c.bits, ConBits::I(_)));
                         if let ConBits::I(sz0) = c.bits {
-                            if c.type_ == ConT::CBits && (0 <= sz0 && sz0 <= NBIT as i64) {
+                            if c.typ == ConT::CBits && (0 <= sz0 && sz0 <= NBIT as i64) {
                                 sz = sz0 as i32;
                             }
                         }

@@ -1260,7 +1260,7 @@ impl Parser<'_> {
                         // TODO - clean up
                         let sz: u32 = {
                             let mut sz_u32: u32 = 0;
-                            let mut is_valid_size: bool = c.type_ == ConT::CBits;
+                            let mut is_valid_size: bool = c.typ == ConT::CBits;
                             if is_valid_size {
                                 if let ConBits::I(sz_i64) = c.bits {
                                     sz_u32 = sz_i64 as u32;
@@ -1923,7 +1923,7 @@ pub fn parse(
 }
 
 pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
-    match c.type_ {
+    match c.typ {
         ConT::CUndef => assert!(false), // nada
         ConT::CAddr => {
             if c.sym.type_ == SymT::SThr {
@@ -1993,7 +1993,7 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Re
             let mut i: bool = false;
             let m: &Mem = fn_.mem(mi);
             let _ = write!(f, "[");
-            if m.offset.type_ != ConT::CUndef {
+            if m.offset.typ != ConT::CUndef {
                 printcon(f, itbl, &m.offset);
                 i = true;
             }

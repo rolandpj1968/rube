@@ -12,6 +12,7 @@ mod alias;
 mod all;
 mod amd64;
 mod cfg;
+mod copy;
 mod live;
 mod load;
 mod mem;
@@ -66,6 +67,9 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     filluse(f);
     fillalias(f);
     coalesce(f, typ, itbl);
+    filluse(f);
+    ssacheck(f).unwrap();
+    // copy(f);
 
     printfn(&mut stdout(), f, typ, itbl);
 }
