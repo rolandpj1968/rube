@@ -1,19 +1,22 @@
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
+use std::io::stdout;
 use std::ops::{Index, IndexMut};
 
 use crate::alias::getalias;
 use crate::all::Ref::{RInt, RTmp, R};
-use crate::all::K::{Kl, Kw, Kx};
+use crate::all::K::{Kl, Kx};
 use crate::all::{
     bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Blks,
-    Con, Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Use, UseT, CON_Z, J, K, NBIT, O,
+    Con, Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Typ, Use, UseT, CON_Z, J, K, NBIT, O,
     OALLOC, OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
 use crate::optab::OPTAB;
+use crate::parse::printfn;
+use crate::util::Bucket;
 
 #[derive(Debug)]
 struct MemError {
@@ -40,7 +43,7 @@ impl Error for MemError {
     }
 }
 
-pub fn promote(f: &mut Fn) -> RubeResult<()> {
+pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
     let blks = &f.blks;
     let tmps: &mut [Tmp] = &mut f.tmps;
 
@@ -70,6 +73,13 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                 continue;
             }
 
+            println!(
+                "           promote: blk {} ins {} tmp {} has {} uses",
+                to_s(&b.name),
+                ii,
+                to_s(&t.name),
+                t.uses.len()
+            );
             for u in &t.uses {
                 if let UseT::UIns(li) = u.typ {
                     let ub = blks.borrow(u.bi);
@@ -88,14 +98,17 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
                             k = OPTAB[l.op as usize].argcls[0][0];
                             continue;
                         }
-                    } else {
-                        continue 'ins_loop;
                     }
-                } else {
-                    continue 'ins_loop;
                 }
+                continue 'ins_loop;
             }
         }
+
+        println!(
+            "                              ins {} tmp {} for promotion",
+            ii,
+            to_s(&t.name)
+        );
 
         /* get rid of the alloc and replace uses */
         blks.borrow_mut(bi).ins_mut()[ii] = Ins::NOP;
@@ -155,10 +168,13 @@ pub fn promote(f: &mut Fn) -> RubeResult<()> {
         }
     }
     // TODO:
-    // if (debug['M']) {
-    //     fprintf(stderr, "\n> After slot promotion:\n");
-    //     printfn(fn, stderr);
-    // }
+    if true
+    /*debug['M']*/
+    {
+        /*e*/
+        println!("\n> After slot promotion:");
+        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
+    }
     Ok(())
 }
 
@@ -296,7 +312,7 @@ fn maxrpo(blks: &Blks, hdi: BlkIdx, bi: BlkIdx) {
     });
 }
 
-pub fn coalesce(f: &mut Fn) {
+pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let blks: &Blks = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let nblk = rpo.len();
@@ -339,6 +355,7 @@ pub fn coalesce(f: &mut Fn) {
     }
 
     let mut bl: Vec<(BlkIdx, InsIdx)> = vec![]; // Mmm
+    let mut ip: i32 = i32::MAX - 1; // ???
     {
         let tmps: &[Tmp] = &f.tmps;
         /* one-pass liveness analysis */
@@ -346,7 +363,6 @@ pub fn coalesce(f: &mut Fn) {
         loopiter(blks, rpo, maxrpo);
         {
             let mut br: Vec<Range> = vec![Range { a: 0, b: 0 }; nblk];
-            let mut ip: i32 = i32::MAX - 1; // ???
             for n in (0..nblk).rev() {
                 let bi: BlkIdx = rpo[n];
                 blks.with(bi, |b| {
@@ -635,8 +651,6 @@ pub fn coalesce(f: &mut Fn) {
     /* fix newly overlapping blits */
     for (bi, ii) in bl {
         blks.with_mut(bi, |b| {
-            //for (n=0; n<nbl; n++) {
-            // i = bl[n];
             let i: Ins = b.ins_mut()[ii]; // Note - copy Ugh fixme
             if i.op == O::Oblit0 {
                 if let Some((s0, off0)) = slot(tmps, cons, i.args[0]) {
@@ -647,16 +661,12 @@ pub fn coalesce(f: &mut Fn) {
                                 let blit1: &mut Ins = &mut b.ins_mut()[ii.next()];
                                 assert!(blit1.op == O::Oblit1 && matches!(blit1.args[0], RInt(_)));
                                 if let RInt(sz) = blit1.args[0] {
-                                    //sz = rsval((i+1).arg[0]);
                                     assert!(sz >= 0);
                                     blit1.args[0] = RInt(-sz); // What are you doing Quentin???
-                                                               //(i+1).arg[0] = INT(-sz);
                                 }
                             } else if off0 == off1 {
                                 b.ins_mut()[ii] = Ins::NOP;
-                                //*i = (Ins){.op = Onop};
                                 b.ins_mut()[ii.next()] = Ins::NOP;
-                                //*(i+1) = (Ins){.op = Onop};
                             }
                         }
                     }
@@ -668,27 +678,37 @@ pub fn coalesce(f: &mut Fn) {
     if true
     /*TODO debug['M']*/
     {
-        // for (s0=sl; s0<&sl[nsl]; s0++) {
-        //     if (s0.s != s0)
-        //         continue;
-        //     fprintf(stderr, "\tfuse (% 3db) [", s0.sz);
-        //     for (s=s0; s<&sl[nsl]; s++) {
-        //         if (s.s != s0)
-        //             continue;
-        //         fprintf(stderr, " %%%s", f.tmp[s.t].name);
-        //         if (s.r.b)
-        //             fprintf(stderr, "[%d,%d)",
-        //                 s.r.a-ip, s.r.b-ip);
-        //         else
-        //             fputs("{}", stderr);
-        //     }
-        //     fputs(" ]\n", stderr);
-        // }
+        for (s0ii, s0) in sl.iter().enumerate() {
+            //for (s0=sl; s0<&sl[nsl]; s0++) {
+            let s0i = SlotIdx::new(s0ii);
+            if s0.si != s0i {
+                continue;
+            }
+            /*e*/
+            print!("\tfuse ({:>3}b) [", s0.sz);
+            for s in &sl {
+                //for (s=s0; s<&sl[nsl]; s++) {
+                if s.si != s0i {
+                    continue;
+                }
+                /*e*/
+                print!(" %{}", to_s(&tmps[s.ti].name));
+                if s.r.b != 0 {
+                    /*e*/
+                    print!("[{},{})", s.r.a - ip, s.r.b - ip);
+                } else {
+                    /*e*/
+                    print!("{{}}");
+                }
+            }
+            /*e*/
+            println!(" ]");
+        }
         /*e*/
         println!(
             "\tsums {}/{}/{} (killed/fused/total)\n",
             freed, fused, total
         );
-        //printfn(f, stderr);
+        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
     }
 }

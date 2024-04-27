@@ -44,6 +44,11 @@ fn bset(tmps: &[Tmp], r: Ref, b: &mut Blk, nlv: &mut [u32; 2]) {
         bsset(&mut b.gen, ti.usize());
         if !bshas(&b.in_, ti.usize()) {
             nlv[kbase(tmps[ti].cls) as usize] += 1;
+            // println!(
+            //     "                            setting {} in bit {}",
+            //     to_s(&b.name),
+            //     ti.usize()
+            // );
             bsset(&mut b.in_, ti.usize());
         }
     }
@@ -70,8 +75,18 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
 
     let mut chg: bool = true;
     loop {
+        // println!(
+        //     "   changing - u[1] is 0x{:08x}, v[1] is 0x{:08x}",
+        //     u[1], v[1]
+        // );
         for n in (0..rpo.len()).rev() {
             let bi: BlkIdx = rpo[n];
+            blks.with(bi, |b| {
+                // println!(
+                //     "                  starting: n {} - in[1] 0x{:08x}, out[1] 0x{:08x}, gen 0x{:08x}",
+                //     n, b.in_[1], b.out[1], b.gen[1]
+                // );
+            });
             {
                 let succs = blks.with_mut(bi, |b| {
                     bscopy(&mut u, &b.out);
@@ -99,6 +114,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
 
                 let jmp_arg = b.jmp().arg;
                 if let RCall(_) = jmp_arg {
+                    // println!("Not here");
                     assert!(bscount(&b.in_) == targ.nrglob && b.in_[0] == targ.rglob);
                     b.in_[0] |= (targ.retregs)(jmp_arg, &nlv); // TODO not implemented
                 } else {
@@ -109,6 +125,11 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
 
                 let ins_len = b.ins().len();
                 for ii in (0..ins_len).rev() {
+                    // println!(
+                    //     "                                          ins {} {:?}",
+                    //     ii,
+                    //     b.ins()[ii]
+                    // );
                     let i: Ins = b.ins()[ii]; // Note, copy
                     if i.op == O::Ocall {
                         if let RCall(_) = i.args[1] {
@@ -138,6 +159,10 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                             nlv[kbase(tmps[ti].cls) as usize] -= 1;
                         }
                         bsset(&mut b.gen, ti.usize());
+                        // println!(
+                        //     "                                              clearing in {}",
+                        //     ti.usize()
+                        // );
                         bsclr(&mut b.in_, ti.usize());
                     }
                     for k in 0..2 {
@@ -151,6 +176,10 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                                 bset(tmps, index, b, &mut nlv);
                             }
                             _ => {
+                                // println!(
+                                //     "                                              bset arg {}",
+                                //     k
+                                // );
                                 bset(tmps, i.args[k], b, &mut nlv);
                             }
                         }
@@ -162,6 +191,12 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                     }
                 }
             });
+            blks.with(bi, |b| {
+                // println!(
+                //     "                    ending: n {} - in[1] 0x{:08x}, out[1] 0x{:08x}, gen 0x{:08x}",
+                //     n, b.in_[1], b.out[1], b.gen[1]
+                // );
+            });
         }
         if chg {
             chg = false;
@@ -169,6 +204,11 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
             break;
         }
     }
+
+    // println!(
+    //     "       done - u[1] is 0x{:08x}, v[1] is 0x{:08x}",
+    //     u[1], v[1]
+    // );
 
     if true
     /*TODO debug['L']*/

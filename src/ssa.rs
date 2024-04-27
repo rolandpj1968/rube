@@ -394,7 +394,8 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     /*debug['N']*/
     {
         // TODO obviously
-        eprintln!("\n> Dominators:");
+        /*e*/
+        println!("\n> Dominators:");
         let mut b1i: BlkIdx = f.start;
         while b1i != BlkIdx::NONE {
             let b1 = f.blk(b1i);
