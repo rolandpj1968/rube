@@ -57,17 +57,17 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     fillrpo(f);
     filluse(f);
     promote(f, typ, itbl).unwrap();
-    // filluse(f);
-    // ssa(f, targ, typ, itbl).unwrap();
-    // filluse(f);
-    // ssacheck(f).unwrap();
-    // fillalias(f);
-    // loadopt(f /*, typ, itbl*/);
-    // filluse(f);
-    // fillalias(f);
+    filluse(f);
+    ssa(f, targ, typ, itbl).unwrap();
+    filluse(f);
+    ssacheck(f).unwrap();
+    fillalias(f);
+    loadopt(f /*, typ, itbl*/);
+    filluse(f);
+    fillalias(f);
     // coalesce(f, typ, itbl);
 
-    // printfn(&mut stdout(), f, typ, itbl);
+    printfn(&mut stdout(), f, typ, itbl);
 }
 
 fn main() {
