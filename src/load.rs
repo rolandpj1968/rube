@@ -14,13 +14,6 @@ use crate::cfg::dom;
 use crate::parse::printfn;
 use crate::util::{getcon2, newcon2, newtmp2, newtmpref2, Bucket};
 
-// TODO remove
-// use crate::all::{to_s, Typ};
-// use crate::optab::OPTAB;
-// use crate::parse::printref;
-// use crate::util::Bucket;
-// use std::io::stdout;
-
 // TODO i32 is dodgy
 fn genmask(w: i32) -> Bits {
     assert!(0 <= w && w <= 8);
@@ -204,7 +197,6 @@ fn load(
      * but its alias base ref will be
      * (see killsl() below) */
     if let RTmp(ti) = r {
-        //let ai = f.tmp(ti).alias;
         let a: Alias = tmps[ti].alias; //*f.alias(ai); // Note - copy!
         match a.typ {
             AliasT::ALoc | AliasT::AEsc | AliasT::AUnk => {
@@ -255,12 +247,6 @@ fn killsl(tmps: &[Tmp], r: Ref, sl: &Slice) -> bool {
     false
 }
 
-// fn prindent(indent: usize) {
-//     for n in 0..indent {
-//         print!("  ");
-//     }
-// }
-
 /* returns a ref containing the contents of the slice
  * passed as argument, all the bits set to 0 in the
  * mask argument are zeroed in the result;
@@ -282,23 +268,6 @@ fn def(
     // indent: usize,
     // debug: bool,
 ) -> Ref {
-    // let blks: &Blks = &f.blks;
-    // let phis: &mut Vec<Phi> = &mut f.phis;
-    // let tmps: &mut Vec<Tmp> = &mut f.tmps;
-    // let cons: &mut Vec<Con> = &mut f.cons;
-    // if debug {
-    //     prindent(indent);
-    //     println!(
-    //         "                         def - for @{} ins {}",
-    //         to_s(&f.blk(bi).name),
-    //         ii.0
-    //     );
-    // }
-
-    // if indent > 32 {
-    //     panic!("Gone too deep");
-    // }
-
     /* invariants:
      * -1- Blk bi dominates Blk il.bi; so we can use
      *     temporaries of Blk bi in Blk il.bi
@@ -323,14 +292,6 @@ fn def(
     let mut goto_load: bool = false;
     while ii != InsIdx::new(0) && !goto_load {
         ii = InsIdx::new(ii.usize() - 1);
-        // if debug {
-        //     prindent(indent);
-        //     println!(
-        //         "                         def -    looking at @{} ins {}",
-        //         to_s(&blks.borrow(bi).name),
-        //         ii.0
-        //     );
-        // }
         let mut i: Ins = blks.borrow(bi).ins()[ii.0 as usize]; /* Note: copy! */
         if killsl(tmps, i.to, &sl) || (i.op == O::Ocall && escapes(&tmps, sl.r)) {
             // println!("                              killsl or escaping call");
@@ -362,10 +323,6 @@ fn def(
         let (can_alias, mut off) = alias(tmps, cons, sl.r, sl.off, sl.sz as i32, r1, sz);
         match can_alias {
             CanAlias::Must => {
-                // if debug {
-                //     prindent(indent);
-                //     println!("                                     MUST alias");
-                // }
                 let mut sl1: Slice = sl.clone(); /*for Oblit0 only, ugh!*/
                 if i.op == O::Oblit0 {
                     //sl1 = sl;
@@ -426,18 +383,7 @@ fn def(
                     mask(blks, tmps, cons, ilog, cls, &mut r, msk1 & msk, il);
                 }
                 if (msk & !msk1) != 0 {
-                    r1 = def(
-                        blks,
-                        phis,
-                        tmps,
-                        cons,
-                        ilog,
-                        sl,
-                        msk & !msk1,
-                        bi,
-                        ii,
-                        il, /*, indent + 1, debug*/
-                    );
+                    r1 = def(blks, phis, tmps, cons, ilog, sl, msk & !msk1, bi, ii, il);
                     if r1 == R {
                         goto_load = true;
                         continue;
@@ -450,49 +396,21 @@ fn def(
                 return r;
             }
             CanAlias::May => {
-                // if debug {
-                //     prindent(indent);
-                //     println!("                                     may alias");
-                // }
                 if !ld {
-                    // println!("                                         ... and not a load");
                     goto_load = true;
                 }
                 continue;
             }
             CanAlias::No => {
-                // if debug {
-                //     prindent(indent);
-                //     println!("                                     no alias");
-                // }
                 continue;
             }
         }
     }
 
-    // if !goto_load {
-    // if debug {
-    //     prindent(indent);
-    //     println!(
-    //         "                         def - got through preceding instructions of @{}",
-    //         to_s(&blks.borrow(bi).name)
-    //     );
-    // }
-    // }
-
     if !goto_load {
         let bid = blks.borrow(bi).id;
 
         for isti in 0..ilog.len() {
-            if !goto_load {
-                // if debug {
-                //     prindent(indent);
-                //     println!(
-                //         "                                         checking Insert {}\n",
-                //         isti
-                //     );
-                // }
-            }
             let ist: &Insert = &ilog[isti];
             if let InsertU::Phi(uphi) = &ist.new {
                 if ist.bid == bid && uphi.m.r == sl.r && uphi.m.off == sl.off && uphi.m.sz == sl.sz
@@ -545,7 +463,7 @@ fn def(
                 msk,
                 bpi,
                 InsIdx::NONE,
-                &l, /*, indent + 1, debug*/
+                &l,
             );
             if r1 == R {
                 goto_load = true;
@@ -567,13 +485,10 @@ fn def(
         ilog.push(Insert::new(
             TmpIdx::new(0), /*TODO*/
             blks.borrow(bi).id,
-            //InsIdx::new(0), // NONE???
             InsertU::Phi(UPhi { m: *sl, pi }),
         ));
         let preds_len = blks.borrow(bi).preds.len();
-        for np in 0..preds_len
-        /*blks.borrow(bi).preds.len()*/
-        {
+        for np in 0..preds_len {
             let bpi: BlkIdx = blks.borrow(bi).preds[np];
             let l_type: LocT;
             if blks.borrow(bpi).s2 == BlkIdx::NONE
@@ -659,18 +574,11 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
 
     let mut ilog: Vec<Insert> = vec![];
 
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
+    blks.for_each_bi(|bi| {
+        // let mut bi: BlkIdx = f.start;
+        // while bi != BlkIdx::NONE {
         let ins_len = blks.borrow(bi).ins().len();
         for iii in 0..ins_len {
-            // println!(
-            //     "                     loadopt: bi {} bid {} @{} ins {} {}",
-            //     bi.0,
-            //     blks.borrow(bi).id,
-            //     to_s(&blks.borrow(bi).name),
-            //     iii,
-            //     to_s(OPTAB[blks.borrow(bi).ins()[iii].op as usize].name)
-            // );
             let i_arg1 = {
                 let i: Ins = blks.borrow(bi).ins()[iii]; // Note - copy
                 if !isload(i.op) {
@@ -689,7 +597,6 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     off: ii,
                     bi,
                 };
-                // let debug: bool = bi.0 == 183 && iii == 1;
                 def(
                     blks,
                     phis,
@@ -700,25 +607,12 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     genmask(sz),
                     bi,
                     ii,
-                    &l, /*, 0, debug*/
+                    &l,
                 )
             };
             blks.borrow_mut(bi).ins_mut()[iii].args[1] = i_arg1;
-            // print!(
-            //     "                     loadopt: @{} ins {} {} - arg1 is now ",
-            //     to_s(&blks.borrow(bi).name),
-            //     iii,
-            //     to_s(OPTAB[blks.borrow(bi).ins()[iii].op as usize].name)
-            // );
-            // if i_arg1 == R {
-            //     print!("R");
-            // } else {
-            //     printref(&mut stdout(), f, typ, itbl, &i_arg1);
-            // }
-            // println!();
         }
-        bi = blks.borrow(bi).link;
-    }
+    });
     ilog.sort_by(icmp);
     let sentinal_ins = Ins::new0(O::Oxxx, Kx, R);
     /* add a sentinel */
@@ -738,7 +632,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         while ist.bid == n {
             if let InsertU::Phi(uphi) = &mut ist.new {
                 let pi = blks.borrow(bi).phi;
-                phis[uphi.pi].link = pi/*blks.borrow(bi).phi*/;
+                phis[uphi.pi].link = pi;
                 blks.borrow_mut(bi).phi = uphi.pi;
             } else {
                 break;
