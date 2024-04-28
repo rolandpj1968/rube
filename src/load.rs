@@ -628,16 +628,8 @@ fn icmp(a: &Insert, b: &Insert) -> Ordering {
     if bid_cmp != Ordering::Equal {
         return bid_cmp;
     }
-    let a_isphi: bool = if let InsertU::Phi(_) = a.new {
-        true
-    } else {
-        false
-    };
-    let b_isphi: bool = if let InsertU::Phi(_) = b.new {
-        true
-    } else {
-        false
-    };
+    let a_isphi: bool = matches!(a.new, InsertU::Phi(_));
+    let b_isphi: bool = matches!(b.new, InsertU::Phi(_));
     if a_isphi && b_isphi {
         return Ordering::Equal;
     }
@@ -750,7 +742,6 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             ist = &mut ilog[isti];
         }
         let mut ni: InsIdx = InsIdx::new(0);
-        // nt = 0; ??? what's this
         let mut ib: Vec<Ins> = vec![];
         loop {
             let mut i: Ins;
@@ -758,18 +749,11 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 (ni1, i1)
             } else {
                 // MUST be InsertU::Ins
-                //assert!(false); TODO...
-                (InsIdx::NONE, Ins::NOP)
+                //assert!(false); TODO... triggering???
+                (InsIdx::NONE, Ins::new0(O::Oxxx, Kx, R))
             };
             if ist.bid == n && ni == ni0 {
-                // Broken ni pattern match
-                if let InsertU::Ins(_, i0) = &ist.new {
-                    i = *i0; // Copy
-                } else {
-                    // MUST be InsertU::Ins
-                    assert!(false);
-                    i = Ins::new0(O::Oxxx, Kx, R);
-                }
+                i = i0; // Copy
                 isti += 1;
                 ist = &mut ilog[isti];
             } else {
@@ -777,7 +761,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                     break;
                 }
                 i = f.blk(bi).ins()[ni.0 as usize];
-                ni = ni.next(); //InsIdx::new(ni.usize() + 1);
+                ni = ni.next();
                 if isload(i.op) && i.args[1] != R {
                     // TODO same code in mem.rs
                     let ext: O =

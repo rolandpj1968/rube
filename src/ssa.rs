@@ -396,15 +396,13 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
         // TODO obviously
         /*e*/
         println!("\n> Dominators:");
-        let mut b1i: BlkIdx = f.start;
-        while b1i != BlkIdx::NONE {
-            let b1 = f.blk(b1i);
+        f.blks.for_each(|b1| {
             if b1.dom != BlkIdx::NONE {
                 /*e*/
                 print!("{:>10}:", to_s(&b1.name));
                 let mut bi: BlkIdx = b1.dom;
                 while bi != BlkIdx::NONE {
-                    let b = f.blk(bi);
+                    let b = f.blks.borrow(bi);
                     /*e*/
                     print!(" {}", to_s(&b.name));
                     bi = b.dlink;
@@ -412,9 +410,7 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
                 /*e*/
                 println!();
             }
-
-            b1i = f.blk(b1i).link;
-        }
+        });
     }
     fillfron(f);
     filllive(f, targ);
@@ -422,11 +418,12 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     let mut namel: NameIdx = NameIdx::INVALID;
     let mut names: Vec<Name> = vec![];
     let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
+    assert!(f.start == BlkIdx::START);
     renblk(
         &f.blks,
         &mut f.phis,
         &mut f.tmps,
-        f.start,
+        BlkIdx::START,
         &mut namel,
         &mut names,
         &mut stk,
