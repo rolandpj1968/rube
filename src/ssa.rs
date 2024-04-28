@@ -62,8 +62,7 @@ pub fn filluse(f: &mut Fn) {
         tmp.uses.clear();
     }
 
-    let mut bi: BlkIdx = f.start;
-    while bi != BlkIdx::NONE {
+    blks.for_each_bi(|bi| {
         blks.with(bi, |b| {
             let mut pi: PhiIdx = b.phi;
             while pi != PhiIdx::NONE {
@@ -123,10 +122,8 @@ pub fn filluse(f: &mut Fn) {
             if let RTmp(ti) = b.jmp().arg {
                 adduse(&mut tmps[ti], UseT::UJmp, bi, b.id);
             }
-
-            bi = b.link;
         });
-    }
+    });
 }
 
 fn refindex(tmps: &mut Vec<Tmp>, ti: TmpIdx) -> Ref {
