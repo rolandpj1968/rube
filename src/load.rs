@@ -1,16 +1,18 @@
 use derive_new::new;
 use std::cell;
 use std::cmp::Ordering;
+use std::io::stdout;
 
 use crate::alias::{alias, escapes};
 use crate::all::Ref::{RCon, RInt, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw, Kx};
 use crate::all::{
     bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, BlkIdx, Blks, CanAlias, Con, Fn, Ins,
-    InsIdx, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, K, O,
+    InsIdx, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, K, O,
 };
 use crate::cfg::dom;
-use crate::util::{getcon2, newcon2, newtmp2, newtmpref2};
+use crate::parse::printfn;
+use crate::util::{getcon2, newcon2, newtmp2, newtmpref2, Bucket};
 
 // TODO remove
 // use crate::all::{to_s, Typ};
@@ -649,8 +651,7 @@ fn icmp(a: &Insert, b: &Insert) -> Ordering {
 }
 
 /* require rpo ssa alias */
-// TODO remove type, itbl - just for debug
-pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
+pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let blks: &Blks = &f.blks;
     let phis: &mut Vec<Phi> = &mut f.phis;
     let tmps: &mut Vec<Tmp> = &mut f.tmps;
@@ -800,9 +801,11 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
         blks.borrow_mut(bi).ins = cell::RefCell::new(ib);
         n = n.next();
     }
-    // TODO
-    // if (debug['M']) {
-    //     fprintf(stderr, "\n> After load elimination:\n");
-    //     printfn(fn, stderr);
-    // }
+    if true
+    /*TODO debug['M']*/
+    {
+        /*e*/
+        println!("\n> After load elimination:");
+        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
+    }
 }
