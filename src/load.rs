@@ -651,23 +651,27 @@ fn icmp(a: &Insert, b: &Insert) -> Ordering {
 /* require rpo ssa alias */
 // TODO remove type, itbl - just for debug
 pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
-    // TODO... let blks: &Blks = &f.blks;
+    let blks: &Blks = &f.blks;
+    let phis: &mut Vec<Phi> = &mut f.phis;
+    let tmps: &mut Vec<Tmp> = &mut f.tmps;
+    let cons: &mut Vec<Con> = &mut f.cons;
+
     let mut ilog: Vec<Insert> = vec![];
 
     let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let ins_len = f.blk(bi).ins().len();
+        let ins_len = blks.borrow(bi).ins().len();
         for iii in 0..ins_len {
             // println!(
             //     "                     loadopt: bi {} bid {} @{} ins {} {}",
             //     bi.0,
-            //     f.blk(bi).id,
-            //     to_s(&f.blk(bi).name),
+            //     blks.borrow(bi).id,
+            //     to_s(&blks.borrow(bi).name),
             //     iii,
-            //     to_s(OPTAB[f.blk(bi).ins()[iii].op as usize].name)
+            //     to_s(OPTAB[blks.borrow(bi).ins()[iii].op as usize].name)
             // );
             let i_arg1 = {
-                let i: Ins = f.blk(bi).ins()[iii]; // Note - copy
+                let i: Ins = blks.borrow(bi).ins()[iii]; // Note - copy
                 if !isload(i.op) {
                     continue;
                 }
@@ -686,10 +690,10 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 };
                 // let debug: bool = bi.0 == 183 && iii == 1;
                 def(
-                    &f.blks,
-                    &mut f.phis,
-                    &mut f.tmps,
-                    &mut f.cons,
+                    blks,
+                    phis,
+                    tmps,
+                    cons,
                     &mut ilog,
                     &sl,
                     genmask(sz),
@@ -698,12 +702,12 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                     &l, /*, 0, debug*/
                 )
             };
-            f.blk_mut(bi).ins_mut()[iii].args[1] = i_arg1;
+            blks.borrow_mut(bi).ins_mut()[iii].args[1] = i_arg1;
             // print!(
             //     "                     loadopt: @{} ins {} {} - arg1 is now ",
-            //     to_s(&f.blk(bi).name),
+            //     to_s(&blks.borrow(bi).name),
             //     iii,
-            //     to_s(OPTAB[f.blk(bi).ins()[iii].op as usize].name)
+            //     to_s(OPTAB[blks.borrow(bi).ins()[iii].op as usize].name)
             // );
             // if i_arg1 == R {
             //     print!("R");
@@ -712,7 +716,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             // }
             // println!();
         }
-        bi = f.blk(bi).link;
+        bi = blks.borrow(bi).link;
     }
     ilog.sort_by(icmp);
     let sentinal_ins = Ins::new0(O::Oxxx, Kx, R);
@@ -732,9 +736,9 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
         let bi: BlkIdx = f.rpo[n];
         while ist.bid == n {
             if let InsertU::Phi(uphi) = &mut ist.new {
-                let pi = f.blk(bi).phi;
-                f.phi_mut(uphi.pi).link = pi/*f.blk(bi).phi*/;
-                f.blk_mut(bi).phi = uphi.pi;
+                let pi = blks.borrow(bi).phi;
+                phis[uphi.pi].link = pi/*blks.borrow(bi).phi*/;
+                blks.borrow_mut(bi).phi = uphi.pi;
             } else {
                 break;
             }
@@ -757,10 +761,10 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
                 isti += 1;
                 ist = &mut ilog[isti];
             } else {
-                if ni == InsIdx::new(f.blk(bi).ins().len()) {
+                if ni == InsIdx::new(blks.borrow(bi).ins().len()) {
                     break;
                 }
-                i = f.blk(bi).ins()[ni.0 as usize];
+                i = blks.borrow(bi).ins()[ni.0 as usize];
                 ni = ni.next();
                 if isload(i.op) && i.args[1] != R {
                     // TODO same code in mem.rs
@@ -793,7 +797,7 @@ pub fn loadopt(f: &mut Fn /*, typ: &[Typ], itbl: &[Bucket]*/) {
             }
             ib.push(i);
         }
-        f.blk_mut(bi).ins = cell::RefCell::new(ib);
+        blks.borrow_mut(bi).ins = cell::RefCell::new(ib);
         n = n.next();
     }
     // TODO
