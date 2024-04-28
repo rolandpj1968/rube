@@ -140,7 +140,8 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     let mut blist: Vec<BlkIdx> = vec![BlkIdx::NONE; blks.len()];
     let be: usize = blks.len();
     let nt: usize = tmps.len();
-    let start_id: RpoIdx = blks.id_of(f.start);
+    assert!(f.start == BlkIdx::START);
+    let start_id: RpoIdx = blks.id_of(BlkIdx::START);
     for tii in TMP0..nt {
         let ti: TmpIdx = TmpIdx::new(tii);
         {
@@ -161,7 +162,8 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         let mut k: K = Kx;
         let mut bp: usize = be;
         let rt: Ref = RTmp(ti);
-        let mut bi = f.start;
+        assert!(f.start == BlkIdx::START);
+        let mut bi = BlkIdx::START;
         while bi != BlkIdx::NONE {
             blks.with_mut(bi, |b| {
                 b.ivisit = 0;
@@ -469,7 +471,8 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
             return Err(ssacheck_err(f, t, bui));
         }
     }
-    let mut bi: BlkIdx = f.start;
+    assert!(f.start == BlkIdx::START);
+    let mut bi: BlkIdx = BlkIdx::START;
     while bi != BlkIdx::NONE {
         blks.with(bi, |b| {
             let mut pi: PhiIdx = b.phi;
