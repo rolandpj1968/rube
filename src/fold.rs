@@ -1,10 +1,10 @@
 use std::io::stdout;
 
 use crate::all::Ref::{RCon, RTmp, R};
-use crate::all::K::{Kd, Kl, Kw};
+use crate::all::K::{Kd, Kl, Ks, Kw};
 use crate::all::{
-    isret, to_s, Blk, BlkIdx, Blks, Con, ConIdx, ConPP, Fn, Idx, Ins, Phi, PhiIdx, Ref, RpoIdx,
-    Tmp, TmpIdx, Typ, Use, UseT, J, K, O, TMP0,
+    isret, kwide, to_s, Blk, BlkIdx, Blks, Con, ConIdx, ConPP, Fn, Idx, Ins, Phi, PhiIdx, Ref,
+    RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, TMP0,
 };
 use crate::optab::OPTAB;
 use crate::parse::printref;
@@ -585,11 +585,11 @@ fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
                     O::Ouwtof => (li as u32) as f64,
                     O::Osltof => (li as i64) as f64,
                     O::Oultof => (li as u64) as f64,
-                    O::Ocast => f64::from_bits(li as u64),
                     O::Oexts => f32::from_bits(li as u32) as f64,
+                    O::Ocast => f64::from_bits(li as u64),
                     _ => return invalidop(op, false),
                 };
-                Con::CBits(xd.to_bits() as i64, ConPP::I)
+                Con::CBits(xd.to_bits() as i64, ConPP::D)
             } else {
                 let ls: f32 = f32::from_bits(li as u32);
                 let rs: f32 = f32::from_bits(ri as u32);
@@ -603,11 +603,11 @@ fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
                     O::Ouwtof => (li as u32) as f32,
                     O::Osltof => (li as i64) as f32,
                     O::Oultof => (li as u64) as f32,
-                    O::Ocast => f32::from_bits(li as u32),
                     O::Otruncd => f64::from_bits(li as u64) as f32,
+                    O::Ocast => f32::from_bits(li as u32),
                     _ => return invalidop(op, false),
                 };
-                Con::CBits(xs.to_bits() as i64, ConPP::I)
+                Con::CBits(xs.to_bits() as i64, ConPP::S)
             }
         }
         _ => {
@@ -617,7 +617,7 @@ fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
 }
 
 fn opfold(cons: &mut Vec<Con>, op: O, cls: K, cli: ConIdx, cri: ConIdx) -> Lat {
-    let c: Con = {
+    let mut c: Con = {
         if cls == Kw || cls == Kl {
             match foldint(op, cls == Kl, &cons[cli.0 as usize], &cons[cri.0 as usize]) {
                 None => return Lat::Bot,
@@ -627,10 +627,13 @@ fn opfold(cons: &mut Vec<Con>, op: O, cls: K, cli: ConIdx, cri: ConIdx) -> Lat {
             foldflt(op, cls == Kd, &cons[cli.0 as usize], &cons[cri.0 as usize])
         }
     };
-    // TODO - this is a bit weird???
-    // if (!KWIDE(cls))
-    //     c.bits.i &= 0xffffffff;
+    // This is a bit weird
+    if kwide(cls) == 0 {
+        if let Con::CBits(i, _) = &mut c {
+            *i &= 0xffffffff;
+        }
+    }
     let ci: ConIdx = newconcon2(cons, c);
-    // TODO - assert!(!(cls == Ks || cls == Kd) || matches!(c.bits, ConBits::F(_)));
+    assert!((cls == Ks || cls == Kd) != matches!(c, Con::CBits(_, ConPP::I)));
     Lat::Con(ci)
 }
