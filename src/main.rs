@@ -13,6 +13,7 @@ mod all;
 mod amd64;
 mod cfg;
 mod copy;
+mod fold;
 mod live;
 mod load;
 mod mem;
@@ -71,6 +72,7 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     filluse(f);
     ssacheck(f).unwrap();
     copy(f, typ, itbl);
+    filluse(f);
 
     printfn(&mut stdout(), f, typ, itbl);
 }

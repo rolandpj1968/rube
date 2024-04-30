@@ -144,14 +144,7 @@ fn phisimpl(
     }
 }
 
-fn subst(tmps: &[Tmp], pr: &mut Ref, cpy: &[Ref]) {
-    // if let RTmp(ti) = *pr {
-    //     println!(
-    //         "             substing %{}, cpy is {:?}",
-    //         to_s(&tmps[ti].name),
-    //         cpy[ti.usize()]
-    //     );
-    // }
+fn subst(pr: &mut Ref, cpy: &[Ref]) {
     assert!({
         if let RTmp(ti) = *pr {
             cpy[ti.usize()] != R
@@ -270,7 +263,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             for a in &mut phis[pi].args {
                 // println!("          arg subst for {:?}", *a);
-                subst(tmps, a, &cpy);
+                subst(a, &cpy);
             }
             ppi = pi;
             pi = p_link;
@@ -285,10 +278,10 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     continue;
                 }
             }
-            subst(tmps, &mut i.args[0], &cpy);
-            subst(tmps, &mut i.args[1], &cpy);
+            subst(&mut i.args[0], &cpy);
+            subst(&mut i.args[1], &cpy);
         }
-        subst(tmps, &mut b.jmp.borrow_mut().arg, &cpy);
+        subst(&mut b.jmp.borrow_mut().arg, &cpy);
     });
 
     if true

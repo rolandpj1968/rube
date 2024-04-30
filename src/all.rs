@@ -155,6 +155,9 @@ impl Blks {
     pub fn visit_of(&self, bi: BlkIdx) -> RpoIdx {
         self.borrow(bi).visit
     }
+    pub fn ivisit_of(&self, bi: BlkIdx) -> i32 {
+        self.borrow(bi).ivisit
+    }
 }
 
 // Hrmm, it's complaining about lifetime params - need more grokking, just use .borrow() for now
@@ -786,7 +789,7 @@ pub struct Blk {
     pub is_dead: bool,
     pub id: RpoIdx,
     pub visit: RpoIdx, // TODO - this is probs not always...
-    pub ivisit: i32,   // TODO - for ssa.rs ... fixme
+    pub ivisit: i32,   // TODO - for ssa.rs, fold.rs ... fixme
 
     pub idom: BlkIdx,
     pub dom: BlkIdx,
@@ -1212,7 +1215,7 @@ impl IndexMut<TmpIdx> for Vec<Tmp> {
 //     pub const NONE: TmpIdx = TmpIdx(u32::MAX);
 // }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum ConT {
     CUndef,
@@ -1220,7 +1223,7 @@ pub enum ConT {
     CAddr,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 pub enum ConBits {
     None,
@@ -1229,7 +1232,7 @@ pub enum ConBits {
     F(f32),
 }
 
-#[derive(new, Debug, PartialEq)]
+#[derive(new, Clone, Copy, Debug, PartialEq)]
 pub struct Con {
     pub typ: ConT,
     pub sym: Sym,

@@ -542,6 +542,19 @@ newcon(Con *c0, Fn *fn)
 }
  */
 
+pub fn newconcon2(cons: &mut Vec<Con>, c0: Con) -> ConIdx {
+    for i in 1..cons.len() {
+        if c0 == cons[i] {
+            return ConIdx(i as u32);
+        }
+    }
+    let ci = ConIdx(cons.len() as u32);
+    cons.push(c0);
+    //let ci = f.add_con(c0);
+
+    ci
+}
+
 pub fn newcon2(cons: &mut Vec<Con>, c0: Con) -> Ref {
     for i in 1..cons.len() {
         if c0 == cons[i] {

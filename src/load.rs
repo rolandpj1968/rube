@@ -60,7 +60,6 @@ enum InsertU {
 struct Insert {
     num: TmpIdx, // TODO rename to ti
     bid: RpoIdx,
-    //off: InsIdx, // TODO rename to ii
     new: InsertU,
 }
 
@@ -265,8 +264,6 @@ fn def(
     bi: BlkIdx,
     mut ii: InsIdx,
     il: &Loc,
-    // indent: usize,
-    // debug: bool,
 ) -> Ref {
     /* invariants:
      * -1- Blk bi dominates Blk il.bi; so we can use
@@ -293,7 +290,7 @@ fn def(
     while ii != InsIdx::new(0) && !goto_load {
         ii = InsIdx::new(ii.usize() - 1);
         let mut i: Ins = blks.borrow(bi).ins()[ii.0 as usize]; /* Note: copy! */
-        if killsl(tmps, i.to, &sl) || (i.op == O::Ocall && escapes(&tmps, sl.r)) {
+        if killsl(tmps, i.to, sl) || (i.op == O::Ocall && escapes(tmps, sl.r)) {
             // println!("                              killsl or escaping call");
             goto_load = true;
             continue;
@@ -323,7 +320,7 @@ fn def(
         let (can_alias, mut off) = alias(tmps, cons, sl.r, sl.off, sl.sz as i32, r1, sz);
         match can_alias {
             CanAlias::Must => {
-                let mut sl1: Slice = sl.clone(); /*for Oblit0 only, ugh!*/
+                let mut sl1: Slice = *sl; /*for Oblit0 only, ugh!*/
                 if i.op == O::Oblit0 {
                     //sl1 = sl;
                     sl1.r = i.args[0];
@@ -352,18 +349,7 @@ fn def(
                     continue;
                 }
                 if i.op == O::Oblit0 {
-                    r = def(
-                        blks,
-                        phis,
-                        tmps,
-                        cons,
-                        ilog,
-                        &sl1,
-                        genmask(sz),
-                        bi,
-                        ii,
-                        il, /*, indent + 1, debug*/
-                    );
+                    r = def(blks, phis, tmps, cons, ilog, &sl1, genmask(sz), bi, ii, il);
                     if r == R {
                         goto_load = true;
                         continue;
@@ -429,7 +415,7 @@ fn def(
         let mut pi = blks.borrow(bi).phi;
         while pi != PhiIdx::NONE {
             let p_to: Ref = phis[pi].to;
-            if killsl(tmps, p_to, &sl) {
+            if killsl(tmps, p_to, sl) {
                 /* scanning predecessors in that
                  * case would be unsafe */
                 goto_load = true;
@@ -439,11 +425,7 @@ fn def(
         }
     }
 
-    if !goto_load {
-        if blks.borrow(bi).preds.is_empty() {
-            goto_load = true;
-        }
-    }
+    goto_load = goto_load || blks.borrow(bi).preds.is_empty();
 
     if !goto_load {
         if blks.borrow(bi).preds.len() == 1 {
@@ -453,18 +435,7 @@ fn def(
             if blks.borrow(bpi).s2 != BlkIdx::NONE {
                 l.typ = LocT::LNoLoad;
             }
-            let r1: Ref = def(
-                blks,
-                phis,
-                tmps,
-                cons,
-                ilog,
-                &sl,
-                msk,
-                bpi,
-                InsIdx::NONE,
-                &l,
-            );
+            let r1: Ref = def(blks, phis, tmps, cons, ilog, sl, msk, bpi, InsIdx::NONE, &l);
             if r1 == R {
                 goto_load = true;
             } else {
@@ -575,8 +546,6 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut ilog: Vec<Insert> = vec![];
 
     blks.for_each_bi(|bi| {
-        // let mut bi: BlkIdx = f.start;
-        // while bi != BlkIdx::NONE {
         let ins_len = blks.borrow(bi).ins().len();
         for iii in 0..ins_len {
             let i_arg1 = {
