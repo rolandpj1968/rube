@@ -1,7 +1,7 @@
 use crate::all::Ref::{RCon, RInt, RTmp, RTyp, R};
 use crate::all::{
     astack, bit, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, BlkIdx, Blks, CanAlias,
-    Con, ConBits, ConT, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
+    Con, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
 };
 
 use crate::load::storesz;
@@ -19,25 +19,28 @@ pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
         }
         RCon(ci) => {
             let c: &Con = &cons[ci.0 as usize];
-            match c.typ {
-                ConT::CAddr => {
+            match c {
+                Con::CAddr(sym, off) => {
                     a_out.typ = AliasT::ASym;
-                    a_out.u = AliasU::ASym(c.sym);
+                    a_out.u = AliasU::ASym(*sym);
+                    a_out.offset = *off;
                 }
-                _ => {
+                Con::CBits(i, _) => {
                     a_out.typ = AliasT::ACon;
+                    a_out.offset = *i;
                 }
+                _ => assert!(false),
             }
             // TODO - get this right
             //assert!(matches!(c.bits, ConBits::I(_)));
-            if let ConBits::I(i) = c.bits {
-                a_out.offset = i;
-            } else {
-                // Needed for CAddr where c.bits is None; ropy!
-                // Hrmm, changed CAddr to have I(0) by default now, check again...
-                a_out.offset = 0;
-                //assert!(false);
-            }
+            // if let ConBits::I(i) = c.bits {
+            //     a_out.offset = i;
+            // } else {
+            //     // Needed for CAddr where c.bits is None; ropy!
+            //     // Hrmm, changed CAddr to have I(0) by default now, check again...
+            //     a_out.offset = 0;
+            //     //assert!(false);
+            // }
             a_out.slot = TmpIdx::NONE;
         }
         _ => (),
@@ -210,10 +213,10 @@ pub fn fillalias(f: &mut Fn) {
                     let mut sz: i32 = -1;
                     if let RCon(ci) = i.args[0] {
                         let c: &Con = &cons[ci.0 as usize];
-                        assert!(matches!(c.bits, ConBits::I(_)));
-                        if let ConBits::I(sz0) = c.bits {
-                            if c.typ == ConT::CBits && (0 <= sz0 && sz0 <= NBIT as i64) {
-                                sz = sz0 as i32;
+                        assert!(matches!(c, Con::CBits(_, _)));
+                        if let Con::CBits(sz0, _) = c {
+                            if 0 <= *sz0 && *sz0 <= NBIT as i64 {
+                                sz = *sz0 as i32;
                             }
                         }
                     }

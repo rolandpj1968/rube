@@ -4,8 +4,8 @@ use crate::all::Ref::{RCon, RTmp, R};
 use crate::all::TmpWdth::{Wsb, Wsh, Wsw, Wub, Wuh, Wuw};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{
-    bit, bshas, isext, kbase, to_s, BSet, Bits, BlkIdx, Blks, Con, ConBits, ConT, Fn, Ins, Phi,
-    PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, O, TMP0, UNDEF,
+    bit, bshas, isext, kbase, to_s, BSet, Bits, BlkIdx, Blks, Con, Fn, Ins, Phi, PhiIdx, Ref,
+    RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, O, TMP0, UNDEF,
 };
 use crate::cfg::dom;
 use crate::parse::{printfn, printref};
@@ -14,10 +14,8 @@ use crate::util::{bscount, bsdiff, bsinit, bsiter, bsset, Bucket};
 fn iscon(cons: &[Con], r: Ref, bits: i64) -> bool {
     if let RCon(ci) = r {
         let con: &Con = &cons[ci.0 as usize];
-        if con.typ == ConT::CBits {
-            if let ConBits::I(i) = con.bits {
-                return bits == i;
-            }
+        if let Con::CBits(i, _) = con {
+            return bits == *i;
         }
     }
     false

@@ -2,7 +2,7 @@ use std::io::Write;
 
 use crate::all::Ref::{RCon, RTmp};
 use crate::all::K::{Kl, Kw, Kx};
-use crate::all::{bit, to_s, BSet, Bits, Con, ConIdx, Fn, Ref, Tmp, TmpIdx, K, NBIT, TMP0};
+use crate::all::{bit, to_s, BSet, Bits, Con, ConIdx, ConPP, Fn, Ref, Tmp, TmpIdx, K, NBIT, TMP0};
 use crate::parse::Parser; // ugh for intern()
 
 /*
@@ -545,10 +545,10 @@ newcon(Con *c0, Fn *fn)
 pub fn newconcon2(cons: &mut Vec<Con>, c0: Con) -> ConIdx {
     for i in 1..cons.len() {
         if c0 == cons[i] {
-            return ConIdx(i as u32);
+            return ConIdx::new(i);
         }
     }
-    let ci = ConIdx(cons.len() as u32);
+    let ci = ConIdx::new(cons.len());
     cons.push(c0);
     //let ci = f.add_con(c0);
 
@@ -558,10 +558,10 @@ pub fn newconcon2(cons: &mut Vec<Con>, c0: Con) -> ConIdx {
 pub fn newcon2(cons: &mut Vec<Con>, c0: Con) -> Ref {
     for i in 1..cons.len() {
         if c0 == cons[i] {
-            return RCon(ConIdx(i as u32));
+            return RCon(ConIdx::new(i));
         }
     }
-    let ci = ConIdx(cons.len() as u32);
+    let ci = ConIdx::new(cons.len());
     cons.push(c0);
     //let ci = f.add_con(c0);
 
@@ -597,11 +597,11 @@ getcon(int64_t val, Fn *fn)
  */
 
 pub fn getcon(f: &mut Fn, i: i64) -> Ref {
-    newcon(f, Con::new_bits(crate::all::ConBits::I(i)))
+    newcon(f, Con::CBits(i, ConPP::I))
 }
 
 pub fn getcon2(cons: &mut Vec<Con>, i: i64) -> Ref {
-    newcon2(cons, Con::new_bits(crate::all::ConBits::I(i)))
+    newcon2(cons, Con::CBits(i, ConPP::I))
 }
 
 /*

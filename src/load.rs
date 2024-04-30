@@ -207,7 +207,7 @@ fn load(
             }
             AliasT::ACon | AliasT::ASym => {
                 if let AliasU::ASym(sym) = a.u {
-                    r = newcon2(cons, Con::new_sym(sym, crate::all::ConBits::I(a.offset)));
+                    r = newcon2(cons, Con::CAddr(sym, a.offset));
                 } else {
                     assert!(false);
                     r = R; // Ugh, TODO

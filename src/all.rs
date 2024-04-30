@@ -1207,58 +1207,92 @@ impl IndexMut<TmpIdx> for Vec<Tmp> {
     }
 }
 
-// Index in Fn::tmps
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// pub struct TmpIdx(pub u32);
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
+pub enum ConPP {
+    I,
+    S,
+    D,
+}
 
-// impl TmpIdx {
-//     pub const NONE: TmpIdx = TmpIdx(u32::MAX);
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[repr(u8)]
+pub enum Con {
+    CUndef,
+    CBits(i64, ConPP),
+    CAddr(Sym, i64),
+}
+
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// #[repr(u8)]
+// pub enum ConBits {
+//     None,
+//     I(i64),
+//     D(f64),
+//     F(f32),
 // }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[repr(u8)]
-pub enum ConT {
-    CUndef,
-    CBits,
-    CAddr,
-}
+// #[derive(new, Clone, Copy, Debug, PartialEq)]
+// pub struct Con {
+//     pub typ: ConT,
+//     pub sym: Sym,
+//     pub bits: ConBits,
+// }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[repr(u8)]
-pub enum ConBits {
-    None,
-    I(i64),
-    D(f64),
-    F(f32),
-}
+// impl Con {
+//     // TODO - merge bits and sym into same enum, unless sym actual const is imported later...
+//     // TODO - add bits (maybe default to 0?)
+//     pub fn new_sym(sym: Sym, bits: ConBits) -> Con {
+//         Con::new(ConT::CAddr, sym, bits)
+//     }
 
-#[derive(new, Clone, Copy, Debug, PartialEq)]
-pub struct Con {
-    pub typ: ConT,
-    pub sym: Sym,
-    pub bits: ConBits,
-}
+//     pub fn new_bits(bits: ConBits) -> Con {
+//         Con::new(ConT::CBits, Sym::UNDEF, bits)
+//     }
+// }
 
-impl Con {
-    // TODO - merge bits and sym into same enum, unless sym actual const is imported later...
-    // TODO - add bits (maybe default to 0?)
-    pub fn new_sym(sym: Sym, bits: ConBits) -> Con {
-        Con::new(ConT::CAddr, sym, bits)
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ConTag();
+// Index in Fn::cons
+pub type ConIdx = Idx<ConTag>;
+
+impl Index<ConIdx> for [Con] {
+    type Output = Con;
+    fn index(&self, index: ConIdx) -> &Self::Output {
+        debug_assert!(index != ConIdx::NONE);
+        self.index(index.0 as usize)
     }
+}
 
-    pub fn new_bits(bits: ConBits) -> Con {
-        Con::new(ConT::CBits, Sym::UNDEF, bits)
+impl IndexMut<ConIdx> for [Con] {
+    fn index_mut(&mut self, index: ConIdx) -> &mut Self::Output {
+        debug_assert!(index != ConIdx::NONE);
+        self.index_mut(index.0 as usize)
+    }
+}
+
+impl Index<ConIdx> for Vec<Con> {
+    type Output = Con;
+    fn index(&self, index: ConIdx) -> &Self::Output {
+        debug_assert!(index != ConIdx::NONE);
+        self.index(index.0 as usize)
+    }
+}
+
+impl IndexMut<ConIdx> for Vec<Con> {
+    fn index_mut(&mut self, index: ConIdx) -> &mut Self::Output {
+        debug_assert!(index != ConIdx::NONE);
+        self.index_mut(index.0 as usize)
     }
 }
 
 // Index in Fn::cons
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ConIdx(pub u32);
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// pub struct ConIdx(pub u32);
 
 impl ConIdx {
-    pub const UNDEF: ConIdx = ConIdx(0); /* represents uninitialized data */
-    pub const CON_Z: ConIdx = ConIdx(1);
-    pub const NONE: ConIdx = ConIdx(u32::MAX);
+    pub const UNDEF: ConIdx = ConIdx::new(0); /* represents uninitialized data */
+    pub const CON_Z: ConIdx = ConIdx::new(1);
 }
 
 #[derive(Debug)]
@@ -1431,7 +1465,7 @@ impl Fn {
     }
 
     pub fn add_con(&mut self, c: Con) -> ConIdx {
-        let ci: ConIdx = ConIdx(self.cons.len() as u32);
+        let ci: ConIdx = ConIdx::new(self.cons.len());
         self.cons.push(c);
         ci
     }

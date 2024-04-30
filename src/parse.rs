@@ -13,9 +13,9 @@ use strum_macros::{EnumIter, FromRepr};
 use crate::all::Ref::{RCall, RCon, RInt, RMem, RSlot, RTmp, RTyp, R};
 use crate::all::K::{Kc, Kd, Ke, Kl, Ks, Ksb, Ksh, Kub, Kuh, Kw, Kx, K0};
 use crate::all::{
-    bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConBits, ConIdx, ConT,
-    Dat, DatT, DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx, RubeResult, Sym, SymT,
-    Target, Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0, TMP0IDX,
+    bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConIdx, ConPP, Dat, DatT,
+    DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx, RubeResult, Sym, SymT, Target, Tmp,
+    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0, TMP0IDX,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -806,20 +806,14 @@ impl Parser<'_> {
         let (t, tv) = self.next()?;
         let c: Con = match t {
             Token::Ttmp => return Ok(self.tmpref(&tv.as_str(), curf)),
-            Token::Tint => Con::new_bits(ConBits::I(tv.as_i())),
-            Token::Tflts => Con::new_bits(ConBits::F(tv.as_s())), // c.flt = 1;
-            Token::Tfltd => Con::new_bits(ConBits::D(tv.as_d())), // c.flt = 2;
+            Token::Tint => Con::CBits(tv.as_i(), ConPP::I),
+            Token::Tflts => Con::CBits(tv.as_s().to_bits() as i64, ConPP::S),
+            Token::Tfltd => Con::CBits(tv.as_d().to_bits() as i64, ConPP::D),
             Token::Tthread => {
                 let name = self.expect(Token::Tglo)?;
-                Con::new_sym(
-                    Sym::new(SymT::SThr, intern(&name.as_str(), self)),
-                    ConBits::I(0),
-                )
+                Con::CAddr(Sym::new(SymT::SThr, intern(&name.as_str(), self)), 0)
             }
-            Token::Tglo => Con::new_sym(
-                Sym::new(SymT::SGlo, intern(&tv.as_str(), self)),
-                ConBits::I(0),
-            ), // Ugh
+            Token::Tglo => Con::CAddr(Sym::new(SymT::SGlo, intern(&tv.as_str(), self)), 0),
             _ => return Ok(R), // TODO, hrmmm - return Ok???
         };
 
@@ -1259,18 +1253,14 @@ impl Parser<'_> {
                         let c: &Con = curf.con(ci);
                         // TODO - clean up
                         let sz: u32 = {
-                            let mut sz_u32: u32 = 0;
-                            let mut is_valid_size: bool = c.typ == ConT::CBits;
-                            if is_valid_size {
-                                if let ConBits::I(sz_i64) = c.bits {
-                                    sz_u32 = sz_i64 as u32;
-                                    is_valid_size = sz_i64 >= 0 && sz_i64 == (sz_u32 as i64);
-                                } else {
-                                    return Err(self.err("blit size must be integer constant"));
+                            let sz_u32: u32;
+                            if let Con::CBits(sz_i64, _) = *c {
+                                sz_u32 = sz_i64 as u32;
+                                if !(sz_i64 >= 0 && sz_i64 == (sz_u32 as i64)) {
+                                    return Err(self.err("blit size negative or too large"));
                                 }
-                            }
-                            if !is_valid_size {
-                                return Err(self.err("blit size negative or too large"));
+                            } else {
+                                return Err(self.err("blit size must be integer constant"));
                             }
                             sz_u32
                         };
@@ -1502,17 +1492,12 @@ impl Parser<'_> {
             }
         }
 
-        curf.cons.push(Con::new(
-            ConT::CBits,
+        curf.cons.push(Con::CAddr(
             Sym::new(SymT::SGlo, InternId::INVALID),
-            ConBits::I(0xdeaddead),
+            0xdeaddead,
         )); /* UNDEF */
-        // ??? what's this for?
-        curf.cons.push(Con::new(
-            ConT::CBits,
-            Sym::new(SymT::SGlo, InternId::INVALID),
-            ConBits::I(0),
-        ));
+        curf.cons
+            .push(Con::CAddr(Sym::new(SymT::SGlo, InternId::INVALID), 0)); /* CON_Z - crash */
         curf.lnk = lnk.clone();
 
         self.blink = BlkIdx::NONE;
@@ -1923,22 +1908,20 @@ pub fn parse(
 }
 
 pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
-    match c.typ {
-        ConT::CUndef => assert!(false), // nada
-        ConT::CAddr => {
-            if c.sym.type_ == SymT::SThr {
+    match *c {
+        Con::CUndef => assert!(false), // nada
+        Con::CAddr(sym, off) => {
+            if sym.type_ == SymT::SThr {
                 let _ = write!(f, "thread ");
             }
-            let _ = write!(f, "${}", to_s(str_(&c.sym.id, itbl)));
-            if let ConBits::I(i) = c.bits {
-                if i != 0 {
-                    let _ = write!(f, "{:+}", i);
-                }
+            let _ = write!(f, "${}", to_s(str_(&sym.id, itbl)));
+            if off != 0 {
+                let _ = write!(f, "{:+}", off);
             }
         }
-        ConT::CBits => match c.bits {
-            ConBits::None => assert!(false),
-            ConBits::F(s) => {
+        Con::CBits(i, pp) => match pp {
+            ConPP::S => {
+                let s: f32 = f32::from_bits(i as u32);
                 // match QBE output of 0.0
                 let _ = if s == 0.0 {
                     write!(f, "0")
@@ -1946,7 +1929,8 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
                     write!(f, "s_{:.6}", s)
                 };
             }
-            ConBits::D(d) => {
+            ConPP::D => {
+                let d: f64 = f64::from_bits(i as u64);
                 // match QBE output of 0.0
                 let _ = if d == 0.0 {
                     write!(f, "0")
@@ -1954,7 +1938,7 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
                     write!(f, "d_{:.6}", d)
                 };
             }
-            ConBits::I(i) => {
+            ConPP::I => {
                 let _ = write!(f, "{}", i);
             }
         },
@@ -1992,7 +1976,7 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Re
             let mut i: bool = false;
             let m: &Mem = fn_.mem(mi);
             let _ = write!(f, "[");
-            if m.offset.typ != ConT::CUndef {
+            if m.offset != Con::CUndef {
                 printcon(f, itbl, &m.offset);
                 i = true;
             }

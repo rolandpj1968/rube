@@ -1,10 +1,10 @@
 use std::io::stdout;
 
 use crate::all::Ref::{RCon, RTmp, R};
-use crate::all::K::{Kd, Kl, Ks, Kw};
+use crate::all::K::{Kd, Kl, Kw};
 use crate::all::{
-    isret, to_s, Blk, BlkIdx, Blks, Con, ConBits, ConIdx, ConT, Fn, Idx, Ins, Phi, PhiIdx, Ref,
-    RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, TMP0,
+    isret, to_s, Blk, BlkIdx, Blks, Con, ConIdx, ConPP, Fn, Idx, Ins, Phi, PhiIdx, Ref, RpoIdx,
+    Tmp, TmpIdx, Typ, Use, UseT, J, K, O, TMP0,
 };
 use crate::optab::OPTAB;
 use crate::parse::printref;
@@ -13,9 +13,9 @@ use crate::util::{newconcon2, Bucket};
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(i8)]
 enum Lat {
-    Bot = -1,    /* lattice bottom */
-    Top = 0,     /* lattice top (matches UNDEF) */
-    Con(ConIdx), /* ??? type */
+    Bot = -1, /* lattice bottom */
+    Top = 0,  /* lattice top (matches UNDEF) */
+    Con(ConIdx),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,19 +37,11 @@ static uint nuse;
  */
 
 fn iscon(c: &Con, w: bool, k: u64) -> bool {
-    if c.typ == ConT::CBits {
-        match c.bits {
-            ConBits::I(i) => {
-                if w {
-                    i as u64 == k
-                } else {
-                    i as u32 == k as u32
-                }
-            }
-            _ => {
-                assert!(false);
-                false
-            }
+    if let Con::CBits(i, _) = *c {
+        if w {
+            i as u64 == k
+        } else {
+            i as u32 == k as u32
         }
     } else {
         false
@@ -566,95 +558,60 @@ fn invalidop(op: O, isaddr: bool) -> Con {
         //err("invalid operand type for '%s'", optab[op].name);
     }
     assert!(false);
-    Con::new_bits(ConBits::None)
+    Con::CUndef
 }
 
 fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
     // float xs, ls, rs;
     // double xd, ld, rd;
 
-    if cl.typ != ConT::CBits || cr.typ != ConT::CBits {
-        return invalidop(op, true);
-    }
+    // if cl.typ != ConT::CBits || cr.typ != ConT::CBits {
+    //     return invalidop(op, true);
+    // }
     // *res = (Con){.type = CBits};
     // memset(&res.bits, 0, sizeof(res.bits));
-    match (cl.bits, cr.bits) {
-        (ConBits::D(ld), ConBits::D(rd)) => {
-            if !w {
-                return invalidop(op, false);
-            }
-            let xd: f64 = match op {
-                O::Oadd => ld + rd,
-                O::Osub => ld - rd,
-                O::Oneg => -ld,
-                O::Odiv => ld / rd,
-                O::Omul => ld * rd,
-                _ => {
-                    // TODO...
-                    //err("invalid address operand for '%s'", optab[op].name);
-                    assert!(false);
-                    return Con::new_bits(ConBits::None);
-                }
-            };
-            Con::new_bits(ConBits::D(xd))
-        }
-        (ConBits::F(ls), ConBits::F(rs)) => {
-            if !w {
-                return invalidop(op, false);
-            }
-            let xs: f32 = match op {
-                O::Oadd => ls + rs,
-                O::Osub => ls - rs,
-                O::Oneg => -ls,
-                O::Odiv => ls / rs,
-                O::Omul => ls * rs,
-                _ => {
-                    return invalidop(op, false);
-                }
-            };
-            Con::new_bits(ConBits::F(xs))
-        }
-        (ConBits::I(i), _) => {
+    match (*cl, *cr) {
+        (Con::CBits(li, _), Con::CBits(ri, _)) => {
             if w {
+                let ld: f64 = f64::from_bits(li as u64);
+                let rd: f64 = f64::from_bits(ri as u64);
                 let xd: f64 = match op {
-                    O::Oswtof => (i as i32) as f64,
-                    O::Ouwtof => (i as u32) as f64,
-                    O::Osltof => (i as i64) as f64,
-                    O::Oultof => (i as u64) as f64,
-                    O::Ocast => f64::from_bits(i as u64),
-                    _ => {
-                        return invalidop(op, false);
-                    }
+                    O::Oadd => ld + rd,
+                    O::Osub => ld - rd,
+                    O::Oneg => -ld,
+                    O::Odiv => ld / rd,
+                    O::Omul => ld * rd,
+                    O::Oswtof => (li as i32) as f64,
+                    O::Ouwtof => (li as u32) as f64,
+                    O::Osltof => (li as i64) as f64,
+                    O::Oultof => (li as u64) as f64,
+                    O::Ocast => f64::from_bits(li as u64),
+                    O::Oexts => f32::from_bits(li as u32) as f64,
+                    _ => return invalidop(op, false),
                 };
-                Con::new_bits(ConBits::D(xd))
+                Con::CBits(xd.to_bits() as i64, ConPP::I)
             } else {
+                let ls: f32 = f32::from_bits(li as u32);
+                let rs: f32 = f32::from_bits(ri as u32);
                 let xs: f32 = match op {
-                    O::Oswtof => (i as i32) as f32,
-                    O::Ouwtof => (i as u32) as f32,
-                    O::Osltof => (i as i64) as f32,
-                    O::Oultof => (i as u64) as f32,
-                    O::Ocast => f32::from_bits(i as u32),
-                    _ => {
-                        return invalidop(op, false);
-                    }
+                    O::Oadd => ls + rs,
+                    O::Osub => ls - rs,
+                    O::Oneg => -ls,
+                    O::Odiv => ls / rs,
+                    O::Omul => ls * rs,
+                    O::Oswtof => (li as i32) as f32,
+                    O::Ouwtof => (li as u32) as f32,
+                    O::Osltof => (li as i64) as f32,
+                    O::Oultof => (li as u64) as f32,
+                    O::Ocast => f32::from_bits(li as u32),
+                    O::Otruncd => f64::from_bits(li as u64) as f32,
+                    _ => return invalidop(op, false),
                 };
-                Con::new_bits(ConBits::F(xs))
+                Con::CBits(xs.to_bits() as i64, ConPP::I)
             }
-        }
-        (ConBits::D(d), _) => {
-            if op != O::Otruncd {
-                return invalidop(op, false);
-            }
-            Con::new_bits(ConBits::F(d as f32))
-        }
-        (ConBits::F(s), _) => {
-            if op != O::Oexts {
-                return invalidop(op, false);
-            }
-            Con::new_bits(ConBits::D(s as f64))
         }
         _ => {
-            return invalidop(op, false);
+            return invalidop(op, true);
         }
     }
 }
@@ -674,6 +631,6 @@ fn opfold(cons: &mut Vec<Con>, op: O, cls: K, cli: ConIdx, cri: ConIdx) -> Lat {
     // if (!KWIDE(cls))
     //     c.bits.i &= 0xffffffff;
     let ci: ConIdx = newconcon2(cons, c);
-    assert!(!(cls == Ks || cls == Kd) || matches!(c.bits, ConBits::F(_)));
+    // TODO - assert!(!(cls == Ks || cls == Kd) || matches!(c.bits, ConBits::F(_)));
     Lat::Con(ci)
 }
