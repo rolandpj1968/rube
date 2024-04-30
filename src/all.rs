@@ -1177,13 +1177,27 @@ pub struct TmpTag();
 // Index into Fn::tmps
 pub type TmpIdx = Idx<TmpTag>;
 
-impl Index<TmpIdx> for [Tmp] {
-    type Output = Tmp;
-    fn index(&self, index: TmpIdx) -> &Self::Output {
-        debug_assert!(index != TmpIdx::NONE);
-        self.index(index.0 as usize)
-    }
+macro_rules! def_index {
+    ($idxt:ty, $colt:ty, $valt:ty) => {
+        impl Index<$idxt> for $colt {
+            type Output = $valt;
+            fn index(&self, index: $idxt) -> &Self::Output {
+                debug_assert!(index != <$idxt>::NONE);
+                self.index(index.0 as usize)
+            }
+        }
+    };
 }
+
+def_index!(TmpIdx, [Tmp], Tmp);
+
+// impl Index<TmpIdx> for [Tmp] {
+//     type Output = Tmp;
+//     fn index(&self, index: TmpIdx) -> &Self::Output {
+//         debug_assert!(index != TmpIdx::NONE);
+//         self.index(index.0 as usize)
+//     }
+// }
 
 impl IndexMut<TmpIdx> for [Tmp] {
     fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {
@@ -1192,13 +1206,15 @@ impl IndexMut<TmpIdx> for [Tmp] {
     }
 }
 
-impl Index<TmpIdx> for Vec<Tmp> {
-    type Output = Tmp;
-    fn index(&self, index: TmpIdx) -> &Self::Output {
-        debug_assert!(index != TmpIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
+def_index!(TmpIdx, Vec<Tmp>, Tmp);
+
+// impl Index<TmpIdx> for Vec<Tmp> {
+//     type Output = Tmp;
+//     fn index(&self, index: TmpIdx) -> &Self::Output {
+//         debug_assert!(index != TmpIdx::NONE);
+//         self.index(index.0 as usize)
+//     }
+// }
 
 impl IndexMut<TmpIdx> for Vec<Tmp> {
     fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {

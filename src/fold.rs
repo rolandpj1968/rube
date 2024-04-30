@@ -562,14 +562,6 @@ fn invalidop(op: O, isaddr: bool) -> Con {
 }
 
 fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
-    // float xs, ls, rs;
-    // double xd, ld, rd;
-
-    // if cl.typ != ConT::CBits || cr.typ != ConT::CBits {
-    //     return invalidop(op, true);
-    // }
-    // *res = (Con){.type = CBits};
-    // memset(&res.bits, 0, sizeof(res.bits));
     match (*cl, *cr) {
         (Con::CBits(li, _), Con::CBits(ri, _)) => {
             if w {
