@@ -107,14 +107,14 @@ pub fn filluse(f: &mut Fn) {
                     }
                     let tmp: &mut Tmp = &mut tmps[ti];
                     tmp.width = w;
-                    tmp.def = InsIdx::new(ii);
+                    tmp.def = InsIdx::from(ii);
                     tmp.bid = b.id;
                     tmp.ndef += 1;
                     tmp.cls = i.cls;
                 }
                 for arg in i.args {
                     if let RTmp(ti) = arg {
-                        adduse(&mut tmps[ti], UseT::UIns(InsIdx::new(ii)), bi, b.id);
+                        adduse(&mut tmps[ti], UseT::UIns(InsIdx::from(ii)), bi, b.id);
                     }
                 }
             }
@@ -143,7 +143,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     assert!(f.start == BlkIdx::START);
     let start_id: RpoIdx = blks.id_of(BlkIdx::START);
     for tii in TMP0..nt {
-        let ti: TmpIdx = TmpIdx::new(tii);
+        let ti: TmpIdx = TmpIdx::from(tii);
         {
             let t: &mut Tmp = &mut tmps[ti];
             t.tvisit = TmpIdx::NONE;
@@ -213,7 +213,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
                 blks.with_mut(ai, |a| {
                     a.ivisit += 1;
                     if a.ivisit == 1 && bshas(&a.in_, ti.usize()) {
-                        let pi: PhiIdx = PhiIdx::new(phis.len());
+                        let pi: PhiIdx = PhiIdx::from(phis.len());
                         phis.push(Phi::new(rt, vec![], vec![], k, a.phi));
                         a.phi = pi;
                         if !bshas(&defs, a.id.usize()) && !bshas(&u, a.id.usize()) {

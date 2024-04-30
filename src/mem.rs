@@ -319,13 +319,13 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         let tmps: &mut [Tmp] = &mut f.tmps;
         let start_id = blks.borrow(f.start).id;
         for n in TMP0..tmps.len() {
-            let ti: TmpIdx = TmpIdx::new(n);
+            let ti: TmpIdx = TmpIdx::from(n);
             let t: &mut Tmp = &mut tmps[ti];
             t.svisit = SlotIdx::NONE;
             if t.alias.typ == AliasT::ALoc && t.alias.slot == ti && t.bid == start_id {
                 if let AliasU::ALoc(aloc) = t.alias.u {
                     if aloc.sz != -1 {
-                        t.svisit = SlotIdx::new(sl.len());
+                        t.svisit = SlotIdx::from(sl.len());
                         sl.push(Slot {
                             ti,
                             sz: aloc.sz,
@@ -376,7 +376,7 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     }
                     for iii in (0..b.ins().len()).rev() {
                         let i: &Ins = &b.ins()[iii];
-                        let ii: InsIdx = InsIdx::new(iii);
+                        let ii: InsIdx = InsIdx::from(iii);
                         if i.op == O::Oargc {
                             ip -= 1;
                             load(tmps, cons, i.args[1], u64::MAX, ip, &mut sl);
@@ -542,7 +542,7 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             if sl[s0i].si != SlotIdx::NONE {
                 continue;
             }
-            sl[s0i].si = SlotIdx::new(s0i);
+            sl[s0i].si = SlotIdx::from(s0i);
             let mut r: Range = sl[s0i].r;
             for si in (s0i + 1)..sl.len() {
                 if sl[si].si != SlotIdx::NONE || sl[si].r.b == 0 {
@@ -553,14 +553,14 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                      * by 'goto Skip;' if need be
                      */
                     for mi in s0i..si {
-                        if sl[mi].si == SlotIdx::new(s0i) && rovlap(&sl[mi].r, &sl[si].r) {
+                        if sl[mi].si == SlotIdx::from(s0i) && rovlap(&sl[mi].r, &sl[si].r) {
                             continue 'outer;
                         }
                     }
                 }
                 radd(&mut r, sl[si].r.a);
                 radd(&mut r, sl[si].r.b - 1);
-                sl[si].si = SlotIdx::new(s0i);
+                sl[si].si = SlotIdx::from(s0i);
                 fused += sl[si].sz;
             }
         }
@@ -578,12 +578,12 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                  * reset it before the slot()
                  * calls below
                  */
-                t.svisit = SlotIdx::new(si);
+                t.svisit = SlotIdx::from(si);
                 assert!(t.ndef == 1 && t.def != InsIdx::NONE);
                 (t.def, t.bid)
             };
             let t_def_bi: BlkIdx = f.rpo[t_bid];
-            if sl[si].si == SlotIdx::new(si) {
+            if sl[si].si == SlotIdx::from(si) {
                 continue;
             }
             blks.with_mut(t_def_bi, |b| b.ins_mut()[t_def_ii] = Ins::NOP);
@@ -668,7 +668,7 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     {
         for (s0ii, s0) in sl.iter().enumerate() {
             //for (s0=sl; s0<&sl[nsl]; s0++) {
-            let s0i = SlotIdx::new(s0ii);
+            let s0i = SlotIdx::from(s0ii);
             if s0.si != s0i {
                 continue;
             }

@@ -499,7 +499,7 @@ pub fn newtmp2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> TmpIdx {
         }
     }
 
-    let ti: TmpIdx = TmpIdx::new(tmps.len());
+    let ti: TmpIdx = TmpIdx::from(tmps.len());
     tmps.push(Tmp::new(name, /*slot*/ -1, /*cls*/ k));
     ti
     //fn_.add_tmp(Tmp::new(name, /*slot*/ -1, /*cls*/ k))
@@ -545,10 +545,10 @@ newcon(Con *c0, Fn *fn)
 pub fn newconcon2(cons: &mut Vec<Con>, c0: Con) -> ConIdx {
     for i in 1..cons.len() {
         if c0 == cons[i] {
-            return ConIdx::new(i);
+            return ConIdx::from(i);
         }
     }
-    let ci = ConIdx::new(cons.len());
+    let ci = ConIdx::from(cons.len());
     cons.push(c0);
     //let ci = f.add_con(c0);
 
@@ -558,10 +558,10 @@ pub fn newconcon2(cons: &mut Vec<Con>, c0: Con) -> ConIdx {
 pub fn newcon2(cons: &mut Vec<Con>, c0: Con) -> Ref {
     for i in 1..cons.len() {
         if c0 == cons[i] {
-            return RCon(ConIdx::new(i));
+            return RCon(ConIdx::from(i));
         }
     }
-    let ci = ConIdx::new(cons.len());
+    let ci = ConIdx::from(cons.len());
     cons.push(c0);
     //let ci = f.add_con(c0);
 

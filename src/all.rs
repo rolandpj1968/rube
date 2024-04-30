@@ -75,7 +75,7 @@ impl Blks {
         self.with_mut_i(bi.0 as usize, f)
     }
     pub fn add(&mut self, b: Blk) -> BlkIdx {
-        BlkIdx::new(self.add_i(b))
+        BlkIdx::from(self.add_i(b))
     }
     pub fn play(&self) -> std::slice::Iter<cell::RefCell<Blk>> {
         self.v.iter()
@@ -174,8 +174,8 @@ impl Blks {
 pub struct Idx<T>(pub u32, PhantomData<T>);
 
 impl<T> Idx<T> {
-    pub const NONE: Idx<T> = Idx::<T>::new(u32::MAX as usize);
-    pub const fn new(i: usize) -> Idx<T> {
+    pub const NONE: Idx<T> = Idx::<T>::from(u32::MAX as usize);
+    pub const fn from(i: usize) -> Idx<T> {
         debug_assert!(i <= u32::MAX as usize);
         Idx::<T>(i as u32, PhantomData)
     }
@@ -236,7 +236,7 @@ pub const fn bit(n: usize) -> Bits {
 
 pub const RXX: u32 = 0;
 pub const TMP0: usize = NBIT as usize;
-pub const TMP0IDX: TmpIdx = TmpIdx::new(TMP0);
+pub const TMP0IDX: TmpIdx = TmpIdx::from(TMP0);
 
 // TODO - just use BitSet
 pub type BSet = Vec<Bits>;
@@ -884,7 +884,7 @@ pub struct BlkTag();
 pub type BlkIdx = Idx<BlkTag>;
 
 impl BlkIdx {
-    pub const START: BlkIdx = BlkIdx::new(0);
+    pub const START: BlkIdx = BlkIdx::from(0);
 }
 
 impl Index<BlkIdx> for [Blk] {
@@ -1307,8 +1307,8 @@ impl IndexMut<ConIdx> for Vec<Con> {
 // pub struct ConIdx(pub u32);
 
 impl ConIdx {
-    pub const UNDEF: ConIdx = ConIdx::new(0); /* represents uninitialized data */
-    pub const CON_Z: ConIdx = ConIdx::new(1);
+    pub const UNDEF: ConIdx = ConIdx::from(0); /* represents uninitialized data */
+    pub const CON_Z: ConIdx = ConIdx::from(1);
 }
 
 #[derive(Debug)]
@@ -1449,7 +1449,7 @@ impl Fn {
     }
 
     pub fn add_phi(&mut self, p: Phi) -> PhiIdx {
-        let pi: PhiIdx = PhiIdx::new(self.phis.len());
+        let pi: PhiIdx = PhiIdx::from(self.phis.len());
         self.phis.push(p);
         pi
     }
@@ -1465,7 +1465,7 @@ impl Fn {
     }
 
     pub fn add_tmp(&mut self, t: Tmp) -> TmpIdx {
-        let ti: TmpIdx = TmpIdx::new(self.tmps.len());
+        let ti: TmpIdx = TmpIdx::from(self.tmps.len());
         self.tmps.push(t);
         ti
     }
@@ -1481,7 +1481,7 @@ impl Fn {
     }
 
     pub fn add_con(&mut self, c: Con) -> ConIdx {
-        let ci: ConIdx = ConIdx::new(self.cons.len());
+        let ci: ConIdx = ConIdx::from(self.cons.len());
         self.cons.push(c);
         ci
     }

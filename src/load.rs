@@ -281,14 +281,14 @@ fn def(
 
     if ii == InsIdx::NONE {
         // Bit naughty - this is out of range
-        ii = InsIdx::new(blks.borrow(bi).ins().len());
+        ii = InsIdx::from(blks.borrow(bi).ins().len());
     }
     let cls: K = if sl.sz > 4 { Kl } else { Kw };
     let msks: Bits = genmask(sl.sz as i32);
 
     let mut goto_load: bool = false;
-    while ii != InsIdx::new(0) && !goto_load {
-        ii = InsIdx::new(ii.usize() - 1);
+    while ii != InsIdx::from(0) && !goto_load {
+        ii = InsIdx::from(ii.usize() - 1);
         let mut i: Ins = blks.borrow(bi).ins()[ii.0 as usize]; /* Note: copy! */
         if killsl(tmps, i.to, sl) || (i.op == O::Ocall && escapes(tmps, sl.r)) {
             // println!("                              killsl or escaping call");
@@ -303,8 +303,8 @@ fn def(
                 (storesz(&i), i.args[1], i.args[0])
             } else if i.op == O::Oblit1 {
                 if let RInt(blit1_i) = i.args[0] {
-                    assert!(ii != InsIdx::new(0));
-                    ii = InsIdx::new(ii.usize() - 1);
+                    assert!(ii != InsIdx::from(0));
+                    ii = InsIdx::from(ii.usize() - 1);
                     i = blks.borrow(bi).ins()[ii.0 as usize];
                     assert!(i.op == O::Oblit0);
                     (blit1_i.abs(), i.args[1], R)
@@ -448,13 +448,13 @@ fn def(
     if !goto_load {
         r = newtmpref2(tmps, b"ld", true, sl.cls);
         let p: Phi = Phi::new(r, vec![], vec![], sl.cls, PhiIdx::NONE);
-        let pi: PhiIdx = PhiIdx::new(phis.len());
+        let pi: PhiIdx = PhiIdx::from(phis.len());
         phis.push(p);
         // TODO - notify QBE? QBE doesn't seem to set ist.num (i.e. ti). Nor off
         // I suspect to should be r's ti, not 0???
         // Maybe for phi's, QBE gets "to" from UPhi(p.to)
         ilog.push(Insert::new(
-            TmpIdx::new(0), /*TODO*/
+            TmpIdx::from(0), /*TODO*/
             blks.borrow(bi).id,
             InsertU::Phi(UPhi { m: *sl, pi }),
         ));
@@ -473,7 +473,7 @@ fn def(
             let l: Loc = Loc {
                 typ: l_type,
                 bi: bpi,
-                off: InsIdx::new(blks.borrow(bpi).ins().len()),
+                off: InsIdx::from(blks.borrow(bpi).ins().len()),
             };
             let r1: Ref = def(
                 blks,
@@ -560,7 +560,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     sz: sz as i16,
                     cls: i.cls,
                 };
-                let ii: InsIdx = InsIdx::new(iii);
+                let ii: InsIdx = InsIdx::from(iii);
                 let l: Loc = Loc {
                     typ: LocT::LRoot,
                     off: ii,
@@ -588,12 +588,12 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     // TODO - why???
     ilog.push(Insert::new(
         TmpIdx::NONE,
-        RpoIdx::new(f.nblk as usize), // RpoIdx::NONE???
+        RpoIdx::from(f.nblk as usize), // RpoIdx::NONE???
         //InsIdx::NONE,
         InsertU::Ins(InsIdx::NONE, sentinal_ins),
     ));
     let mut isti: usize = 0;
-    let mut n: RpoIdx = RpoIdx::new(0);
+    let mut n: RpoIdx = RpoIdx::from(0);
     // Ugh, fixme
     while n.usize() < f.nblk as usize {
         let mut ist: &mut Insert = &mut ilog[isti];
@@ -609,7 +609,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             isti += 1;
             ist = &mut ilog[isti];
         }
-        let mut ni: InsIdx = InsIdx::new(0);
+        let mut ni: InsIdx = InsIdx::from(0);
         let mut ib: Vec<Ins> = vec![];
         loop {
             let mut i: Ins;
@@ -625,7 +625,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 isti += 1;
                 ist = &mut ilog[isti];
             } else {
-                if ni == InsIdx::new(blks.borrow(bi).ins().len()) {
+                if ni == InsIdx::from(blks.borrow(bi).ins().len()) {
                     break;
                 }
                 i = blks.borrow(bi).ins()[ni.0 as usize];

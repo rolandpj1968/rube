@@ -291,7 +291,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             if cpy[tii] == R {
                 /*e*/
                 print!("\n{:>10} not seen!", to_s(&tmps[tii].name));
-            } else if cpy[tii] != RTmp(TmpIdx::new(tii)) {
+            } else if cpy[tii] != RTmp(TmpIdx::from(tii)) {
                 /*e*/
                 print!("\n{:>10} copy of ", to_s(&tmps[tii].name));
                 printref(/*stderr*/ &mut stdout(), f, typ, itbl, cpy[tii]);

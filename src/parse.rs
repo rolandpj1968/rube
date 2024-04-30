@@ -793,7 +793,7 @@ impl Parser<'_> {
             }
             for ti in (TMP0..curf.tmps.len()).rev() {
                 if curf.tmps[ti].name == name {
-                    return RTmp(TmpIdx::new(ti));
+                    return RTmp(TmpIdx::from(ti));
                 }
             }
         }
@@ -972,7 +972,7 @@ impl Parser<'_> {
             bi = b.dlink;
         }
 
-        let id = RpoIdx::new(curf.blks.len()); // TODO - is this value used???
+        let id = RpoIdx::from(curf.blks.len()); // TODO - is this value used???
         bi = curf.add_blk(Blk::new(name, id, self.blkh[h as usize]));
         self.blkh[h as usize] = bi;
 

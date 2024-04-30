@@ -63,7 +63,7 @@ fn rporec(blks: &Blks, bi: BlkIdx, mut x: RpoIdx) -> RpoIdx {
     });
 
     let succs = blks.with_mut(bi, |b| {
-        b.id = RpoIdx::new(1); // placeholder
+        b.id = RpoIdx::from(1); // placeholder
         if swap_succs {
             (b.s1, b.s2) = (b.s2, b.s1);
         }
@@ -110,7 +110,7 @@ pub fn fillrpo(f: &mut Fn) {
 
     blks.for_each_mut(|b| b.id = RpoIdx::NONE);
 
-    let mut x = RpoIdx::new((f.nblk as usize) - 1);
+    let mut x = RpoIdx::from((f.nblk as usize) - 1);
     // Deliberately wraps from u32::MAX
     x = rporec(blks, f.start, x);
     let n = x.next().usize();
@@ -126,7 +126,7 @@ pub fn fillrpo(f: &mut Fn) {
             blks.with_mut(bi, |b| b.is_dead = true);
         } else {
             blks.with_mut(bi, |b| {
-                b.id = RpoIdx::new(b.id.usize() - n);
+                b.id = RpoIdx::from(b.id.usize() - n);
                 f.rpo[b.id] = bi;
                 prev_bi = bi;
             });

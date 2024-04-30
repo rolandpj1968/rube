@@ -161,18 +161,18 @@ fn visitjmp(
             match l {
                 Lat::Bot => {
                     edge[n.usize() * 2 + 1].work = *flowrk;
-                    edge[n.usize() * 2].work = EdgeIdx::new(n.usize() * 2 + 1);
-                    *flowrk = EdgeIdx::new(n.usize() * 2);
+                    edge[n.usize() * 2].work = EdgeIdx::from(n.usize() * 2 + 1);
+                    *flowrk = EdgeIdx::from(n.usize() * 2);
                 }
                 Lat::Con(ci) => {
                     if iscon(&cons[ci.0 as usize], false, 0) {
                         assert!(edge[n.usize() * 2].dead);
                         edge[n.usize() * 2 + 1].work = *flowrk;
-                        *flowrk = EdgeIdx::new(n.usize() * 2 + 1);
+                        *flowrk = EdgeIdx::from(n.usize() * 2 + 1);
                     } else {
                         assert!(edge[n.usize() * 2 + 1].dead);
                         edge[n.usize() * 2].work = *flowrk;
-                        *flowrk = EdgeIdx::new(n.usize() * 2);
+                        *flowrk = EdgeIdx::from(n.usize() * 2);
                     }
                 }
                 Lat::Top => assert!(false),
@@ -180,7 +180,7 @@ fn visitjmp(
         }
         J::Jjmp => {
             edge[n.usize() * 2].work = *flowrk;
-            *flowrk = EdgeIdx::new(n.usize() * 2);
+            *flowrk = EdgeIdx::from(n.usize() * 2);
         }
         J::Jhlt => (),
         _ => assert!(isret(b.jmp().typ)),
@@ -256,7 +256,7 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     //     work: EdgeIdx::NONE,
     //};
     initedge(blks, &mut edge[rpo.len() * 2], BlkIdx::START);
-    let mut flowrk: EdgeIdx = EdgeIdx::new(rpo.len() * 2);
+    let mut flowrk: EdgeIdx = EdgeIdx::from(rpo.len() * 2);
 
     /* 1. find out constants and dead cfg edges */
     loop {
@@ -333,7 +333,7 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         /*e*/
         print!("\n> SCCP findings:");
         for tii in TMP0..tmps.len() {
-            let ti: TmpIdx = TmpIdx::new(tii);
+            let ti: TmpIdx = TmpIdx::from(tii);
             if val[ti.usize()] == Lat::Bot {
                 continue;
             }
