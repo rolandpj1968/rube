@@ -193,6 +193,42 @@ impl<T> Idx<T> {
     }
 }
 
+macro_rules! def_index {
+    ($idxt:ty, $colt:ty, $valt:ty) => {
+        impl Index<$idxt> for $colt {
+            type Output = $valt;
+            fn index(&self, index: $idxt) -> &Self::Output {
+                debug_assert!(index != <$idxt>::NONE);
+                self.index(index.0 as usize)
+            }
+        }
+        impl Index<&$idxt> for $colt {
+            type Output = $valt;
+            fn index(&self, index: &$idxt) -> &Self::Output {
+                debug_assert!(*index != <$idxt>::NONE);
+                self.index(index.0 as usize)
+            }
+        }
+    };
+}
+
+macro_rules! def_index_mut {
+    ($idxt:ty, $colt:ty, $valt:ty) => {
+        impl IndexMut<$idxt> for $colt {
+            fn index_mut(&mut self, index: $idxt) -> &mut Self::Output {
+                debug_assert!(index != <$idxt>::NONE);
+                self.index_mut(index.0 as usize)
+            }
+        }
+        impl IndexMut<&$idxt> for $colt {
+            fn index_mut(&mut self, index: &$idxt) -> &mut Self::Output {
+                debug_assert!(*index != <$idxt>::NONE);
+                self.index_mut(index.0 as usize)
+            }
+        }
+    };
+}
+
 pub type Bits = u64;
 
 /*
@@ -668,47 +704,15 @@ impl Ins {
     }
 }
 
-// #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-// pub struct InsIdx(pub u32); // Index into Blk::ins
-
-// impl InsIdx {
-//     pub const NONE: InsIdx = InsIdx(u32::MAX);
-// }
-
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InsTag();
 // Index into Blk::ins
 pub type InsIdx = Idx<InsTag>;
 
-impl Index<InsIdx> for [Ins] {
-    type Output = Ins;
-    fn index(&self, index: InsIdx) -> &Self::Output {
-        debug_assert!(index != InsIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<InsIdx> for [Ins] {
-    fn index_mut(&mut self, index: InsIdx) -> &mut Self::Output {
-        debug_assert!(index != InsIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl Index<InsIdx> for Vec<Ins> {
-    type Output = Ins;
-    fn index(&self, index: InsIdx) -> &Self::Output {
-        debug_assert!(index != InsIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<InsIdx> for Vec<Ins> {
-    fn index_mut(&mut self, index: InsIdx) -> &mut Self::Output {
-        debug_assert!(index != InsIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
+def_index!(InsIdx, [Ins], Ins);
+def_index_mut!(InsIdx, [Ins], Ins);
+def_index!(InsIdx, Vec<Ins>, Ins);
+def_index_mut!(InsIdx, Vec<Ins>, Ins);
 
 #[derive(new)]
 pub struct Phi {
@@ -719,47 +723,15 @@ pub struct Phi {
     pub link: PhiIdx,
 }
 
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// pub struct PhiIdx(pub u32); // Index into Fn::phis
-
-// impl PhiIdx {
-//     pub const NONE: PhiIdx = PhiIdx(u32::MAX);
-// }
-
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PhiTag();
 // Index into Fn::phis
 pub type PhiIdx = Idx<PhiTag>;
 
-impl Index<PhiIdx> for [Phi] {
-    type Output = Phi;
-    fn index(&self, index: PhiIdx) -> &Self::Output {
-        debug_assert!(index != PhiIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<PhiIdx> for [Phi] {
-    fn index_mut(&mut self, index: PhiIdx) -> &mut Self::Output {
-        debug_assert!(index != PhiIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl Index<PhiIdx> for Vec<Phi> {
-    type Output = Phi;
-    fn index(&self, index: PhiIdx) -> &Self::Output {
-        debug_assert!(index != PhiIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<PhiIdx> for Vec<Phi> {
-    fn index_mut(&mut self, index: PhiIdx) -> &mut Self::Output {
-        debug_assert!(index != PhiIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
+def_index!(PhiIdx, [Phi], Phi);
+def_index_mut!(PhiIdx, [Phi], Phi);
+def_index!(PhiIdx, Vec<Phi>, Phi);
+def_index_mut!(PhiIdx, Vec<Phi>, Phi);
 
 #[derive(Clone, Copy)]
 pub struct BlkJmp {
@@ -870,14 +842,6 @@ impl Blk {
     }
 }
 
-// Index into Fn::blks
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// pub struct BlkIdx(pub u32);
-
-// impl BlkIdx {
-//     pub const NONE: BlkIdx = BlkIdx(u32::MAX);
-// }
-
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlkTag();
 // Index into Fn::blks
@@ -887,117 +851,20 @@ impl BlkIdx {
     pub const START: BlkIdx = BlkIdx::from(0);
 }
 
-impl Index<BlkIdx> for [Blk] {
-    type Output = Blk;
-    fn index(&self, index: BlkIdx) -> &Self::Output {
-        debug_assert!(index != BlkIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl Index<&BlkIdx> for [Blk] {
-    type Output = Blk;
-    fn index(&self, index: &BlkIdx) -> &Self::Output {
-        debug_assert!(*index != BlkIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<BlkIdx> for [Blk] {
-    fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
-        debug_assert!(index != BlkIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl IndexMut<&BlkIdx> for [Blk] {
-    fn index_mut(&mut self, index: &BlkIdx) -> &mut Self::Output {
-        debug_assert!(*index != BlkIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl Index<BlkIdx> for Vec<Blk> {
-    type Output = Blk;
-    fn index(&self, index: BlkIdx) -> &Self::Output {
-        debug_assert!(index != BlkIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<BlkIdx> for Vec<Blk> {
-    fn index_mut(&mut self, index: BlkIdx) -> &mut Self::Output {
-        debug_assert!(index != BlkIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
+def_index!(BlkIdx, [Blk], Blk);
+def_index_mut!(BlkIdx, [Blk], Blk);
+def_index!(BlkIdx, Vec<Blk>, Blk);
+def_index_mut!(BlkIdx, Vec<Blk>, Blk);
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RpoTag();
 // Index into Fn::rpj
 pub type RpoIdx = Idx<RpoTag>;
 
-impl Index<RpoIdx> for [BlkIdx] {
-    type Output = BlkIdx;
-    fn index(&self, index: RpoIdx) -> &Self::Output {
-        debug_assert!(index != RpoIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl Index<&RpoIdx> for [BlkIdx] {
-    type Output = BlkIdx;
-    fn index(&self, index: &RpoIdx) -> &Self::Output {
-        debug_assert!(*index != RpoIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<RpoIdx> for [BlkIdx] {
-    fn index_mut(&mut self, index: RpoIdx) -> &mut Self::Output {
-        debug_assert!(index != RpoIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl IndexMut<&RpoIdx> for [BlkIdx] {
-    fn index_mut(&mut self, index: &RpoIdx) -> &mut Self::Output {
-        debug_assert!(*index != RpoIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl Index<RpoIdx> for Vec<BlkIdx> {
-    type Output = BlkIdx;
-    fn index(&self, index: RpoIdx) -> &Self::Output {
-        debug_assert!(index != RpoIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<RpoIdx> for Vec<BlkIdx> {
-    fn index_mut(&mut self, index: RpoIdx) -> &mut Self::Output {
-        debug_assert!(index != RpoIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-/*
-struct Use {
-    enum {
-        UXXX,
-        UPhi,
-        UIns,
-        UJmp,
-    } type;
-    uint bid;
-    union {
-        Ins *ins;
-        Phi *phi;
-    } u;
-};
-
- */
+def_index!(RpoIdx, [BlkIdx], BlkIdx);
+def_index_mut!(RpoIdx, [BlkIdx], BlkIdx);
+def_index!(RpoIdx, Vec<BlkIdx>, BlkIdx);
+def_index_mut!(RpoIdx, Vec<BlkIdx>, BlkIdx);
 
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
@@ -1177,51 +1044,10 @@ pub struct TmpTag();
 // Index into Fn::tmps
 pub type TmpIdx = Idx<TmpTag>;
 
-macro_rules! def_index {
-    ($idxt:ty, $colt:ty, $valt:ty) => {
-        impl Index<$idxt> for $colt {
-            type Output = $valt;
-            fn index(&self, index: $idxt) -> &Self::Output {
-                debug_assert!(index != <$idxt>::NONE);
-                self.index(index.0 as usize)
-            }
-        }
-    };
-}
-
 def_index!(TmpIdx, [Tmp], Tmp);
-
-// impl Index<TmpIdx> for [Tmp] {
-//     type Output = Tmp;
-//     fn index(&self, index: TmpIdx) -> &Self::Output {
-//         debug_assert!(index != TmpIdx::NONE);
-//         self.index(index.0 as usize)
-//     }
-// }
-
-impl IndexMut<TmpIdx> for [Tmp] {
-    fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {
-        debug_assert!(index != TmpIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
+def_index_mut!(TmpIdx, [Tmp], Tmp);
 def_index!(TmpIdx, Vec<Tmp>, Tmp);
-
-// impl Index<TmpIdx> for Vec<Tmp> {
-//     type Output = Tmp;
-//     fn index(&self, index: TmpIdx) -> &Self::Output {
-//         debug_assert!(index != TmpIdx::NONE);
-//         self.index(index.0 as usize)
-//     }
-// }
-
-impl IndexMut<TmpIdx> for Vec<Tmp> {
-    fn index_mut(&mut self, index: TmpIdx) -> &mut Self::Output {
-        debug_assert!(index != TmpIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
+def_index_mut!(TmpIdx, Vec<Tmp>, Tmp);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
@@ -1239,77 +1065,20 @@ pub enum Con {
     CAddr(Sym, i64),
 }
 
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// #[repr(u8)]
-// pub enum ConBits {
-//     None,
-//     I(i64),
-//     D(f64),
-//     F(f32),
-// }
-
-// #[derive(new, Clone, Copy, Debug, PartialEq)]
-// pub struct Con {
-//     pub typ: ConT,
-//     pub sym: Sym,
-//     pub bits: ConBits,
-// }
-
-// impl Con {
-//     // TODO - merge bits and sym into same enum, unless sym actual const is imported later...
-//     // TODO - add bits (maybe default to 0?)
-//     pub fn new_sym(sym: Sym, bits: ConBits) -> Con {
-//         Con::new(ConT::CAddr, sym, bits)
-//     }
-
-//     pub fn new_bits(bits: ConBits) -> Con {
-//         Con::new(ConT::CBits, Sym::UNDEF, bits)
-//     }
-// }
-
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ConTag();
 // Index in Fn::cons
 pub type ConIdx = Idx<ConTag>;
 
-impl Index<ConIdx> for [Con] {
-    type Output = Con;
-    fn index(&self, index: ConIdx) -> &Self::Output {
-        debug_assert!(index != ConIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<ConIdx> for [Con] {
-    fn index_mut(&mut self, index: ConIdx) -> &mut Self::Output {
-        debug_assert!(index != ConIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl Index<ConIdx> for Vec<Con> {
-    type Output = Con;
-    fn index(&self, index: ConIdx) -> &Self::Output {
-        debug_assert!(index != ConIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<ConIdx> for Vec<Con> {
-    fn index_mut(&mut self, index: ConIdx) -> &mut Self::Output {
-        debug_assert!(index != ConIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-// Index in Fn::cons
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// pub struct ConIdx(pub u32);
-
 impl ConIdx {
     pub const UNDEF: ConIdx = ConIdx::from(0); /* represents uninitialized data */
     pub const CON_Z: ConIdx = ConIdx::from(1);
 }
+
+def_index!(ConIdx, [Con], Con);
+def_index_mut!(ConIdx, [Con], Con);
+def_index!(ConIdx, Vec<Con>, Con);
+def_index_mut!(ConIdx, Vec<Con>, Con);
 
 #[derive(Debug)]
 pub struct Addr {
@@ -1321,47 +1090,16 @@ pub struct Addr {
 }
 
 pub type Mem = Addr;
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// pub struct MemIdx(pub u32); // Index into Fn::mem
-
-// impl MemIdx {
-//     pub const NONE: MemIdx = MemIdx(u32::MAX);
-// }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MemTag();
 // Index into Fn::mems
 pub type MemIdx = Idx<MemTag>;
 
-impl Index<MemIdx> for [Mem] {
-    type Output = Mem;
-    fn index(&self, index: MemIdx) -> &Self::Output {
-        debug_assert!(index != MemIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl Index<&MemIdx> for [Mem] {
-    type Output = Mem;
-    fn index(&self, index: &MemIdx) -> &Self::Output {
-        debug_assert!(*index != MemIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<MemIdx> for [Mem] {
-    fn index_mut(&mut self, index: MemIdx) -> &mut Self::Output {
-        debug_assert!(index != MemIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
-
-impl IndexMut<&MemIdx> for [Mem] {
-    fn index_mut(&mut self, index: &MemIdx) -> &mut Self::Output {
-        debug_assert!(*index != MemIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
+def_index!(MemIdx, [Mem], Mem);
+def_index_mut!(MemIdx, [Mem], Mem);
+def_index!(MemIdx, Vec<Mem>, Mem);
+def_index_mut!(MemIdx, Vec<Mem>, Mem);
 
 #[derive(Clone)]
 pub struct Lnk {
@@ -1375,10 +1113,6 @@ pub struct Lnk {
 pub struct Fn {
     pub blks: Blks,
     pub phis: Vec<Phi>,
-    // Hrmmm, these actually are 1:1 with Tmp's
-    // Maybe make Alias.slot a TmpIdx?
-    pub aliases: Vec<Alias>,
-
     pub start: BlkIdx,
     pub tmps: Vec<Tmp>,
     pub cons: Vec<Con>,
@@ -1400,7 +1134,6 @@ impl Fn {
         Fn {
             blks: Blks { v: vec![] },
             phis: vec![], // TODO - should be on Blk
-            aliases: vec![],
             start: BlkIdx::NONE,
             tmps: vec![],
             cons: vec![],
@@ -1528,6 +1261,7 @@ pub struct Typ {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+// TODO - Idx<T>
 pub struct TypIdx(pub u32);
 
 impl TypIdx {
