@@ -7,6 +7,9 @@ extern crate lazy_static;
 #[macro_use]
 extern crate static_assertions;
 
+#[macro_use]
+mod macros;
+
 mod abi;
 mod alias;
 mod all;
@@ -49,7 +52,7 @@ fn dump_data(dat: &Dat, _typ: &[Typ]) {
     println!(
         "Got dat \"{}\" {:?}",
         String::from_utf8_lossy(&dat.name),
-        dat.type_
+        dat.typ
     );
 }
 

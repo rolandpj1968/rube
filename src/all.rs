@@ -193,42 +193,6 @@ impl<T> Idx<T> {
     }
 }
 
-macro_rules! def_index {
-    ($idxt:ty, $colt:ty, $valt:ty) => {
-        impl Index<$idxt> for $colt {
-            type Output = $valt;
-            fn index(&self, index: $idxt) -> &Self::Output {
-                debug_assert!(index != <$idxt>::NONE);
-                self.index(index.0 as usize)
-            }
-        }
-        impl Index<&$idxt> for $colt {
-            type Output = $valt;
-            fn index(&self, index: &$idxt) -> &Self::Output {
-                debug_assert!(*index != <$idxt>::NONE);
-                self.index(index.0 as usize)
-            }
-        }
-    };
-}
-
-macro_rules! def_index_mut {
-    ($idxt:ty, $colt:ty, $valt:ty) => {
-        impl IndexMut<$idxt> for $colt {
-            fn index_mut(&mut self, index: $idxt) -> &mut Self::Output {
-                debug_assert!(index != <$idxt>::NONE);
-                self.index_mut(index.0 as usize)
-            }
-        }
-        impl IndexMut<&$idxt> for $colt {
-            fn index_mut(&mut self, index: &$idxt) -> &mut Self::Output {
-                debug_assert!(*index != <$idxt>::NONE);
-                self.index_mut(index.0 as usize)
-            }
-        }
-    };
-}
-
 pub type Bits = u64;
 
 /*
@@ -271,8 +235,7 @@ pub const fn bit(n: usize) -> Bits {
 }
 
 pub const RXX: u32 = 0;
-pub const TMP0: usize = NBIT as usize;
-pub const TMP0IDX: TmpIdx = TmpIdx::from(TMP0);
+pub const TMP0: usize = NBIT;
 
 // TODO - just use BitSet
 pub type BSet = Vec<Bits>;
@@ -1044,6 +1007,10 @@ pub struct TmpTag();
 // Index into Fn::tmps
 pub type TmpIdx = Idx<TmpTag>;
 
+impl TmpIdx {
+    pub const TMP0: TmpIdx = TmpIdx::from(TMP0);
+}
+
 def_index!(TmpIdx, [Tmp], Tmp);
 def_index_mut!(TmpIdx, [Tmp], Tmp);
 def_index!(TmpIdx, Vec<Tmp>, Tmp);
@@ -1225,7 +1192,7 @@ impl Fn {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TypFldT {
     FEnd,
@@ -1239,17 +1206,13 @@ pub enum TypFldT {
     FTyp,
 }
 
+#[derive(Debug, new)]
 pub struct TypFld {
-    pub type_: TypFldT,
+    pub typ: TypFldT,
     pub len: u32, // or index in typ[] for FTyp
 }
 
-impl TypFld {
-    pub fn new(type_: TypFldT, len: u32) -> TypFld {
-        TypFld { type_, len }
-    }
-}
-
+#[derive(Debug)]
 pub struct Typ {
     pub name: Vec<u8>,
     pub isdark: bool,
@@ -1257,15 +1220,7 @@ pub struct Typ {
     pub align: i32,
     pub size: u64,
     pub nunion: u32,
-    pub fields: Vec<TypFld>, // TODO need indirection???
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-// TODO - Idx<T>
-pub struct TypIdx(pub u32);
-
-impl TypIdx {
-    pub const NONE: TypIdx = TypIdx(u32::MAX);
+    pub fields: Vec<TypFld>,
 }
 
 impl Typ {
@@ -1281,6 +1236,16 @@ impl Typ {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct TypTag();
+// Index into Fn::tmps
+pub type TypIdx = Idx<TypTag>;
+
+def_index!(TypIdx, [Typ], Typ);
+def_index_mut!(TypIdx, [Typ], Typ);
+def_index!(TypIdx, Vec<Typ>, Typ);
+def_index_mut!(TypIdx, Vec<Typ>, Typ);
 
 #[derive(Debug)]
 #[repr(u8)]
@@ -1305,7 +1270,7 @@ pub enum DatU {
 }
 
 pub struct Dat {
-    pub type_: DatT,
+    pub typ: DatT,
     pub name: Vec<u8>,
     pub lnk: Lnk,
     pub u: DatU,
@@ -1314,9 +1279,9 @@ pub struct Dat {
 }
 
 impl Dat {
-    pub fn new(type_: DatT, name: &[u8], lnk: Lnk) -> Dat {
+    pub fn new(typ: DatT, name: &[u8], lnk: Lnk) -> Dat {
         Dat {
-            type_,
+            typ,
             name: name.to_vec(),
             lnk,
             u: DatU::None,

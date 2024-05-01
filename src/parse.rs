@@ -15,7 +15,7 @@ use crate::all::K::{Kc, Kd, Ke, Kl, Ks, Ksb, Ksh, Kub, Kuh, Kw, Kx, K0};
 use crate::all::{
     bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConIdx, ConPP, Dat, DatT,
     DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx, RubeResult, Sym, SymT, Target, Tmp,
-    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0, TMP0IDX,
+    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -823,7 +823,7 @@ impl Parser<'_> {
     fn findtyp(&self, name: &[u8]) -> RubeResult<TypIdx> {
         for i in (0..self.typ.len()).rev() {
             if name == self.typ[i].name {
-                return Ok(TypIdx(i as u32));
+                return Ok(TypIdx::from(i));
             }
         }
         Err(self.err(&format!("undefined type :{}", to_s(name))))
@@ -1554,7 +1554,7 @@ impl Parser<'_> {
         let mut sz: u64 = 0;
         let mut al = ty.align;
         while t != Token::Trbrace {
-            let mut ftyp_idx: u32 = 0;
+            let mut ftyp_idx: TypIdx = TypIdx::NONE;
 
             let (type_, mut s, mut a) = match t {
                 Token::Td => (TypFldT::Fd, 8u64, 3i32),
@@ -1564,14 +1564,10 @@ impl Parser<'_> {
                 Token::Th => (TypFldT::Fh, 2u64, 1i32),
                 Token::Tb => (TypFldT::Fb, 1u64, 0i32),
                 Token::Ttyp => {
-                    let TypIdx(idx) = self.findtyp(&tv.as_str())?;
+                    let idx: TypIdx = self.findtyp(&tv.as_str())?;
                     // TODO - neaten up...
                     ftyp_idx = idx;
-                    (
-                        TypFldT::FTyp,
-                        self.typ[idx as usize].size,
-                        self.typ[idx as usize].align,
-                    )
+                    (TypFldT::FTyp, self.typ[idx].size, self.typ[idx].align)
                 }
                 _ => return Err(self.err("invalid type member specifier")),
             };
@@ -1591,7 +1587,7 @@ impl Parser<'_> {
             }
             sz += (a as u64) + (c as u64) * s;
             if type_ == TypFldT::FTyp {
-                s = ftyp_idx as u64;
+                s = ftyp_idx.usize() as u64;
             }
             while c > 0 {
                 ty.fields.push(TypFld::new(type_, s as u32)); // ugh
@@ -1742,7 +1738,7 @@ impl Parser<'_> {
         }
         loop {
             (t, tv) = self.nextnl()?;
-            d.type_ = match t {
+            d.typ = match t {
                 Token::Trbrace => break,
                 Token::Tl => DatT::DL,
                 Token::Tw => DatT::DW,
@@ -1794,7 +1790,7 @@ impl Parser<'_> {
                 return Err(self.err(", or } expected in data"));
             }
         }
-        d.type_ = DatT::DEnd;
+        d.typ = DatT::DEnd;
         cb(&d, &self.typ);
 
         Ok(())
@@ -1949,7 +1945,7 @@ pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Re
     match r {
         R => assert!(false),
         RTmp(ti) => {
-            if ti < TMP0IDX {
+            if ti < TmpIdx::TMP0 {
                 let _ = write!(f, "R{}", ti.0);
             } else {
                 let _ = write!(f, "%{}", to_s(&fn_.tmp(ti).name));
