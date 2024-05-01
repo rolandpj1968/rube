@@ -196,28 +196,10 @@ pub struct SlotTag();
 // Index into coalesce::sl vector
 pub type SlotIdx = Idx<SlotTag>;
 
-impl Index<SlotIdx> for [Slot] {
-    type Output = Slot;
-    fn index(&self, index: SlotIdx) -> &Self::Output {
-        debug_assert!(index != SlotIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl Index<SlotIdx> for Vec<Slot> {
-    type Output = Slot;
-    fn index(&self, index: SlotIdx) -> &Self::Output {
-        debug_assert!(index != SlotIdx::NONE);
-        self.index(index.0 as usize)
-    }
-}
-
-impl IndexMut<SlotIdx> for [Slot] {
-    fn index_mut(&mut self, index: SlotIdx) -> &mut Self::Output {
-        debug_assert!(index != SlotIdx::NONE);
-        self.index_mut(index.0 as usize)
-    }
-}
+def_index!(SlotIdx, [Slot], Slot);
+def_index_mut!(SlotIdx, [Slot], Slot);
+def_index!(SlotIdx, Vec<Slot>, Slot);
+def_index_mut!(SlotIdx, Vec<Slot>, Slot);
 
 fn rin(r: &Range, n: i32) -> bool {
     r.a <= n && n < r.b

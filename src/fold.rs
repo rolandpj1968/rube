@@ -20,21 +20,14 @@ enum Lat {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Edge {
-    dest: RpoIdx, // TODO what's this? Lat?
+    dest: RpoIdx,
     dead: bool,
-    work: EdgeIdx, // ???
+    work: EdgeIdx,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 struct EdgeTag {}
 type EdgeIdx = Idx<EdgeTag>;
-
-/*
-static int *val;
-static Edge *flowrk, (*edge)[2];
-static Use **usewrk;
-static uint nuse;
- */
 
 fn iscon(c: &Con, w: bool, k: u64) -> bool {
     if let Con::CBits(i, _) = *c {
@@ -129,7 +122,7 @@ fn visitins(
 ) {
     if let RTmp(ti) = i.to {
         let mut v: Lat = Lat::Bot;
-        if OPTAB[i.op as usize].canfold {
+        if OPTAB[i.op].canfold {
             let l: Lat = latval(val, i.args[0]);
             let r: Lat = if i.args[1] != R {
                 latval(val, i.args[1])
@@ -165,7 +158,7 @@ fn visitjmp(
                     *flowrk = EdgeIdx::from(n.usize() * 2);
                 }
                 Lat::Con(ci) => {
-                    if iscon(&cons[ci.0 as usize], false, 0) {
+                    if iscon(&cons[ci], false, 0) {
                         assert!(edge[n.usize() * 2].dead);
                         edge[n.usize() * 2 + 1].work = *flowrk;
                         *flowrk = EdgeIdx::from(n.usize() * 2 + 1);
@@ -239,9 +232,8 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         ;
         rpo.len()*2 + 1 /* use edge[len*2] for start */
     ];
-    let mut usewrk: Vec<(TmpIdx, u32 /*UseIdx*/)> = vec![]; // Maybe copy?
+    let mut usewrk: Vec<(TmpIdx, u32 /*UseIdx*/)> = vec![];
 
-    //     for (n=0; n<fn->nblk; n++) {
     for n in 0..rpo.len() {
         blks.with_mut(rpo[n], |b| {
             b.ivisit = 0;
@@ -250,11 +242,6 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         });
     }
     assert!(f.start == BlkIdx::START);
-    // let mut start: Edge = Edge {
-    //     dest: RpoIdx::NONE,
-    //     dead: false,
-    //     work: EdgeIdx::NONE,
-    //};
     initedge(blks, &mut edge[rpo.len() * 2], BlkIdx::START);
     let mut flowrk: EdgeIdx = EdgeIdx::from(rpo.len() * 2);
 
@@ -611,15 +598,15 @@ fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
 fn opfold(cons: &mut Vec<Con>, op: O, cls: K, cli: ConIdx, cri: ConIdx) -> Lat {
     let mut c: Con = {
         if cls == Kw || cls == Kl {
-            match foldint(op, cls == Kl, &cons[cli.0 as usize], &cons[cri.0 as usize]) {
+            match foldint(op, cls == Kl, &cons[cli], &cons[cri]) {
                 None => return Lat::Bot,
                 Some(c0) => c0,
             }
         } else {
-            foldflt(op, cls == Kd, &cons[cli.0 as usize], &cons[cri.0 as usize])
+            foldflt(op, cls == Kd, &cons[cli], &cons[cri])
         }
     };
-    // This is a bit weird
+    // TODO - this is a bit weird
     if kwide(cls) == 0 {
         if let Con::CBits(i, _) = &mut c {
             *i &= 0xffffffff;

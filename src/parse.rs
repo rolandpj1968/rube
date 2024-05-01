@@ -1907,7 +1907,7 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
     match *c {
         Con::CUndef => assert!(false), // nada
         Con::CAddr(sym, off) => {
-            if sym.type_ == SymT::SThr {
+            if sym.typ == SymT::SThr {
                 let _ = write!(f, "thread ");
             }
             let _ = write!(f, "${}", to_s(str_(&sym.id, itbl)));

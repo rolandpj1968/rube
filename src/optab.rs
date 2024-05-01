@@ -1,11 +1,11 @@
-use std::ops::{Index, IndexMut};
+use std::ops::Index;
 
 use crate::all::K::{Kd, Ke, Kl, Ks, Kw, Kx};
 use crate::all::{Op, KM, O};
 
 def_enum_index!(O, [Op], Op);
 // Hrmm, doesn't work in the below cos mut refs not allowed in static
-def_enum_index_mut!(O, [Op], Op);
+// def_enum_index_mut!(O, [Op], Op);
 
 pub static OPTAB: [Op; O::NOp as usize] = {
     let nullop = Op::new(b"", [[Ke, Ke, Ke, Ke], [Ke, Ke, Ke, Ke]], false);

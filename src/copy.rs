@@ -13,7 +13,7 @@ use crate::util::{bscount, bsdiff, bsinit, bsiter, bsset, Bucket};
 
 fn iscon(cons: &[Con], r: Ref, bits: i64) -> bool {
     if let RCon(ci) = r {
-        let con: &Con = &cons[ci.0 as usize];
+        let con: &Con = &cons[ci];
         if let Con::CBits(i, _) = con {
             return bits == *i;
         }

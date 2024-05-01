@@ -18,7 +18,7 @@ pub fn getalias(tmps: &[Tmp], cons: &[Con], a_in: &Alias, r: Ref) -> Alias {
             assert!(a_out.typ != AliasT::ABot);
         }
         RCon(ci) => {
-            let c: &Con = &cons[ci.0 as usize];
+            let c: &Con = &cons[ci];
             match c {
                 Con::CAddr(sym, off) => {
                     a_out.typ = AliasT::ASym;
@@ -173,10 +173,10 @@ pub fn fillalias(f: &mut Fn) {
 
     tmps.iter_mut().for_each(|t| t.alias = Alias::default());
 
-    for n in 0..f.nblk {
-        let bi: BlkIdx = rpo[n as usize];
-        let b = blks.borrow(bi);
-        let mut pi: PhiIdx = b.phi; //blks.phi_of(bi);
+    assert!(f.nblk as usize == rpo.len());
+    for bi in rpo {
+        let b = blks.borrow(*bi);
+        let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             assert!(matches!(p.to, RTmp(_)));
@@ -212,7 +212,7 @@ pub fn fillalias(f: &mut Fn) {
                     a.slot = ti;
                     let mut sz: i32 = -1;
                     if let RCon(ci) = i.args[0] {
-                        let c: &Con = &cons[ci.0 as usize];
+                        let c: &Con = &cons[ci];
                         assert!(matches!(c, Con::CBits(_, _)));
                         if let Con::CBits(sz0, _) = c {
                             if 0 <= *sz0 && *sz0 <= NBIT as i64 {

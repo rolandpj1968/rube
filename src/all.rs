@@ -821,7 +821,7 @@ def_index_mut!(BlkIdx, Vec<Blk>, Blk);
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RpoTag();
-// Index into Fn::rpj
+// Index into Fn::rpo
 pub type RpoIdx = Idx<RpoTag>;
 
 def_index!(RpoIdx, [BlkIdx], BlkIdx);
@@ -854,13 +854,13 @@ pub enum SymT {
 
 #[derive(new, Clone, Copy, Debug, PartialEq)]
 pub struct Sym {
-    pub type_: SymT,
+    pub typ: SymT,
     pub id: InternId,
 }
 
 impl Sym {
     const UNDEF: Sym = Sym {
-        type_: SymT::SGlo,
+        typ: SymT::SGlo,
         id: InternId::INVALID,
     }; // Ugh, sort out Con
 }
@@ -977,8 +977,7 @@ pub struct Tmp {
     pub phi: TmpIdx,
     pub alias: Alias,
     pub width: TmpWdth,
-    pub tvisit: TmpIdx, /*u32*/
-    // bool??? TmpIdx?? It's a slot index in mem::coalesce :(
+    pub tvisit: TmpIdx,
     pub svisit: SlotIdx,
 }
 
