@@ -257,8 +257,9 @@ pub enum Ref {
 pub const UNDEF: Ref = RCon(ConIdx::UNDEF); /* represents uninitialized data */
 pub const CON_Z: Ref = RCon(ConIdx::CON_Z); /* represents uninitialized data */
 
-/*
-enum CmpI {
+#[derive(Clone, Copy, Debug, FromRepr, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum CmpI {
     Cieq,
     Cine,
     Cisge,
@@ -270,9 +271,23 @@ enum CmpI {
     Ciule,
     Ciult,
     NCmpI,
-};
+}
 
-enum CmpF {
+impl CmpI {
+    pub fn from_op_w(op: O) -> CmpI {
+        assert!(OCMPW <= op && op <= OCMPW1);
+        return CmpI::from_repr((op as u8) - (OCMPW as u8)).unwrap();
+    }
+
+    pub fn from_op_l(op: O) -> CmpI {
+        assert!(OCMPL <= op && op <= OCMPL1);
+        return CmpI::from_repr((op as u8) - (OCMPL as u8)).unwrap();
+    }
+}
+
+#[derive(Clone, Copy, Debug, FromRepr, PartialEq, PartialOrd)]
+#[repr(u8)]
+pub enum CmpF {
     Cfeq,
     Cfge,
     Cfgt,
@@ -282,9 +297,22 @@ enum CmpF {
     Cfo,
     Cfuo,
     NCmpF,
-    NCmp = NCmpI + NCmpF,
-};
+    //NCmp = NCmpI + NCmpF,
+}
 
+impl CmpF {
+    pub fn from_op_s(op: O) -> CmpF {
+        assert!(OCMPS <= op && op <= OCMPS1);
+        return CmpF::from_repr((op as u8) - (OCMPS as u8)).unwrap();
+    }
+
+    pub fn from_op_d(op: O) -> CmpF {
+        assert!(OCMPD <= op && op <= OCMPD1);
+        return CmpF::from_repr((op as u8) - (OCMPD as u8)).unwrap();
+    }
+}
+
+/*
 enum O {
     Oxxx,
 #define O(op, x, y) O##op,
@@ -535,6 +563,14 @@ pub fn cls_for_ret(j: J) -> Option<K> {
 //     Jjf1 = J::Jjffuo as u8,
 // }
 
+pub const OCMPW: O = O::Oceqw;
+pub const OCMPW1: O = O::Ocultw;
+pub const OCMPL: O = O::Oceql;
+pub const OCMPL1: O = O::Ocultl;
+pub const OCMPS: O = O::Oceqs;
+pub const OCMPS1: O = O::Ocuos;
+pub const OCMPD: O = O::Oceqd;
+pub const OCMPD1: O = O::Ocuod;
 pub const OALLOC: O = O::Oalloc4;
 pub const OALLOC1: O = O::Oalloc16;
 

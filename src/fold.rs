@@ -3,8 +3,9 @@ use std::io::stdout;
 use crate::all::Ref::{RCon, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw};
 use crate::all::{
-    isret, kwide, to_s, Blk, BlkIdx, Blks, Con, ConIdx, ConPP, Fn, Idx, Ins, Phi, PhiIdx, Ref,
-    RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, TMP0,
+    isret, kwide, to_s, Blk, BlkIdx, Blks, CmpF, CmpI, Con, ConIdx, ConPP, Fn, Idx, Ins, Phi,
+    PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, OCMPD, OCMPD1, OCMPL1, OCMPS,
+    OCMPS1, OCMPW, OCMPW1, TMP0,
 };
 use crate::optab::OPTAB;
 use crate::parse::printref;
@@ -398,142 +399,147 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
 }
 
 /* boring folding code */
-
 fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
-    // union {
-    //     int64_t s;
-    //     uint64_t u;
-    //     float fs;
-    //     double fd;
-    // } l, r;
-    // uint64_t x;
-    // Sym sym;
-    // int typ;
-
-    // memset(&sym, 0, sizeof sym);
-    // typ = CBits;
-    // l.s = cl->bits.i;
-    // r.s = cr->bits.i;
-    // if (op == Oadd) {
-    //     if (cl->type == CAddr) {
-    //         if (cr->type == CAddr)
-    //             return 1;
-    //         typ = CAddr;
-    //         sym = cl->sym;
-    //     }
-    //     else if (cr->type == CAddr) {
-    //         typ = CAddr;
-    //         sym = cr->sym;
-    //     }
-    // }
-    // else if (op == Osub) {
-    //     if (cl->type == CAddr) {
-    //         if (cr->type != CAddr) {
-    //             typ = CAddr;
-    //             sym = cl->sym;
-    //         } else if (!symeq(cl->sym, cr->sym))
-    //             return 1;
-    //     }
-    //     else if (cr->type == CAddr)
-    //         return 1;
-    // }
-    // else if (cl->type == CAddr || cr->type == CAddr)
-    //     return 1;
-    // if (op == Odiv || op == Orem || op == Oudiv || op == Ourem) {
-    //     if (iscon(cr, w, 0))
-    //         return 1;
-    //     if (op == Odiv || op == Orem) {
-    //         x = w ? INT64_MIN : INT32_MIN;
-    //         if (iscon(cr, w, -1))
-    //         if (iscon(cl, w, x))
-    //             return 1;
-    //     }
-    // }
-    // switch (op) {
-    // case Oadd:  x = l.u + r.u; break;
-    // case Osub:  x = l.u - r.u; break;
-    // case Oneg:  x = -l.u; break;
-    // case Odiv:  x = w ? l.s / r.s : (int32_t)l.s / (int32_t)r.s; break;
-    // case Orem:  x = w ? l.s % r.s : (int32_t)l.s % (int32_t)r.s; break;
-    // case Oudiv: x = w ? l.u / r.u : (uint32_t)l.u / (uint32_t)r.u; break;
-    // case Ourem: x = w ? l.u % r.u : (uint32_t)l.u % (uint32_t)r.u; break;
-    // case Omul:  x = l.u * r.u; break;
-    // case Oand:  x = l.u & r.u; break;
-    // case Oor:   x = l.u | r.u; break;
-    // case Oxor:  x = l.u ^ r.u; break;
-    // case Osar:  x = (w ? l.s : (int32_t)l.s) >> (r.u & (31|w<<5)); break;
-    // case Oshr:  x = (w ? l.u : (uint32_t)l.u) >> (r.u & (31|w<<5)); break;
-    // case Oshl:  x = l.u << (r.u & (31|w<<5)); break;
-    // case Oextsb: x = (int8_t)l.u;   break;
-    // case Oextub: x = (uint8_t)l.u;  break;
-    // case Oextsh: x = (int16_t)l.u;  break;
-    // case Oextuh: x = (uint16_t)l.u; break;
-    // case Oextsw: x = (int32_t)l.u;  break;
-    // case Oextuw: x = (uint32_t)l.u; break;
-    // case Ostosi: x = w ? (int64_t)cl->bits.s : (int32_t)cl->bits.s; break;
-    // case Ostoui: x = w ? (uint64_t)cl->bits.s : (uint32_t)cl->bits.s; break;
-    // case Odtosi: x = w ? (int64_t)cl->bits.d : (int32_t)cl->bits.d; break;
-    // case Odtoui: x = w ? (uint64_t)cl->bits.d : (uint32_t)cl->bits.d; break;
-    // case Ocast:
-    //     x = l.u;
-    //     if (cl->type == CAddr) {
-    //         typ = CAddr;
-    //         sym = cl->sym;
-    //     }
-    //     break;
-    // default:
-    //     if (Ocmpw <= op && op <= Ocmpl1) {
-    //         if (op <= Ocmpw1) {
-    //             l.u = (int32_t)l.u;
-    //             r.u = (int32_t)r.u;
-    //         } else
-    //             op -= Ocmpl - Ocmpw;
-    //         switch (op - Ocmpw) {
-    //         case Ciule: x = l.u <= r.u; break;
-    //         case Ciult: x = l.u < r.u;  break;
-    //         case Cisle: x = l.s <= r.s; break;
-    //         case Cislt: x = l.s < r.s;  break;
-    //         case Cisgt: x = l.s > r.s;  break;
-    //         case Cisge: x = l.s >= r.s; break;
-    //         case Ciugt: x = l.u > r.u;  break;
-    //         case Ciuge: x = l.u >= r.u; break;
-    //         case Cieq:  x = l.u == r.u; break;
-    //         case Cine:  x = l.u != r.u; break;
-    //         default: die("unreachable");
-    //         }
-    //     }
-    //     else if (Ocmps <= op && op <= Ocmps1) {
-    //         switch (op - Ocmps) {
-    //         case Cfle: x = l.fs <= r.fs; break;
-    //         case Cflt: x = l.fs < r.fs;  break;
-    //         case Cfgt: x = l.fs > r.fs;  break;
-    //         case Cfge: x = l.fs >= r.fs; break;
-    //         case Cfne: x = l.fs != r.fs; break;
-    //         case Cfeq: x = l.fs == r.fs; break;
-    //         case Cfo: x = l.fs < r.fs || l.fs >= r.fs; break;
-    //         case Cfuo: x = !(l.fs < r.fs || l.fs >= r.fs); break;
-    //         default: die("unreachable");
-    //         }
-    //     }
-    //     else if (Ocmpd <= op && op <= Ocmpd1) {
-    //         switch (op - Ocmpd) {
-    //         case Cfle: x = l.fd <= r.fd; break;
-    //         case Cflt: x = l.fd < r.fd;  break;
-    //         case Cfgt: x = l.fd > r.fd;  break;
-    //         case Cfge: x = l.fd >= r.fd; break;
-    //         case Cfne: x = l.fd != r.fd; break;
-    //         case Cfeq: x = l.fd == r.fd; break;
-    //         case Cfo: x = l.fd < r.fd || l.fd >= r.fd; break;
-    //         case Cfuo: x = !(l.fd < r.fd || l.fd >= r.fd); break;
-    //         default: die("unreachable");
-    //         }
-    //     }
-    //     else
-    //         die("unreachable");
-    // }
-    // *res = (Con){.type=typ, .sym=sym, .bits={.i=x}};
-    // return 0;
-    None // for now
+    match (*cl, *cr) {
+        (Con::CAddr(sym1, off1), Con::CAddr(sym2, off2)) => {
+            if op == O::Osub && sym1 == sym2 {
+                Some(Con::CBits(off1 - off2, ConPP::I))
+            } else {
+                None
+            }
+        }
+        (Con::CAddr(sym, off), Con::CBits(i, _)) | (Con::CBits(i, _), Con::CAddr(sym, off)) => {
+            if op == O::Oadd {
+                Some(Con::CAddr(sym, off + i))
+            } else {
+                None
+            }
+        }
+        (Con::CBits(mut li64, _), Con::CBits(mut ri64, _)) => {
+            if op == O::Odiv || op == O::Orem || op == O::Oudiv || op == O::Ourem {
+                if iscon(cr, w, 0) {
+                    return None;
+                }
+                if op == O::Odiv || op == O::Orem {
+                    let x: i64 = if w { i64::MIN } else { i32::MIN as i64 };
+                    if (iscon(cr, w, -1i64 as u64)) && (iscon(cl, w, x as u64)) {
+                        return None;
+                    }
+                }
+            }
+            let lfs: f32 = f32::from_bits(li64 as u32);
+            let rfs: f32 = f32::from_bits(ri64 as u32);
+            let lfd: f64 = f64::from_bits(li64 as u64);
+            let rfd: f64 = f64::from_bits(ri64 as u64);
+            let mut lu64: u64 = li64 as u64;
+            let mut ru64: u64 = ri64 as u64;
+            let lu32: u32 = li64 as u32;
+            let ru32: u32 = ri64 as u32;
+            let li32: i32 = li64 as i32;
+            let ri32: i32 = ri64 as i32;
+            let shmask: u64 = if w { 63 } else { 31 };
+            let x: u64 = match op {
+                O::Oadd => lu64 + ru64,
+                O::Osub => lu64 - ru64,
+                O::Oneg => (-li64) as u64,
+                O::Odiv => (if w { li64 / ri64 } else { (li32 / ri32) as i64 }) as u64,
+                O::Orem => (if w { li64 % ri64 } else { (li32 % ri32) as i64 }) as u64,
+                O::Oudiv => (if w { lu64 / ru64 } else { (lu32 / ru32) as u64 }),
+                O::Ourem => (if w { lu64 % ru64 } else { (lu32 % ru32) as u64 }),
+                O::Omul => lu64 * ru64,
+                O::Oand => lu64 & ru64,
+                O::Oor => lu64 | ru64,
+                O::Oxor => lu64 ^ ru64,
+                O::Osar => ((if w { li64 } else { li32 as i64 }) >> (ru64 & shmask)) as u64,
+                O::Oshr => (if w { lu64 } else { lu32 as u64 }) >> (ru64 & shmask),
+                O::Oshl => lu64 << (ru64 & shmask),
+                O::Oextsb => lu64 as i8 as i64 as u64,
+                O::Oextub => lu64 as i8 as u64,
+                O::Oextsh => lu64 as i16 as i64 as u64,
+                O::Oextuh => lu64 as u16 as u64,
+                O::Oextsw => li32 as i64 as u64,
+                O::Oextuw => lu32 as u64,
+                O::Ostosi => (if w { lfs as i64 } else { lfs as i32 as i64 }) as u64,
+                O::Ostoui => (if w { lfs as u64 } else { lfs as u32 as u64 }),
+                O::Odtosi => (if w { lfd as i64 } else { lfd as i32 as i64 }) as u64,
+                O::Odtoui => (if w { lfd as u64 } else { lfd as u32 as u64 }),
+                O::Ocast => {
+                    lu64
+                    // TODO
+                    //     if (cl->type == CAddr) {
+                    //         typ = CAddr;
+                    //         sym = cl->sym;
+                    //     }
+                }
+                _ => {
+                    if OCMPW <= op && op <= OCMPL1 {
+                        let cmpi: CmpI;
+                        if op <= OCMPW1 {
+                            cmpi = CmpI::from_op_w(op);
+                            lu64 = li32 as u64;
+                            ru64 = ri32 as u64;
+                            // TODO: QBE doesn't do this - bug?
+                            li64 = li32 as i64;
+                            ri64 = ri32 as i64;
+                        } else {
+                            cmpi = CmpI::from_op_l(op);
+                        }
+                        (match cmpi {
+                            CmpI::Ciule => lu64 <= ru64,
+                            CmpI::Ciult => lu64 < ru64,
+                            CmpI::Cisle => li64 <= ri64,
+                            CmpI::Cislt => li64 < ri64,
+                            CmpI::Cisgt => li64 > ri64,
+                            CmpI::Cisge => li64 >= ri64,
+                            CmpI::Ciugt => lu64 > ru64,
+                            CmpI::Ciuge => lu64 >= ru64,
+                            CmpI::Cieq => lu64 == ru64,
+                            CmpI::Cine => lu64 != ru64,
+                            _ => {
+                                assert!(false); // unreachable
+                                false
+                            }
+                        }) as u64
+                    } else if OCMPS <= op && op <= OCMPS1 {
+                        (match CmpF::from_op_s(op) {
+                            CmpF::Cfle => lfs <= rfs,
+                            CmpF::Cflt => lfs < rfs,
+                            CmpF::Cfgt => lfs > rfs,
+                            CmpF::Cfge => lfs >= rfs,
+                            CmpF::Cfne => lfs != rfs,
+                            CmpF::Cfeq => lfs == rfs,
+                            CmpF::Cfo => lfs < rfs || lfs >= rfs,
+                            CmpF::Cfuo => !(lfs < rfs || lfs >= rfs),
+                            _ => {
+                                assert!(false); // unreachable
+                                false
+                            }
+                        }) as u64
+                    } else if OCMPD <= op && op <= OCMPD1 {
+                        (match CmpF::from_op_d(op) {
+                            CmpF::Cfle => lfd <= rfd,
+                            CmpF::Cflt => lfd < rfd,
+                            CmpF::Cfgt => lfd > rfd,
+                            CmpF::Cfge => lfd >= rfd,
+                            CmpF::Cfne => lfd != rfd,
+                            CmpF::Cfeq => lfd == rfd,
+                            CmpF::Cfo => lfd < rfd || lfd >= rfd,
+                            CmpF::Cfuo => !(lfd < rfd || lfd >= rfd),
+                            _ => {
+                                assert!(false); // unreachable
+                                false
+                            }
+                        }) as u64
+                    } else {
+                        assert!(false); // unreachable
+                        0
+                    }
+                }
+            };
+            Some(Con::CBits(x as i64, ConPP::I))
+        }
+        _ => None,
+    }
 }
 
 // TODO Result<Con>
