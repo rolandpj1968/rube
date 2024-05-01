@@ -3,12 +3,13 @@ use std::io::stdout;
 use crate::all::Ref::{RCon, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw};
 use crate::all::{
-    isret, kwide, to_s, Blk, BlkIdx, Blks, CmpF, CmpI, Con, ConIdx, ConPP, Fn, Idx, Ins, Phi,
-    PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, OCMPD, OCMPD1, OCMPL1, OCMPS,
-    OCMPS1, OCMPW, OCMPW1, TMP0,
+    isret, isstore, kwide, to_s, Blk, BlkIdx, BlkJmp, Blks, CmpF, CmpI, Con, ConIdx, ConPP, Fn,
+    Idx, Ins, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, OCMPD, OCMPD1,
+    OCMPL1, OCMPS, OCMPS1, OCMPW, OCMPW1, TMP0, UNDEF,
 };
+use crate::cfg::edgedel;
 use crate::optab::OPTAB;
-use crate::parse::printref;
+use crate::parse::{printfn, printref};
 use crate::util::{newconcon2, Bucket};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -191,20 +192,19 @@ fn initedge(blks: &Blks, e: &mut Edge, s: BlkIdx) {
     e.work = EdgeIdx::NONE;
 }
 
-/*
-static int
-renref(Ref *r)
-{
-    int l;
-
-    if (rtype(*r) == RTmp)
-        if ((l=val[r->val]) != Bot) {
-            *r = CON(l);
-            return 1;
+fn renref(val: &[Lat], r: &mut Ref) -> bool {
+    if let RTmp(ti) = *r {
+        match val[ti.usize()] {
+            Lat::Top => assert!(false),
+            Lat::Bot => (), // nada
+            Lat::Con(ci) => {
+                *r = RCon(ci);
+                return true;
+            }
         }
-    return 0;
+    }
+    false
 }
- */
 
 /* require rpo, use, pred */
 fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
@@ -341,61 +341,105 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         print!("\n dead code: ");
     }
 
-    //     /* 2. trim dead code, replace constants */
-    //     d = 0;
+    let phis: &mut [Phi] = &mut f.phis;
+    let cons: &[Con] = &f.cons;
+
+    /* 2. trim dead code, replace constants */
+    let mut d: bool = false;
+    assert!(f.start == BlkIdx::START);
+    let mut prev_bi = BlkIdx::NONE;
+    let mut bi: BlkIdx = BlkIdx::START;
     //     for (pb=&f.start; (b=*pb);) {
-    //         if (b.ivisit == 0) {
-    //             d = 1;
-    //             if (debug['F'])
-    //                 fprintf(stderr, "%s ", b.name);
-    //             edgedel(b, &b.s1);
-    //             edgedel(b, &b.s2);
-    //             *pb = b.link;
-    //             continue;
-    //         }
-    //         for (pp=&b.phi; (p=*pp);)
-    //             if (val[p.to.val] != Bot)
-    //                 *pp = p.link;
-    //             else {
-    //                 for (a=0; a<p.narg; a++)
-    //                     if (!deadedge(p.blk[a].id, b.id))
-    //                         renref(&p.arg[a]);
-    //                 pp = &p.link;
-    //             }
-    //         for (i=b.ins; i<&b.ins[b.nins]; i++)
-    //             if (renref(&i.to))
-    //                 *i = (Ins){.op = Onop};
-    //             else {
-    //                 for (n=0; n<2; n++)
-    //                     renref(&i.arg[n]);
-    //                 if (isstore(i.op))
-    //                 if (req(i.arg[0], UNDEF))
-    //                     *i = (Ins){.op = Onop};
-    //             }
-    //         renref(&b.jmp.arg);
-    //         if (b.jmp.type == Jjnz && rtype(b.jmp.arg) == RCon) {
-    //                 if (iscon(&f.con[b.jmp.arg.val], 0, 0)) {
-    //                     edgedel(b, &b.s1);
-    //                     b.s1 = b.s2;
-    //                     b.s2 = 0;
-    //                 } else
-    //                     edgedel(b, &b.s2);
-    //                 b.jmp.type = Jjmp;
-    //                 b.jmp.arg = R;
-    //         }
-    //         pb = &b.link;
-    //     }
+    while bi != BlkIdx::NONE {
+        if blks.ivisit_of(bi) == 0 {
+            d = true;
+            if true
+            /*debug['F']*/
+            {
+                /*e*/
+                print!("{} ", to_s(&blks.borrow(bi).name));
+            }
+            edgedel(blks, phis, bi, blks.borrow(bi).s1);
+            edgedel(blks, phis, bi, blks.borrow(bi).s2);
+            if prev_bi == BlkIdx::NONE {
+                f.start = blks.borrow(bi).link;
+            } else {
+                blks.borrow_mut(prev_bi).link = blks.borrow(bi).link;
+            }
+            bi = blks.borrow(bi).link;
+            continue;
+        }
+        let bid: RpoIdx = blks.id_of(bi);
+        let mut prev_pi: PhiIdx = PhiIdx::NONE;
+        let mut pi: PhiIdx = blks.phi_of(bi);
+        //         for (pp=&b.phi; (p=*pp);)
+        while pi != PhiIdx::NONE {
+            let p_to: Ref = phis[pi].to;
+            let p_link: PhiIdx = phis[pi].link;
+            assert!(matches!(p_to, RTmp(_)));
+            if let RTmp(ti) = p_to {
+                if val[ti.usize()] != Lat::Bot {
+                    // *pp = p.link;
+                    if prev_pi == PhiIdx::NONE {
+                        blks.with_mut(bi, |b| b.phi = p_link);
+                    } else {
+                        phis[prev_pi].link = p_link;
+                    }
+                } else {
+                    let p: &mut Phi = &mut phis[pi];
+                    for a in 0..p.args.len() {
+                        if !deadedge(&edge, blks.id_of(p.blks[a]), bid) {
+                            renref(&val, &mut p.args[a]);
+                        }
+                    }
+                    prev_pi = pi;
+                }
+            }
+            pi = p_link;
+        }
+        for i in blks.borrow(bi).ins_mut().iter_mut() {
+            if renref(&val, &mut i.to) {
+                *i = Ins::NOP;
+            } else {
+                for n in 0..2 {
+                    renref(&val, &mut i.args[n]);
+                }
+                if isstore(i.op) && i.args[0] == UNDEF {
+                    *i = Ins::NOP;
+                }
+            }
+        }
+        renref(&val, &mut blks.borrow(bi).jmp_mut().arg);
+        if blks.borrow(bi).jmp().typ == J::Jjnz && matches!(blks.borrow(bi).jmp().arg, RCon(_)) {
+            if let RCon(ci) = blks.borrow(bi).jmp().arg {
+                if iscon(&cons[ci], false, 0) {
+                    edgedel(blks, phis, bi, blks.borrow(bi).s1);
+                    blks.with_mut(bi, |b| {
+                        b.s1 = b.s2;
+                        b.s2 = BlkIdx::NONE;
+                    });
+                } else {
+                    edgedel(blks, phis, bi, blks.borrow(bi).s2);
+                }
+                blks.borrow(bi).jmp_mut().typ = J::Jjmp;
+                blks.borrow(bi).jmp_mut().arg = R;
+            }
+        }
+        prev_bi = bi;
+        bi = blks.borrow(bi).link;
+    }
 
-    //     if (debug['F']) {
-    //         if (!d)
-    //             fprintf(stderr, "(none)");
-    //         fprintf(stderr, "\n\n> After constant folding:\n");
-    //         printfn(f, stderr);
-    //     }
-
-    //     free(val);
-    //     free(edge);
-    //     vfree(usewrk);
+    if true
+    /*debug['F']*/
+    {
+        if !d {
+            /*e*/
+            print!("(none)");
+        }
+        /*e*/
+        println!("\n\n> After constant folding:");
+        printfn(/*stderr*/ &mut stdout(), f, typ, itbl);
+    }
 }
 
 /* boring folding code */

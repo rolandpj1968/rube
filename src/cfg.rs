@@ -27,7 +27,7 @@ fn preddel(b: &mut Blk, bsi: BlkIdx) {
     }
 }
 
-fn edgedel(blks: &Blks, phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
+pub fn edgedel(blks: &Blks, phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
     if bdi != BlkIdx::NONE {
         blks.with_mut(bsi, |bs| succsdel(bs, bdi));
         phisdel(phis, blks.phi_of(bdi), bsi);
