@@ -602,7 +602,6 @@ pub enum K {
     K0,
 
     Ke = -2, /* erroneous mode */
-             //Km = KBase::Kl as isize, /* memory pointer */
 }
 
 pub fn kwide(k: K) -> i32 {
@@ -614,7 +613,7 @@ pub fn kbase(k: K) -> i32 {
 }
 
 // Alias
-pub const KM: K = K::Kl;
+pub const KM: K = K::Kl; /* memory pointer */
 
 // Used as array indices in OPTAB init
 const_assert_eq!(Kw as usize, 0);
@@ -1154,11 +1153,6 @@ impl Fn {
         self.cons.push(c);
         ci
     }
-
-    // pub fn mem(&self, mi: MemIdx) -> &Mem {
-    //     assert!(mi != MemIdx::NONE);
-    //     &self.mems[mi.0 as usize]
-    // }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
