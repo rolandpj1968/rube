@@ -171,25 +171,37 @@ impl Blks {
 
 // Typed index into blks, tmps, etc for type safety
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Idx<T>(pub u32, PhantomData<T>);
+pub struct Idx<TagT: Eq + Copy>(pub u32, PhantomData<TagT>);
 
-impl<T> Idx<T> {
-    pub const NONE: Idx<T> = Idx::<T>::from(u32::MAX as usize);
-    pub const fn from(i: usize) -> Idx<T> {
+impl<TagT: Eq + Copy> Idx<TagT> {
+    pub const NONE: Idx<TagT> = Idx::<TagT>::from(u32::MAX as usize);
+    pub const fn from(i: usize) -> Idx<TagT> {
         debug_assert!(i <= u32::MAX as usize);
-        Idx::<T>(i as u32, PhantomData)
+        Idx::<TagT>(i as u32, PhantomData)
     }
     // Implement cast???
     pub fn usize(self) -> usize {
         self.0 as usize
     }
-    pub fn next(self) -> Idx<T> {
+    pub fn next(self) -> Idx<TagT> {
         // Wrapping for RpoIdx in rporec et al
         Self(self.0.wrapping_add(1), PhantomData)
     }
-    pub fn prev(self) -> Idx<T> {
+    pub fn prev(self) -> Idx<TagT> {
         // Wrapping for RpoIdx in rporec et al
         Self(self.0.wrapping_sub(1), PhantomData)
+    }
+    pub fn is_none(self) -> bool {
+        self == Self::NONE
+    }
+    pub fn is_some(self) -> bool {
+        !self.is_none()
+    }
+}
+
+impl<TagT: Eq + Copy> Default for Idx<TagT> {
+    fn default() -> Self {
+        Self::NONE
     }
 }
 
