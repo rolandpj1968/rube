@@ -51,12 +51,12 @@ macro_rules! def_enum_index {
 }
 
 // mut [] operator for enum
-macro_rules! def_enum_index_mut {
-    ($enumt:ty, $colt:ty, $valt:ty) => {
-        impl IndexMut<$enumt> for $colt {
-            fn index_mut(&mut self, index: $enumt) -> &mut Self::Output {
-                self.index_mut(index as usize)
-            }
-        }
-    };
-}
+// macro_rules! def_enum_index_mut {
+//     ($enumt:ty, $colt:ty, $valt:ty) => {
+//         impl IndexMut<$enumt> for $colt {
+//             fn index_mut(&mut self, index: $enumt) -> &mut Self::Output {
+//                 self.index_mut(index as usize)
+//             }
+//         }
+//     };
+// }

@@ -788,7 +788,7 @@ impl Parser<'_> {
         let tmph_i = (hash(name) & TMASK) as usize;
         let ti: TmpIdx = self.tmph[tmph_i];
         if ti != TmpIdx::NONE {
-            if curf.tmp(ti).name == name {
+            if curf.tmps[ti].name == name {
                 return RTmp(ti);
             }
             for ti in (TMP0..curf.tmps.len()).rev() {
@@ -1232,7 +1232,7 @@ impl Parser<'_> {
                         if self.plink == PhiIdx::NONE {
                             curf.blk_mut(self.cur_bi).phi = pi;
                         } else {
-                            let prev_phi = &mut curf.phi_mut(self.plink);
+                            let prev_phi = &mut curf.phis[self.plink];
                             prev_phi.link = pi;
                         }
                         self.plink = pi;
@@ -1250,7 +1250,7 @@ impl Parser<'_> {
                         } else {
                             return Err(self.err("blit size must be constant"));
                         }
-                        let c: &Con = curf.con(ci);
+                        let c: &Con = &curf.cons[ci];
                         // TODO - clean up
                         let sz: u32 = {
                             let sz_u32: u32;
@@ -1286,10 +1286,10 @@ impl Parser<'_> {
     }
 }
 
-fn usecheck(fn_: &Fn, r: &Ref, k: K) -> bool {
+fn usecheck(f: &Fn, r: Ref, k: K) -> bool {
     match r {
         RTmp(ti) => {
-            let cls: K = fn_.tmp(*ti).cls;
+            let cls: K = f.tmps[ti].cls;
             cls == k || (cls == Kl && k == Kw)
         }
         _ => true,
@@ -1297,30 +1297,28 @@ fn usecheck(fn_: &Fn, r: &Ref, k: K) -> bool {
 }
 
 impl Parser<'_> {
-    fn typecheck(&self, fn_: &mut Fn) -> RubeResult<()> {
-        fillpreds(fn_);
-        let mut bi: BlkIdx = fn_.start;
+    fn typecheck(&self, f: &mut Fn) -> RubeResult<()> {
+        fillpreds(f);
+        let mut bi: BlkIdx = f.start;
         while bi != BlkIdx::NONE {
-            let mut pi: PhiIdx = fn_.blk(bi).phi;
+            let mut pi: PhiIdx = f.blk(bi).phi;
             while pi != PhiIdx::NONE {
-                if let RTmp(ti) = fn_.phi(pi).to {
-                    fn_.tmp_mut(ti).cls = fn_.phi(pi).cls;
+                if let RTmp(ti) = f.phis[pi].to {
+                    f.tmps[ti].cls = f.phis[pi].cls;
                 } else {
                     return Err(self.err(&format!(
                         "phi to val is not a tmp in block {}",
-                        to_s(&fn_.blk(bi).name)
+                        to_s(&f.blk(bi).name)
                     )));
                 }
-                pi = fn_.phi(pi).link;
+                pi = f.phis[pi].link;
             }
-            let ins_len = fn_.blk(bi).ins().len();
-            for ii in 0..ins_len
-            /*fn_.blk(bi).ins().len()*/
-            {
-                let i: Ins = fn_.blk(bi).ins()[ii]; // Note - copy
-                if let RTmp(ti) = /*fn_.blk(bi).ins()[ii]*/ i.to {
-                    let ins_cls: K = /*fn_.blk(bi).ins()[ii]*/i.cls;
-                    let t: &mut Tmp = fn_.tmp_mut(ti);
+            let ins_len = f.blk(bi).ins().len();
+            for ii in 0..ins_len {
+                let i: Ins = f.blk(bi).ins()[ii]; // Note - copy
+                if let RTmp(ti) = i.to {
+                    let ins_cls: K = i.cls;
+                    let t: &mut Tmp = &mut f.tmps[ti];
                     if clsmerge(&mut t.cls, ins_cls) {
                         return Err(self.err(&format!(
                             "temporary %{} is assigned with multiple types",
@@ -1329,41 +1327,41 @@ impl Parser<'_> {
                     }
                 }
             }
-            bi = fn_.blk(bi).link;
+            bi = f.blk(bi).link;
         }
 
-        bi = fn_.start;
+        bi = f.start;
         while bi != BlkIdx::NONE {
-            let b = fn_.blk(bi);
+            let b = f.blk(bi);
 
-            let mut pb: BSet = bsinit(fn_.blks.len());
+            let mut pb: BSet = bsinit(f.blks.len());
 
             for pred_bi in &b.preds {
                 bsset(&mut pb, pred_bi.usize());
             }
             let mut pi = b.phi;
             while pi != PhiIdx::NONE {
-                let p: &Phi = fn_.phi(pi);
+                let p: &Phi = &f.phis[pi];
                 if let RTmp(ti) = p.to {
-                    let t: &Tmp = fn_.tmp(ti);
+                    let t: &Tmp = &f.tmps[ti];
                     let k: K = t.cls;
-                    let mut ppb: BSet = bsinit(fn_.blks.len());
-                    for n in 0..fn_.phi(pi).args.len() {
+                    let mut ppb: BSet = bsinit(f.blks.len());
+                    for n in 0..f.phis[pi].args.len() {
                         let pbi: BlkIdx = p.blks[n];
                         if bshas(&ppb, pbi.usize()) {
                             return Err(self.err(&format!(
                                 "multiple entries for @{} in phi %{}",
-                                to_s(&fn_.blk(pbi).name),
+                                to_s(&f.blk(pbi).name),
                                 to_s(&t.name)
                             )));
                         }
-                        if !usecheck(fn_, &p.args[n], k) {
-                            let argr: &Ref = &p.args[n];
+                        if !usecheck(f, p.args[n], k) {
+                            let argr: Ref = p.args[n];
                             // Must be a RTmp after usecheck() failure
                             if let RTmp(ti) = argr {
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
-                                    to_s(&fn_.tmp(*ti).name),
+                                    to_s(&f.tmps[ti].name),
                                     to_s(&t.name)
                                 )));
                             } else {
@@ -1380,7 +1378,7 @@ impl Parser<'_> {
                         )));
                     }
 
-                    pi = fn_.phi(pi).link;
+                    pi = f.phis[pi].link;
                 } else {
                     // Already checked above that p.to is an RTmp
                     assert!(false);
@@ -1390,7 +1388,7 @@ impl Parser<'_> {
                 for n in 0..2 {
                     let op: &Op = &OPTAB[i.op as usize];
                     let k: K = op.argcls[n][i.cls as usize];
-                    let r: &Ref = &i.args[n];
+                    let r: Ref = i.args[n];
                     if k == Ke {
                         return Err(
                             self.err(&format!("invalid instruction type in {}", to_s(op.name)))
@@ -1400,27 +1398,27 @@ impl Parser<'_> {
                         continue;
                     }
                     static FS: [&str; 2] = ["first", "second"];
-                    if *r != R && k == Kx {
+                    if r != R && k == Kx {
                         return Err(self.err(&format!(
                             "no {} operand expected in {}",
                             FS[n],
                             to_s(op.name)
                         )));
                     }
-                    if *r == R && k != Kx {
+                    if r == R && k != Kx {
                         return Err(self.err(&format!(
                             "missing {} operand in {}",
                             FS[n],
                             to_s(op.name)
                         )));
                     }
-                    if !usecheck(fn_, r, k) {
+                    if !usecheck(f, r, k) {
                         // Must be a RTmp if usecheck() fails
                         if let RTmp(ti) = r {
                             return Err(self.err(&format!(
                                 "invalid type for {} operand %{} in {}",
                                 FS[n],
-                                to_s(&fn_.tmp(*ti).name),
+                                to_s(&f.tmps[ti].name),
                                 to_s(op.name)
                             )));
                         } else {
@@ -1431,18 +1429,18 @@ impl Parser<'_> {
             }
 
             let mut goto_jerr: bool = false;
-            let r: &Ref = &b.jmp().arg;
+            let r: Ref = b.jmp().arg;
             if isret(b.jmp().typ) {
                 // This must succeed after isret()
                 // TODO - QBE handling of jret0 seems odd
                 if b.jmp().typ != J::Jret0 {
                     let k: K = cls_for_ret(b.jmp().typ).unwrap();
-                    if !usecheck(fn_, r, k) {
+                    if !usecheck(f, r, k) {
                         goto_jerr = true;
                     }
                 }
             }
-            if b.jmp().typ == J::Jjnz && !usecheck(fn_, r, Kw) {
+            if b.jmp().typ == J::Jjnz && !usecheck(f, r, Kw) {
                 goto_jerr = true;
             }
             if goto_jerr {
@@ -1450,7 +1448,7 @@ impl Parser<'_> {
                 if let RTmp(ti) = r {
                     return Err(self.err(&format!(
                         "invalid type for jump argument %{} in block @{}",
-                        to_s(&fn_.tmp(*ti).name),
+                        to_s(&f.tmps[ti].name),
                         to_s(&b.name)
                     )));
                 } else {
@@ -1458,20 +1456,20 @@ impl Parser<'_> {
                 }
             }
 
-            if b.s1 != BlkIdx::NONE && fn_.blk(b.s1).jmp().typ == J::Jxxx {
+            if b.s1 != BlkIdx::NONE && f.blk(b.s1).jmp().typ == J::Jxxx {
                 return Err(self.err(&format!(
                     "block @{} is used undefined",
-                    to_s(&fn_.blk(b.s1).name)
+                    to_s(&f.blk(b.s1).name)
                 )));
             }
-            if b.s2 != BlkIdx::NONE && fn_.blk(b.s2).jmp().typ == J::Jxxx {
+            if b.s2 != BlkIdx::NONE && f.blk(b.s2).jmp().typ == J::Jxxx {
                 return Err(self.err(&format!(
                     "block @{} is used undefined",
-                    to_s(&fn_.blk(b.s2).name)
+                    to_s(&f.blk(b.s2).name)
                 )));
             }
 
-            bi = fn_.blk(bi).link;
+            bi = f.blk(bi).link;
         }
 
         Ok(())
@@ -1903,16 +1901,16 @@ pub fn parse(
     parser.parse(dbgfile, data, func)
 }
 
-pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
+pub fn printcon(outf: &mut dyn Write, itbl: &[Bucket], c: &Con) {
     match *c {
         Con::CUndef => assert!(false), // nada
         Con::CAddr(sym, off) => {
             if sym.typ == SymT::SThr {
-                let _ = write!(f, "thread ");
+                let _ = write!(outf, "thread ");
             }
-            let _ = write!(f, "${}", to_s(str_(&sym.id, itbl)));
+            let _ = write!(outf, "${}", to_s(str_(&sym.id, itbl)));
             if off != 0 {
-                let _ = write!(f, "{:+}", off);
+                let _ = write!(outf, "{:+}", off);
             }
         }
         Con::CBits(i, pp) => match pp {
@@ -1920,85 +1918,85 @@ pub fn printcon(f: &mut dyn Write, itbl: &[Bucket], c: &Con) {
                 let s: f32 = f32::from_bits(i as u32);
                 // match QBE output of 0.0
                 let _ = if s == 0.0 {
-                    write!(f, "0")
+                    write!(outf, "0")
                 } else {
-                    write!(f, "s_{:.6}", s)
+                    write!(outf, "s_{:.6}", s)
                 };
             }
             ConPP::D => {
                 let d: f64 = f64::from_bits(i as u64);
                 // match QBE output of 0.0
                 let _ = if d == 0.0 {
-                    write!(f, "0")
+                    write!(outf, "0")
                 } else {
-                    write!(f, "d_{:.6}", d)
+                    write!(outf, "d_{:.6}", d)
                 };
             }
             ConPP::I => {
-                let _ = write!(f, "{}", i);
+                let _ = write!(outf, "{}", i);
             }
         },
     }
 }
 
-pub fn printref(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket], r: Ref) {
+pub fn printref(outf: &mut dyn Write, f: &Fn, typ: &[Typ], itbl: &[Bucket], r: Ref) {
     match r {
         R => assert!(false),
         RTmp(ti) => {
             if ti < TmpIdx::TMP0 {
-                let _ = write!(f, "R{}", ti.0);
+                let _ = write!(outf, "R{}", ti.0);
             } else {
-                let _ = write!(f, "%{}", to_s(&fn_.tmp(ti).name));
+                let _ = write!(outf, "%{}", to_s(&f.tmps[ti].name));
             }
         }
         RCon(ci) => {
             if ci.0 == 0 {
                 //(req(r, UNDEF)) { TODO - this seems missing
-                let _ = write!(f, "UNDEF");
+                let _ = write!(outf, "UNDEF");
             } else {
-                printcon(f, itbl, fn_.con(ci));
+                printcon(outf, itbl, &f.cons[ci]);
             }
         }
         RSlot(i) => {
-            let _ = write!(f, "S{}", i);
+            let _ = write!(outf, "S{}", i);
         }
         RCall(n) => {
-            let _ = write!(f, "{:04x}", n);
+            let _ = write!(outf, "{:04x}", n);
         }
         RTyp(ti) => {
-            let _ = write!(f, ":{}", to_s(&typ[ti.0 as usize].name));
+            let _ = write!(outf, ":{}", to_s(&typ[ti.0 as usize].name));
         }
         RMem(mi) => {
             let mut i: bool = false;
-            let m: &Mem = fn_.mem(mi);
-            let _ = write!(f, "[");
+            let m: &Mem = &f.mems[mi];
+            let _ = write!(outf, "[");
             if m.offset != Con::CUndef {
-                printcon(f, itbl, &m.offset);
+                printcon(outf, itbl, &m.offset);
                 i = true;
             }
             if m.base != R {
                 if i {
-                    let _ = write!(f, " + ");
+                    let _ = write!(outf, " + ");
                 }
-                printref(f, fn_, typ, itbl, m.base);
+                printref(outf, f, typ, itbl, m.base);
                 i = true;
             }
             if m.index != R {
                 if i {
-                    let _ = write!(f, " + ");
+                    let _ = write!(outf, " + ");
                 }
-                let _ = write!(f, "{} * ", m.scale);
-                printref(f, fn_, typ, itbl, m.index);
+                let _ = write!(outf, "{} * ", m.scale);
+                printref(outf, f, typ, itbl, m.index);
             }
-            let _ = write!(f, "]");
+            let _ = write!(outf, "]");
         }
         RInt(i) => {
-            let _ = write!(f, "{}", i);
+            let _ = write!(outf, "{}", i);
         }
     }
 }
 
-pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
+pub fn printfn(outf: &mut dyn Write, f: &Fn, typ: &[Typ], itbl: &[Bucket]) {
     static KTOC: [&str; 4] = ["w", "l", "s", "d"];
     // Generated from gcc -E and hand-munged
     static JTOA: [&str; J::NJmp as usize] = {
@@ -2038,39 +2036,39 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
 
         jtoa0
     };
-    let _ = writeln!(f, "function ${}() {{", to_s(&fn_.name));
-    let mut bi: BlkIdx = fn_.start;
+    let _ = writeln!(outf, "function ${}() {{", to_s(&f.name));
+    let mut bi: BlkIdx = f.start;
     while bi != BlkIdx::NONE {
-        let b = fn_.blk(bi);
-        let _ = writeln!(f, "@{}", to_s(&b.name));
+        let b = f.blk(bi);
+        let _ = writeln!(outf, "@{}", to_s(&b.name));
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
-            let p: &Phi = fn_.phi(pi);
-            let _ = write!(f, "\t");
-            printref(f, fn_, typ, itbl, p.to);
-            let _ = write!(f, " ={} phi ", KTOC[p.cls as usize]);
+            let p: &Phi = &f.phis[pi];
+            let _ = write!(outf, "\t");
+            printref(outf, f, typ, itbl, p.to);
+            let _ = write!(outf, " ={} phi ", KTOC[p.cls as usize]);
             assert!(!p.args.is_empty());
             assert!(p.args.len() == p.blks.len());
             for n in 0..p.args.len() {
                 let bi: BlkIdx = p.blks[n];
-                let pb = fn_.blk(bi);
-                let _ = write!(f, "@{} ", to_s(&pb.name));
-                printref(f, fn_, typ, itbl, p.args[n]);
+                let pb = f.blk(bi);
+                let _ = write!(outf, "@{} ", to_s(&pb.name));
+                printref(outf, f, typ, itbl, p.args[n]);
                 if n != p.args.len() - 1 {
-                    let _ = write!(f, ", ");
+                    let _ = write!(outf, ", ");
                 }
             }
-            let _ = writeln!(f);
+            let _ = writeln!(outf);
             pi = p.link;
         }
         for i in b.ins().iter() {
-            let _ = write!(f, "\t");
+            let _ = write!(outf, "\t");
             if i.to != R {
-                printref(f, fn_, typ, itbl, i.to);
-                let _ = write!(f, " ={} ", KTOC[i.cls as usize]);
+                printref(outf, f, typ, itbl, i.to);
+                let _ = write!(outf, " ={} ", KTOC[i.cls as usize]);
             }
             assert!(!OPTAB[i.op as usize].name.is_empty());
-            let _ = write!(f, "{}", to_s(OPTAB[i.op as usize].name));
+            let _ = write!(outf, "{}", to_s(OPTAB[i.op as usize].name));
             if i.to == R {
                 match i.op {
                     O::Oarg
@@ -2082,20 +2080,20 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
                     | O::Oxtest
                     | O::Oxdiv
                     | O::Oxidiv => {
-                        let _ = write!(f, "{}", KTOC[i.cls as usize]);
+                        let _ = write!(outf, "{}", KTOC[i.cls as usize]);
                     }
                     _ => {} // nada
                 }
             }
             if i.args[0] != R {
-                let _ = write!(f, " ");
-                printref(f, fn_, typ, itbl, i.args[0]);
+                let _ = write!(outf, " ");
+                printref(outf, f, typ, itbl, i.args[0]);
             }
             if i.args[1] != R {
-                let _ = write!(f, ", ");
-                printref(f, fn_, typ, itbl, i.args[1]);
+                let _ = write!(outf, ", ");
+                printref(outf, f, typ, itbl, i.args[1]);
             }
-            let _ = writeln!(f);
+            let _ = writeln!(outf);
         }
         let mut skip_writeln: bool = false;
         match b.jmp().typ {
@@ -2109,44 +2107,44 @@ pub fn printfn(f: &mut dyn Write, fn_: &Fn, typ: &[Typ], itbl: &[Bucket]) {
             | J::Jrets
             | J::Jretd
             | J::Jretc => {
-                let _ = write!(f, "\t{}", JTOA[b.jmp().typ as usize]);
+                let _ = write!(outf, "\t{}", JTOA[b.jmp().typ as usize]);
                 if b.jmp().typ != J::Jret0 || b.jmp().arg != R {
-                    let _ = write!(f, " ");
-                    printref(f, fn_, typ, itbl, b.jmp().arg);
+                    let _ = write!(outf, " ");
+                    printref(outf, f, typ, itbl, b.jmp().arg);
                 }
                 if b.jmp().typ == J::Jretc {
-                    let _ = write!(f, ", :{}", to_s(&typ[fn_.retty.0 as usize].name));
+                    let _ = write!(outf, ", :{}", to_s(&typ[f.retty.0 as usize].name));
                 }
             }
             J::Jhlt => {
-                let _ = write!(f, "\thlt");
+                let _ = write!(outf, "\thlt");
             }
             J::Jjmp => {
                 if b.s1 == b.link {
                     skip_writeln = true;
                 } else {
-                    let _ = write!(f, "\tjmp @{}", to_s(&fn_.blk(b.s1).name));
+                    let _ = write!(outf, "\tjmp @{}", to_s(&f.blk(b.s1).name));
                 }
             }
             _ => {
-                let _ = write!(f, "\t{} ", JTOA[b.jmp().typ as usize]);
+                let _ = write!(outf, "\t{} ", JTOA[b.jmp().typ as usize]);
                 if b.jmp().typ == J::Jjnz {
-                    printref(f, fn_, typ, itbl, b.jmp().arg);
-                    let _ = write!(f, ", ");
+                    printref(outf, f, typ, itbl, b.jmp().arg);
+                    let _ = write!(outf, ", ");
                 }
                 assert!(b.s1 != BlkIdx::NONE && b.s2 != BlkIdx::NONE);
                 let _ = write!(
-                    f,
+                    outf,
                     "@{}, @{}",
-                    to_s(&fn_.blk(b.s1).name),
-                    to_s(&fn_.blk(b.s2).name)
+                    to_s(&f.blk(b.s1).name),
+                    to_s(&f.blk(b.s2).name)
                 );
             }
         }
         if !skip_writeln {
-            let _ = writeln!(f);
+            let _ = writeln!(outf);
         }
         bi = b.link;
     }
-    let _ = writeln!(f, "}}");
+    let _ = writeln!(outf, "}}");
 }

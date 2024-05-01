@@ -1137,30 +1137,10 @@ impl Fn {
         }
     }
 
-    pub fn phi(&self, pi: PhiIdx) -> &Phi {
-        assert!(pi != PhiIdx::NONE);
-        &self.phis[pi.0 as usize]
-    }
-
-    pub fn phi_mut(&mut self, pi: PhiIdx) -> &mut Phi {
-        assert!(pi != PhiIdx::NONE);
-        &mut self.phis[pi.0 as usize]
-    }
-
     pub fn add_phi(&mut self, p: Phi) -> PhiIdx {
         let pi: PhiIdx = PhiIdx::from(self.phis.len());
         self.phis.push(p);
         pi
-    }
-
-    pub fn tmp(&self, ti: TmpIdx) -> &Tmp {
-        assert!(ti != TmpIdx::NONE);
-        &self.tmps[ti.0 as usize]
-    }
-
-    pub fn tmp_mut(&mut self, ti: TmpIdx) -> &mut Tmp {
-        assert!(ti != TmpIdx::NONE);
-        &mut self.tmps[ti.0 as usize]
     }
 
     pub fn add_tmp(&mut self, t: Tmp) -> TmpIdx {
@@ -1169,26 +1149,16 @@ impl Fn {
         ti
     }
 
-    pub fn con(&self, ci: ConIdx) -> &Con {
-        assert!(ci != ConIdx::NONE);
-        &self.cons[ci.0 as usize]
-    }
-
-    pub fn con_mut(&mut self, ci: ConIdx) -> &mut Con {
-        assert!(ci != ConIdx::NONE);
-        &mut self.cons[ci.0 as usize]
-    }
-
     pub fn add_con(&mut self, c: Con) -> ConIdx {
         let ci: ConIdx = ConIdx::from(self.cons.len());
         self.cons.push(c);
         ci
     }
 
-    pub fn mem(&self, mi: MemIdx) -> &Mem {
-        assert!(mi != MemIdx::NONE);
-        &self.mems[mi.0 as usize]
-    }
+    // pub fn mem(&self, mi: MemIdx) -> &Mem {
+    //     assert!(mi != MemIdx::NONE);
+    //     &self.mems[mi.0 as usize]
+    // }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
