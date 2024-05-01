@@ -3,9 +3,9 @@ use std::io::stdout;
 use crate::all::Ref::{RCon, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw};
 use crate::all::{
-    isret, isstore, kwide, to_s, Blk, BlkIdx, BlkJmp, Blks, CmpF, CmpI, Con, ConIdx, ConPP, Fn,
-    Idx, Ins, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, OCMPD, OCMPD1,
-    OCMPL1, OCMPS, OCMPS1, OCMPW, OCMPW1, TMP0, UNDEF,
+    isret, isstore, kwide, to_s, Blk, BlkIdx, Blks, CmpF, CmpI, Con, ConIdx, ConPP, Fn, Idx, Ins,
+    Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, OCMPD, OCMPD1, OCMPL1, OCMPS,
+    OCMPS1, OCMPW, OCMPW1, TMP0, UNDEF,
 };
 use crate::cfg::edgedel;
 use crate::optab::OPTAB;
@@ -195,8 +195,8 @@ fn initedge(blks: &Blks, e: &mut Edge, s: BlkIdx) {
 fn renref(val: &[Lat], r: &mut Ref) -> bool {
     if let RTmp(ti) = *r {
         match val[ti.usize()] {
-            Lat::Top => assert!(false),
-            Lat::Bot => (), // nada
+            Lat::Top => assert!(false), // maybe should be UNDEF?
+            Lat::Bot => (),             // nada
             Lat::Con(ci) => {
                 *r = RCon(ci);
                 return true;
@@ -207,7 +207,7 @@ fn renref(val: &[Lat], r: &mut Ref) -> bool {
 }
 
 /* require rpo, use, pred */
-fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
+pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     //     Edge *e, start;
     //     Use *u;
     //     Blk *b, **pb;
@@ -236,11 +236,12 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut usewrk: Vec<(TmpIdx, u32 /*UseIdx*/)> = vec![];
 
     for n in 0..rpo.len() {
-        blks.with_mut(rpo[n], |b| {
+        let (s1, s2) = blks.with_mut(rpo[n], |b| {
             b.ivisit = 0;
-            initedge(blks, &mut edge[n * 2], b.s1);
-            initedge(blks, &mut edge[n * 2 + 1], b.s2);
+            (b.s1, b.s2)
         });
+        initedge(blks, &mut edge[n * 2], s1);
+        initedge(blks, &mut edge[n * 2 + 1], s2);
     }
     assert!(f.start == BlkIdx::START);
     initedge(blks, &mut edge[rpo.len() * 2], BlkIdx::START);
@@ -359,8 +360,10 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 /*e*/
                 print!("{} ", to_s(&blks.borrow(bi).name));
             }
-            edgedel(blks, phis, bi, blks.borrow(bi).s1);
-            edgedel(blks, phis, bi, blks.borrow(bi).s2);
+            let succs = blks.succs_of(bi);
+            for si in succs {
+                edgedel(blks, phis, bi, si);
+            }
             if prev_bi == BlkIdx::NONE {
                 f.start = blks.borrow(bi).link;
             } else {
@@ -372,7 +375,6 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         let bid: RpoIdx = blks.id_of(bi);
         let mut prev_pi: PhiIdx = PhiIdx::NONE;
         let mut pi: PhiIdx = blks.phi_of(bi);
-        //         for (pp=&b.phi; (p=*pp);)
         while pi != PhiIdx::NONE {
             let p_to: Ref = phis[pi].to;
             let p_link: PhiIdx = phis[pi].link;
@@ -410,19 +412,31 @@ fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
         }
         renref(&val, &mut blks.borrow(bi).jmp_mut().arg);
-        if blks.borrow(bi).jmp().typ == J::Jjnz && matches!(blks.borrow(bi).jmp().arg, RCon(_)) {
-            if let RCon(ci) = blks.borrow(bi).jmp().arg {
-                if iscon(&cons[ci], false, 0) {
-                    edgedel(blks, phis, bi, blks.borrow(bi).s1);
-                    blks.with_mut(bi, |b| {
-                        b.s1 = b.s2;
-                        b.s2 = BlkIdx::NONE;
-                    });
+        if blks.borrow(bi).jmp().typ == J::Jjnz {
+            let maybe_ci: Option<ConIdx> = {
+                if let RCon(ci) = blks.borrow(bi).jmp().arg {
+                    Some(ci)
                 } else {
-                    edgedel(blks, phis, bi, blks.borrow(bi).s2);
+                    None
                 }
-                blks.borrow(bi).jmp_mut().typ = J::Jjmp;
-                blks.borrow(bi).jmp_mut().arg = R;
+            };
+            match maybe_ci {
+                None => (), // nada
+                Some(ci) => {
+                    if iscon(&cons[ci], false, 0) {
+                        let s1: BlkIdx = blks.borrow(bi).s1;
+                        edgedel(blks, phis, bi, s1);
+                        blks.with_mut(bi, |b| {
+                            b.s1 = b.s2;
+                            b.s2 = BlkIdx::NONE;
+                        });
+                    } else {
+                        let s2: BlkIdx = blks.borrow(bi).s2;
+                        edgedel(blks, phis, bi, s2);
+                    }
+                    blks.borrow(bi).jmp_mut().typ = J::Jjmp;
+                    blks.borrow(bi).jmp_mut().arg = R;
+                }
             }
         }
         prev_bi = bi;
@@ -483,20 +497,20 @@ fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
             let ri32: i32 = ri64 as i32;
             let shmask: u64 = if w { 63 } else { 31 };
             let x: u64 = match op {
-                O::Oadd => lu64 + ru64,
-                O::Osub => lu64 - ru64,
+                O::Oadd => lu64.wrapping_add(ru64),
+                O::Osub => lu64.wrapping_sub(ru64),
                 O::Oneg => (-li64) as u64,
                 O::Odiv => (if w { li64 / ri64 } else { (li32 / ri32) as i64 }) as u64,
                 O::Orem => (if w { li64 % ri64 } else { (li32 % ri32) as i64 }) as u64,
                 O::Oudiv => (if w { lu64 / ru64 } else { (lu32 / ru32) as u64 }),
                 O::Ourem => (if w { lu64 % ru64 } else { (lu32 % ru32) as u64 }),
-                O::Omul => lu64 * ru64,
+                O::Omul => lu64.wrapping_mul(ru64),
                 O::Oand => lu64 & ru64,
                 O::Oor => lu64 | ru64,
                 O::Oxor => lu64 ^ ru64,
                 O::Osar => ((if w { li64 } else { li32 as i64 }) >> (ru64 & shmask)) as u64,
                 O::Oshr => (if w { lu64 } else { lu32 as u64 }) >> (ru64 & shmask),
-                O::Oshl => lu64 << (ru64 & shmask),
+                O::Oshl => lu64.wrapping_shl((ru64 & shmask) as u32),
                 O::Oextsb => lu64 as i8 as i64 as u64,
                 O::Oextub => lu64 as i8 as u64,
                 O::Oextsh => lu64 as i16 as i64 as u64,
@@ -607,9 +621,29 @@ fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
                 let xd: f64 = match op {
                     O::Oadd => ld + rd,
                     O::Osub => ld - rd,
-                    O::Oneg => -ld,
                     O::Odiv => ld / rd,
                     O::Omul => ld * rd,
+                    _ => return invalidop(op, false),
+                };
+                Con::CBits(xd.to_bits() as i64, ConPP::D)
+            } else {
+                let ls: f32 = f32::from_bits(li as u32);
+                let rs: f32 = f32::from_bits(ri as u32);
+                let xs: f32 = match op {
+                    O::Oadd => ls + rs,
+                    O::Osub => ls - rs,
+                    O::Odiv => ls / rs,
+                    O::Omul => ls * rs,
+                    _ => return invalidop(op, false),
+                };
+                Con::CBits(xs.to_bits() as i64, ConPP::S)
+            }
+        }
+        (Con::CBits(li, _), _) => {
+            if w {
+                let ld: f64 = f64::from_bits(li as u64);
+                let xd: f64 = match op {
+                    O::Oneg => -ld,
                     O::Oswtof => (li as i32) as f64,
                     O::Ouwtof => (li as u32) as f64,
                     O::Osltof => (li as i64) as f64,
@@ -621,13 +655,8 @@ fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
                 Con::CBits(xd.to_bits() as i64, ConPP::D)
             } else {
                 let ls: f32 = f32::from_bits(li as u32);
-                let rs: f32 = f32::from_bits(ri as u32);
                 let xs: f32 = match op {
-                    O::Oadd => ls + rs,
-                    O::Osub => ls - rs,
                     O::Oneg => -ls,
-                    O::Odiv => ls / rs,
-                    O::Omul => ls * rs,
                     O::Oswtof => (li as i32) as f32,
                     O::Ouwtof => (li as u32) as f32,
                     O::Osltof => (li as i64) as f32,
@@ -640,6 +669,7 @@ fn foldflt(op: O, w: bool, cl: &Con, cr: &Con) -> Con {
             }
         }
         _ => {
+            println!("----> op is {:?}", op);
             return invalidop(op, true);
         }
     }
@@ -663,6 +693,13 @@ fn opfold(cons: &mut Vec<Con>, op: O, cls: K, cli: ConIdx, cri: ConIdx) -> Lat {
         }
     }
     let ci: ConIdx = newconcon2(cons, c);
-    assert!((cls == Ks || cls == Kd) != matches!(c, Con::CBits(_, ConPP::I)));
+    // Breaks on syms
+    // if !((cls == Ks || cls == Kd) != matches!(c, Con::CBits(_, ConPP::I))) {
+    //     println!(
+    //         "-----> op is {:?} cls is {:?} cli is {:?} cri is {:?} -> c is {:?} ",
+    //         op, cls, cli, cri, c
+    //     );
+    // }
+    // assert!((cls == Ks || cls == Kd) != matches!(c, Con::CBits(_, ConPP::I)));
     Lat::Con(ci)
 }
