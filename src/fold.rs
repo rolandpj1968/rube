@@ -473,6 +473,7 @@ fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
                 None
             }
         }
+        // TODO - unary operators are going to be caught by the above, and incorrectly
         (Con::CBits(mut li64, _), Con::CBits(mut ri64, _)) => {
             if op == O::Odiv || op == O::Orem || op == O::Oudiv || op == O::Ourem {
                 if iscon(cr, w, 0) {
