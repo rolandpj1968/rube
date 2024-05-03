@@ -979,7 +979,7 @@ impl Parser<'_> {
     }
 
     fn closeblk(&mut self, curf: &mut Fn) {
-        let mut curb = curf.blk_mut(self.cur_bi);
+        let curb = curf.blk_mut(self.cur_bi);
         curb.is_defined = true;
         // TODO - this is silly, just use Blk::ins directly
         curb.ins = self.insb.clone();
@@ -1035,7 +1035,7 @@ impl Parser<'_> {
                 let new_bi: BlkIdx = self.findblk(curf, &tv.as_str());
                 if self.cur_bi != BlkIdx::NONE && curf.blk(self.cur_bi).jmp.typ == J::Jxxx {
                     self.closeblk(curf);
-                    let mut curb = curf.blk_mut(self.cur_bi);
+                    let curb = curf.blk_mut(self.cur_bi);
                     curb.jmp.typ = J::Jjmp;
                     curb.s1 = new_bi;
                 }
@@ -1528,7 +1528,7 @@ impl Parser<'_> {
 
         let mut bi = curf.start;
         while bi != BlkIdx::NONE {
-            let mut b = curf.blk_mut(bi);
+            let b = curf.blk_mut(bi);
             b.dlink = BlkIdx::NONE;
             bi = b.link;
         }

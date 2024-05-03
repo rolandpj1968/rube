@@ -44,20 +44,21 @@ impl Error for MemError {
 }
 
 pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
-    let blks = &f.blks;
+    let blks: &mut [Blk] = &mut f.blks;
     let tmps: &mut [Tmp] = &mut f.tmps;
 
     /* promote uniform stack slots to temporaries */
-    let bi: BlkIdx = f.start;
+    assert!(f.start == BlkIdx::START);
+    let bi: BlkIdx = BlkIdx::START;
     let ins_len = blks[bi].ins.len();
     'ins_loop: for ii in 0..ins_len {
         let t: &mut Tmp;
         let mut k: K = Kx;
         let mut s: i32 = -1; // TODO sz types in general :(
         {
-            let b = blks[bi];
-            let i: &Ins = &b.ins[ii];
-            // TODO !isalloc
+            //let b: &Blk = &blks[bi];
+            let i: Ins = blks[bi].ins[ii]; // Note - copy
+                                           // TODO !isalloc
             if OALLOC > i.op || i.op > OALLOC1 {
                 continue;
             }
@@ -75,7 +76,7 @@ pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
 
             for u in &t.uses {
                 if let UseT::UIns(li) = u.typ {
-                    let ub = blks[u.bi];
+                    let ub: &Blk = &blks[u.bi];
                     let l: &Ins = &ub.ins[li];
                     if isload(l.op) {
                         if s == -1 || s == loadsz(l) {
@@ -103,7 +104,7 @@ pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
 
         for u in &t.uses {
             let ub: &mut Blk = &mut blks[u.bi];
-            let mut ub_ins = ub.ins;
+            let ub_ins: &mut [Ins] = &mut ub.ins;
             let l: &mut Ins = {
                 assert!(matches!(u.typ, UseT::UIns(_)));
                 if let UseT::UIns(li) = u.typ {
@@ -482,18 +483,18 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                                 b.jmp.arg = R;
                             }
                             UseT::UIns(ii) => {
-                                let i: &mut Ins = &mut b.ins[ii];
+                                let i: Ins = b.ins[ii]; // Note - copy
                                 assert!(i.to == R || matches!(i.to, RTmp(_)));
                                 match i.to {
                                     R => {
                                         if isarg(i.op) {
                                             assert!(i.op == O::Oargc);
-                                            i.args[1] = CON_Z; // crash
+                                            b.ins[ii].args[1] = CON_Z; // crash
                                         } else {
                                             if i.op == O::Oblit0 {
                                                 b.ins[ii.next()] = Ins::NOP;
                                             }
-                                            *i = Ins::NOP;
+                                            b.ins[ii] = Ins::NOP;
                                         }
                                     }
                                     RTmp(ti) => {

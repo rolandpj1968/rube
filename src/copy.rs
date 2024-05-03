@@ -165,9 +165,9 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     /* 1. build the copy-of map */
     for n in 0..rpo.len() {
         let bi: BlkIdx = rpo[n];
-        let b: &Blk = &blks[bi];
+        //let b: &Blk = &blks[bi];
         // println!("Building copy-map using @{}", to_s(&b.name));
-        let mut pi: PhiIdx = b.phi;
+        let mut pi: PhiIdx = blks[bi].phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             assert!(matches!(p.to, RTmp(_)));
@@ -211,7 +211,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             pi = p.link;
         }
-        for i in &b.ins {
+        for i in &blks[bi].ins {
             assert!(i.to == R || matches!(i.to, RTmp(_)));
             if let RTmp(ti) = i.to {
                 // println!("  ins for {:?} %{}", i.to, to_s(&tmps[ti].name));

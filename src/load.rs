@@ -6,8 +6,8 @@ use crate::alias::{alias, escapes};
 use crate::all::Ref::{RCon, RInt, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw, Kx};
 use crate::all::{
-    bit, for_each_bi_mut, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, Blk, BlkIdx,
-    CanAlias, Con, Fn, Ins, InsIdx, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, K, O,
+    bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, Blk, BlkIdx, CanAlias, Con, Fn, Ins,
+    InsIdx, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, K, O,
 };
 use crate::cfg::dom;
 use crate::parse::printfn;
@@ -540,7 +540,9 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
 
     let mut ilog: Vec<Insert> = vec![];
 
-    for_each_bi_mut(blks, |bi| {
+    assert!(f.start == BlkIdx::START);
+    let mut bi = BlkIdx::START;
+    while bi != BlkIdx::NONE {
         let ins_len = blks[bi].ins.len();
         for iii in 0..ins_len {
             let i_arg1 = {
@@ -576,7 +578,8 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             };
             blks[bi].ins[iii].args[1] = i_arg1;
         }
-    });
+        bi = blks[bi].link;
+    }
     ilog.sort_by(icmp);
     let sentinal_ins = Ins::new0(O::Oxxx, Kx, R);
     /* add a sentinel */

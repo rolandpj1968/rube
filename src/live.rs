@@ -2,8 +2,8 @@ use std::io::stdout;
 
 use crate::all::Ref::{RCall, RMem, RTmp, R};
 use crate::all::{
-    bshas, for_each_blk, kbase, to_s, BSet, Blk, BlkIdx, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target,
-    Tmp, O,
+    bshas, for_each_blk, for_each_blk_mut, kbase, to_s, BSet, Blk, BlkIdx, Fn, Ins, Mem, Phi,
+    PhiIdx, Ref, Target, Tmp, O,
 };
 
 use crate::util::{bsclr, bscopy, bscount, bsequal, bsinit, bsiter, bsset, bsunion, dumpts};
@@ -63,7 +63,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     let mut u: BSet = bsinit(tmps.len());
     let mut v: BSet = bsinit(tmps.len());
 
-    f.for_each_blk_mut(|b| {
+    for_each_blk_mut(blks, |b| {
         b.in_ = bsinit(tmps.len());
         b.out = bsinit(tmps.len());
         b.gen = bsinit(tmps.len());

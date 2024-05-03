@@ -133,7 +133,7 @@ fn refindex(tmps: &mut Vec<Tmp>, ti: TmpIdx) -> Ref {
 }
 
 fn phiins(f: &mut Fn) -> RubeResult<()> {
-    let blks = &f.blks;
+    let blks: &mut [Blk] = &mut f.blks;
     let phis: &mut Vec<Phi> = &mut f.phis;
     let tmps: &mut Vec<Tmp> = &mut f.tmps;
 
@@ -312,7 +312,7 @@ fn getstk(
 }
 
 fn renblk(
-    blks: &[Blk],
+    blks: &mut [Blk],
     phis: &mut Vec<Phi>,
     tmps: &mut Vec<Tmp>,
     bi: BlkIdx,
@@ -320,8 +320,7 @@ fn renblk(
     names: &mut Vec<Name>,
     stk: &mut [NameIdx],
 ) {
-    let b: &Blk = &blks[bi];
-    let mut pi = b.phi;
+    let mut pi = blks[bi].phi;
     while pi != PhiIdx::NONE {
         let to: Ref = phis[pi].to;
         let to_new = rendef(tmps, bi, to, namel, names, stk);
@@ -329,24 +328,25 @@ fn renblk(
 
         pi = phis[pi].link;
     }
-    let ins_len = b.ins.len();
+    let ins_len = blks[bi].ins.len();
     for ii in 0..ins_len {
         for m in 0..2 {
-            let arg = b.ins[ii].args[m];
+            let arg = blks[bi].ins[ii].args[m];
             if let RTmp(ti) = arg {
                 if tmps[ti].tvisit != TmpIdx::NONE {
                     let new_arg = getstk(blks, bi, ti, namel, names, stk);
-                    b.ins[ii].args[m] = new_arg;
+                    blks[bi].ins[ii].args[m] = new_arg;
                 }
             }
         }
-        let to: Ref = b.ins[ii].to;
-        b.ins[ii].to = rendef(tmps, bi, to, namel, names, stk);
+        let to: Ref = blks[bi].ins[ii].to;
+        blks[bi].ins[ii].to = rendef(tmps, bi, to, namel, names, stk);
     }
-    let jmp_arg: Ref = b.jmp.arg;
+    let jmp_arg: Ref = blks[bi].jmp.arg;
     if let RTmp(ti) = jmp_arg {
         if tmps[ti].tvisit != TmpIdx::NONE {
-            b.jmp.arg = getstk(blks, bi, ti, namel, names, stk);
+            let new_jmp_arg = getstk(blks, bi, ti, namel, names, stk);
+            blks[bi].jmp.arg = new_jmp_arg;
         }
     }
 
@@ -414,7 +414,7 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     let mut stk: Vec<NameIdx> = vec![NameIdx::INVALID; f.tmps.len()];
     assert!(f.start == BlkIdx::START);
     renblk(
-        &f.blks,
+        &mut f.blks,
         &mut f.phis,
         &mut f.tmps,
         BlkIdx::START,

@@ -1,4 +1,4 @@
-use crate::all::{for_each_bi_mut, for_each_blk_mut, Blk, BlkIdx, Fn, Phi, PhiIdx, RpoIdx};
+use crate::all::{for_each_blk_mut, Blk, BlkIdx, Fn, Phi, PhiIdx, RpoIdx};
 
 // Not pretty - would be better if s1, s2 were [BlkIndex; 2]
 fn succsdel(b: &mut Blk, bdi: BlkIdx) {
@@ -35,17 +35,20 @@ pub fn edgedel(blks: &mut [Blk], phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
     }
 }
 
-pub fn fillpreds(f: &Fn) {
-    f.for_each_blk_mut(|b| b.preds.clear());
+pub fn fillpreds(f: &mut Fn) {
+    for_each_blk_mut(&mut f.blks, |b| b.preds.clear());
     let blks: &mut [Blk] = &mut f.blks;
-    for_each_bi_mut(blks, |bi| {
+    assert!(f.start == BlkIdx::START);
+    let mut bi: BlkIdx = BlkIdx::START;
+    while bi != BlkIdx::NONE {
         let succs = blks[bi].succs();
         succs.iter().for_each(|si| {
             if *si != BlkIdx::NONE {
                 blks[si].preds.push(bi);
             }
         });
-    });
+        bi = blks[bi].link;
+    }
 }
 
 fn rporec(blks: &mut [Blk], bi: BlkIdx, mut x: RpoIdx) -> RpoIdx {
@@ -108,7 +111,6 @@ fn rporec(blks: &mut [Blk], bi: BlkIdx, mut x: RpoIdx) -> RpoIdx {
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
     let blks: &mut [Blk] = &mut f.blks;
-    let rpo: &mut [BlkIdx] = &mut f.rpo;
     let phis: &mut [Phi] = &mut f.phis;
 
     for_each_blk_mut(blks, |b| b.id = RpoIdx::NONE);
@@ -119,8 +121,11 @@ pub fn fillrpo(f: &mut Fn) {
     let n = x.next().usize();
     f.nblk -= n as u32;
     f.rpo = vec![BlkIdx::NONE; f.nblk as usize];
+    let rpo: &mut [BlkIdx] = &mut f.rpo;
     let mut prev_bi = BlkIdx::NONE;
-    for_each_bi_mut(blks, |bi| {
+    assert!(f.start == BlkIdx::START);
+    let mut bi: BlkIdx = BlkIdx::START;
+    while bi != BlkIdx::NONE {
         let (id, succs, link) = (blks[bi].id, blks[bi].succs(), blks[bi].link);
         if id == RpoIdx::NONE {
             // Unreachable Blk
@@ -133,7 +138,8 @@ pub fn fillrpo(f: &mut Fn) {
             rpo[b.id] = bi;
             prev_bi = bi;
         }
-    });
+        bi = blks[bi].link;
+    }
 }
 
 /* for dominators computation, read
@@ -187,14 +193,17 @@ pub fn filldom(f: &mut Fn) {
             break;
         }
     }
-    for_each_bi_mut(blks, |bi| {
+    assert!(f.start == BlkIdx::START);
+    let mut bi = BlkIdx::START;
+    while bi != BlkIdx::NONE {
         let di: BlkIdx = blks[bi].idom;
         if di != BlkIdx::NONE {
             assert!(di != bi);
             blks[bi].dlink = blks[di].dom;
             blks[di].dom = bi;
         }
-    });
+        bi = blks[bi].link;
+    }
 }
 
 pub fn sdom(blks: &[Blk], b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
@@ -232,10 +241,13 @@ fn fillfron_for_succ(blks: &mut [Blk], bi: BlkIdx, si: BlkIdx) {
 pub fn fillfron(f: &mut Fn) {
     f.for_each_blk_mut(|b| b.frons.clear());
     let blks: &mut [Blk] = &mut f.blks;
-    for_each_bi_mut(blks, |bi| {
+    assert!(f.start == BlkIdx::START);
+    let mut bi = BlkIdx::START;
+    while bi != BlkIdx::NONE {
         let succs = blks[bi].succs();
         succs.iter().for_each(|si| fillfron_for_succ(blks, bi, *si));
-    });
+        bi = blks[bi].link;
+    }
 }
 
 fn loopmark(blks: &mut [Blk], hdi: BlkIdx, bi: BlkIdx, func: fn(&mut [Blk], BlkIdx, BlkIdx)) {

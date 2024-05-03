@@ -215,12 +215,8 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     //     Ins *i;
     //     int t, d;
     //     uint n, a;
-
-    let blks: &mut [Blk] = &mut f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
-    let phis: &[Phi] = &f.phis;
     let tmps: &[Tmp] = &f.tmps;
-    let cons: &mut Vec<Con> = &mut f.cons;
 
     let mut val: Vec<Lat> = vec![Lat::Top; tmps.len()];
     assert!(f.nblk as usize == rpo.len());
@@ -233,82 +229,87 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         ;
         rpo.len()*2 + 1 /* use edge[len*2] for start */
     ];
-    let mut usewrk: Vec<(TmpIdx, u32 /*UseIdx*/)> = vec![];
+    {
+        let blks: &mut [Blk] = &mut f.blks;
+        let phis: &[Phi] = &f.phis;
+        let cons: &mut Vec<Con> = &mut f.cons;
 
-    for n in 0..rpo.len() {
-        let bi: BlkIdx = rpo[n];
-        blks[bi].ivisit = 0;
-        let (s1, s2) = (blks[bi].s1, blks[bi].s2);
-        initedge(blks, &mut edge[n * 2], s1);
-        initedge(blks, &mut edge[n * 2 + 1], s2);
-    }
-    assert!(f.start == BlkIdx::START);
-    initedge(blks, &mut edge[rpo.len() * 2], BlkIdx::START);
-    let mut flowrk: EdgeIdx = EdgeIdx::from(rpo.len() * 2);
+        let mut usewrk: Vec<(TmpIdx, u32 /*UseIdx*/)> = vec![];
 
-    /* 1. find out constants and dead cfg edges */
-    loop {
-        let ei: EdgeIdx = flowrk;
-        if ei != EdgeIdx::NONE {
-            let e: &mut Edge = &mut edge[ei.usize()];
-            flowrk = e.work;
-            e.work = EdgeIdx::NONE;
-            if e.dest == RpoIdx::NONE || !e.dead {
-                continue;
-            }
-            e.dead = false;
-            let n: RpoIdx = e.dest;
+        for n in 0..rpo.len() {
             let bi: BlkIdx = rpo[n];
-            let mut pi: PhiIdx = blks[bi].phi;
-            while pi != PhiIdx::NONE {
-                let p: &Phi = &phis[pi];
-                visitphi(blks, tmps, &mut usewrk, &mut val, &edge, p, n);
-                pi = p.link;
-            }
-            if blks[bi].ivisit == 0 {
-                for i in &blks[bi].ins {
-                    visitins(tmps, cons, &mut usewrk, &mut val, i);
+            blks[bi].ivisit = 0;
+            let (s1, s2) = (blks[bi].s1, blks[bi].s2);
+            initedge(blks, &mut edge[n * 2], s1);
+            initedge(blks, &mut edge[n * 2 + 1], s2);
+        }
+        assert!(f.start == BlkIdx::START);
+        initedge(blks, &mut edge[rpo.len() * 2], BlkIdx::START);
+        let mut flowrk: EdgeIdx = EdgeIdx::from(rpo.len() * 2);
+
+        /* 1. find out constants and dead cfg edges */
+        loop {
+            let ei: EdgeIdx = flowrk;
+            if ei != EdgeIdx::NONE {
+                let e: &mut Edge = &mut edge[ei.usize()];
+                flowrk = e.work;
+                e.work = EdgeIdx::NONE;
+                if e.dest == RpoIdx::NONE || !e.dead {
+                    continue;
                 }
-                visitjmp(cons, &val, &mut edge, &mut flowrk, &blks[bi], n);
-            }
-            blks[bi].ivisit += 1;
-            assert!(
-                blks[bi].jmp.typ != J::Jjmp
-                    || !edge[n.usize() * 2].dead
-                    || flowrk.usize() == n.usize() * 2
-            );
-        } else {
-            match usewrk.pop() {
-                None => break,
-                Some((ti, ui)) => {
-                    let u: &Use = &tmps[ti].uses[ui as usize];
-                    let n: RpoIdx = u.bid;
-                    let bi: BlkIdx = rpo[n];
-                    if blks[bi].ivisit == 0 {
-                        continue;
+                e.dead = false;
+                let n: RpoIdx = e.dest;
+                let bi: BlkIdx = rpo[n];
+                let mut pi: PhiIdx = blks[bi].phi;
+                while pi != PhiIdx::NONE {
+                    let p: &Phi = &phis[pi];
+                    visitphi(blks, tmps, &mut usewrk, &mut val, &edge, p, n);
+                    pi = p.link;
+                }
+                if blks[bi].ivisit == 0 {
+                    for i in &blks[bi].ins {
+                        visitins(tmps, cons, &mut usewrk, &mut val, i);
                     }
-                    match u.typ {
-                        UseT::UPhi(pi) => {
-                            visitphi(blks, tmps, &mut usewrk, &mut val, &edge, &phis[pi], n)
+                    visitjmp(cons, &val, &mut edge, &mut flowrk, &blks[bi], n);
+                }
+                blks[bi].ivisit += 1;
+                assert!(
+                    blks[bi].jmp.typ != J::Jjmp
+                        || !edge[n.usize() * 2].dead
+                        || flowrk.usize() == n.usize() * 2
+                );
+            } else {
+                match usewrk.pop() {
+                    None => break,
+                    Some((ti, ui)) => {
+                        let u: &Use = &tmps[ti].uses[ui as usize];
+                        let n: RpoIdx = u.bid;
+                        let bi: BlkIdx = rpo[n];
+                        if blks[bi].ivisit == 0 {
+                            continue;
                         }
-                        UseT::UIns(ii) => {
-                            // TODO - which bi - just changed this from bi to u.bi
-                            assert!(bi == u.bi);
-                            visitins(tmps, cons, &mut usewrk, &mut val, &blks[u.bi].ins[ii]);
-                        }
-                        UseT::UJmp => {
-                            visitjmp(cons, &val, &mut edge, &mut flowrk, &blks[bi], n);
-                        }
-                        _ => {
-                            // unreachable
-                            assert!(false);
+                        match u.typ {
+                            UseT::UPhi(pi) => {
+                                visitphi(blks, tmps, &mut usewrk, &mut val, &edge, &phis[pi], n)
+                            }
+                            UseT::UIns(ii) => {
+                                // TODO - which bi - just changed this from bi to u.bi
+                                assert!(bi == u.bi);
+                                visitins(tmps, cons, &mut usewrk, &mut val, &blks[u.bi].ins[ii]);
+                            }
+                            UseT::UJmp => {
+                                visitjmp(cons, &val, &mut edge, &mut flowrk, &blks[bi], n);
+                            }
+                            _ => {
+                                // unreachable
+                                assert!(false);
+                            }
                         }
                     }
                 }
             }
         }
     }
-
     if true
     /*debug['F']*/
     {
@@ -335,103 +336,106 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         print!("\n dead code: ");
     }
 
-    let phis: &mut [Phi] = &mut f.phis;
-    let cons: &[Con] = &f.cons;
-
-    /* 2. trim dead code, replace constants */
     let mut d: bool = false;
-    assert!(f.start == BlkIdx::START);
-    let mut prev_bi = BlkIdx::NONE;
-    let mut bi: BlkIdx = BlkIdx::START;
-    //     for (pb=&f.start; (b=*pb);) {
-    while bi != BlkIdx::NONE {
-        if blks[bi].ivisit == 0 {
-            d = true;
-            if true
-            /*debug['F']*/
-            {
-                /*e*/
-                print!("{} ", to_s(&blks[bi].name));
-            }
-            let succs = blks[bi].succs();
-            for si in succs {
-                edgedel(blks, phis, bi, si);
-            }
-            if prev_bi == BlkIdx::NONE {
-                f.start = blks[bi].link;
-            } else {
-                blks[prev_bi].link = blks[bi].link;
-            }
-            bi = blks[bi].link;
-            continue;
-        }
-        let bid: RpoIdx = blks[bi].id;
-        let mut prev_pi: PhiIdx = PhiIdx::NONE;
-        let mut pi: PhiIdx = blks[bi].phi;
-        while pi != PhiIdx::NONE {
-            let p_to: Ref = phis[pi].to;
-            let p_link: PhiIdx = phis[pi].link;
-            assert!(matches!(p_to, RTmp(_)));
-            if let RTmp(ti) = p_to {
-                if val[ti.usize()] != Lat::Bot {
-                    // *pp = p.link;
-                    if prev_pi == PhiIdx::NONE {
-                        blks[bi].phi = p_link;
-                    } else {
-                        phis[prev_pi].link = p_link;
-                    }
+    {
+        let blks: &mut [Blk] = &mut f.blks;
+        let phis: &mut [Phi] = &mut f.phis;
+        let cons: &[Con] = &f.cons;
+
+        /* 2. trim dead code, replace constants */
+        assert!(f.start == BlkIdx::START);
+        let mut prev_bi = BlkIdx::NONE;
+        let mut bi: BlkIdx = BlkIdx::START;
+        //     for (pb=&f.start; (b=*pb);) {
+        while bi != BlkIdx::NONE {
+            if blks[bi].ivisit == 0 {
+                d = true;
+                if true
+                /*debug['F']*/
+                {
+                    /*e*/
+                    print!("{} ", to_s(&blks[bi].name));
+                }
+                let succs = blks[bi].succs();
+                for si in succs {
+                    edgedel(blks, phis, bi, si);
+                }
+                if prev_bi == BlkIdx::NONE {
+                    f.start = blks[bi].link;
                 } else {
-                    let p: &mut Phi = &mut phis[pi];
-                    for a in 0..p.args.len() {
-                        if !deadedge(&edge, blks[p.blks[a]].id, bid) {
-                            renref(&val, &mut p.args[a]);
+                    blks[prev_bi].link = blks[bi].link;
+                }
+                bi = blks[bi].link;
+                continue;
+            }
+            let bid: RpoIdx = blks[bi].id;
+            let mut prev_pi: PhiIdx = PhiIdx::NONE;
+            let mut pi: PhiIdx = blks[bi].phi;
+            while pi != PhiIdx::NONE {
+                let p_to: Ref = phis[pi].to;
+                let p_link: PhiIdx = phis[pi].link;
+                assert!(matches!(p_to, RTmp(_)));
+                if let RTmp(ti) = p_to {
+                    if val[ti.usize()] != Lat::Bot {
+                        // *pp = p.link;
+                        if prev_pi == PhiIdx::NONE {
+                            blks[bi].phi = p_link;
+                        } else {
+                            phis[prev_pi].link = p_link;
                         }
-                    }
-                    prev_pi = pi;
-                }
-            }
-            pi = p_link;
-        }
-        for i in &mut blks[bi].ins {
-            if renref(&val, &mut i.to) {
-                *i = Ins::NOP;
-            } else {
-                for n in 0..2 {
-                    renref(&val, &mut i.args[n]);
-                }
-                if isstore(i.op) && i.args[0] == UNDEF {
-                    *i = Ins::NOP;
-                }
-            }
-        }
-        renref(&val, &mut blks[bi].jmp.arg);
-        if blks[bi].jmp.typ == J::Jjnz {
-            let maybe_ci: Option<ConIdx> = {
-                if let RCon(ci) = blks[bi].jmp.arg {
-                    Some(ci)
-                } else {
-                    None
-                }
-            };
-            match maybe_ci {
-                None => (), // nada
-                Some(ci) => {
-                    if iscon(&cons[ci], false, 0) {
-                        let s1: BlkIdx = blks[bi].s1;
-                        edgedel(blks, phis, bi, s1);
-                        blks[bi].s1 = blks[bi].s2;
-                        blks[bi].s2 = BlkIdx::NONE;
                     } else {
-                        let s2: BlkIdx = blks[bi].s2;
-                        edgedel(blks, phis, bi, s2);
+                        let p: &mut Phi = &mut phis[pi];
+                        for a in 0..p.args.len() {
+                            if !deadedge(&edge, blks[p.blks[a]].id, bid) {
+                                renref(&val, &mut p.args[a]);
+                            }
+                        }
+                        prev_pi = pi;
                     }
-                    blks[bi].jmp.typ = J::Jjmp;
-                    blks[bi].jmp.arg = R;
+                }
+                pi = p_link;
+            }
+            for i in &mut blks[bi].ins {
+                if renref(&val, &mut i.to) {
+                    *i = Ins::NOP;
+                } else {
+                    for n in 0..2 {
+                        renref(&val, &mut i.args[n]);
+                    }
+                    if isstore(i.op) && i.args[0] == UNDEF {
+                        *i = Ins::NOP;
+                    }
                 }
             }
+            renref(&val, &mut blks[bi].jmp.arg);
+            if blks[bi].jmp.typ == J::Jjnz {
+                let maybe_ci: Option<ConIdx> = {
+                    if let RCon(ci) = blks[bi].jmp.arg {
+                        Some(ci)
+                    } else {
+                        None
+                    }
+                };
+                match maybe_ci {
+                    None => (), // nada
+                    Some(ci) => {
+                        if iscon(&cons[ci], false, 0) {
+                            let s1: BlkIdx = blks[bi].s1;
+                            edgedel(blks, phis, bi, s1);
+                            blks[bi].s1 = blks[bi].s2;
+                            blks[bi].s2 = BlkIdx::NONE;
+                        } else {
+                            let s2: BlkIdx = blks[bi].s2;
+                            edgedel(blks, phis, bi, s2);
+                        }
+                        blks[bi].jmp.typ = J::Jjmp;
+                        blks[bi].jmp.arg = R;
+                    }
+                }
+            }
+            prev_bi = bi;
+            bi = blks[bi].link;
         }
-        prev_bi = bi;
-        bi = blks[bi].link;
     }
 
     if true
