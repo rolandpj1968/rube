@@ -2,7 +2,8 @@ use std::io::stdout;
 
 use crate::all::Ref::{RCall, RMem, RTmp, R};
 use crate::all::{
-    bshas, kbase, to_s, BSet, Blk, BlkIdx, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target, Tmp, O,
+    bshas, for_each_blk, kbase, to_s, BSet, Blk, BlkIdx, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target,
+    Tmp, O,
 };
 
 use crate::util::{bsclr, bscopy, bscount, bsequal, bsinit, bsiter, bsset, bsunion, dumpts};
@@ -73,21 +74,20 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
         for n in (0..rpo.len()).rev() {
             let bi: BlkIdx = rpo[n];
             {
-                let succs = blks.with_mut(bi, |b| {
-                    bscopy(&mut u, &b.out);
-                    b.succs()
-                });
+                bscopy(&mut u, &blks[bi].out);
+                let succs = blks[bi].succs();
                 succs.iter().for_each(|si| {
                     if *si != BlkIdx::NONE {
                         liveon(blks, phis, &mut v, bi, *si);
-                        blks.with_mut(bi, |b| bsunion(&mut b.out, &v));
+                        bsunion(&mut blks[bi].out, &v);
                     }
                 });
-                chg = chg || !bsequal(&blks.borrow(bi).out, &u);
+                chg = chg || !bsequal(&blks[bi].out, &u);
             }
 
             let mut nlv: [u32; 2] = [0; 2];
-            blks.with_mut(bi, |b| {
+            {
+                let b: &mut Blk = &mut blks[bi];
                 b.out[0] |= targ.rglob;
                 bscopy(&mut b.in_, &b.out);
 
@@ -97,7 +97,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                     ti += 1;
                 }
 
-                let jmp_arg = b.jmp().arg;
+                let jmp_arg = b.jmp.arg;
                 if let RCall(_) = jmp_arg {
                     assert!(bscount(&b.in_) == targ.nrglob && b.in_[0] == targ.rglob);
                     b.in_[0] |= (targ.retregs)(jmp_arg, &nlv); // TODO not implemented
@@ -107,9 +107,9 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
 
                 b.nlive.copy_from_slice(&nlv);
 
-                let ins_len = b.ins().len();
+                let ins_len = b.ins.len();
                 for ii in (0..ins_len).rev() {
-                    let i: Ins = b.ins()[ii]; // Note, copy
+                    let i: Ins = b.ins[ii]; // Note, copy
                     if i.op == O::Ocall {
                         if let RCall(_) = i.args[1] {
                             let mut m: [u32; 2] = [0; 2];
@@ -161,7 +161,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
                         }
                     }
                 }
-            });
+            }
         }
         if chg {
             chg = false;
@@ -175,7 +175,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     {
         /*e*/
         println!("\n> Liveness analysis:");
-        blks.for_each(|b| {
+        for_each_blk(blks, |b| {
             /*e*/
             print!("\t{:<10}in:   ", to_s(&b.name));
             dumpts(&b.in_, &f.tmps, &mut stdout() /*stderr*/);

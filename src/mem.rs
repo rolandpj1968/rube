@@ -8,9 +8,9 @@ use crate::alias::getalias;
 use crate::all::Ref::{RInt, RTmp, R};
 use crate::all::K::{Kl, Kx};
 use crate::all::{
-    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, Blk, BlkIdx, Con,
-    Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Typ, Use, UseT, CON_Z, J, K, NBIT, O,
-    OALLOC, OALLOC1, TMP0, UNDEF,
+    bit, for_each_blk_mut, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits,
+    Blk, BlkIdx, Con, Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Typ, Use, UseT, CON_Z, J,
+    K, NBIT, O, OALLOC, OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
 use crate::load::{loadsz, storesz};
@@ -49,14 +49,14 @@ pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
 
     /* promote uniform stack slots to temporaries */
     let bi: BlkIdx = f.start;
-    let ins_len = blks.borrow(bi).ins().len();
+    let ins_len = blks[bi].ins.len();
     'ins_loop: for ii in 0..ins_len {
         let t: &mut Tmp;
         let mut k: K = Kx;
         let mut s: i32 = -1; // TODO sz types in general :(
         {
-            let b = blks.borrow(bi);
-            let i: &Ins = &b.ins()[ii];
+            let b = blks[bi];
+            let i: &Ins = &b.ins[ii];
             // TODO !isalloc
             if OALLOC > i.op || i.op > OALLOC1 {
                 continue;
@@ -75,8 +75,8 @@ pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
 
             for u in &t.uses {
                 if let UseT::UIns(li) = u.typ {
-                    let ub = blks.borrow(u.bi);
-                    let l: &Ins = &ub.ins()[li];
+                    let ub = blks[u.bi];
+                    let l: &Ins = &ub.ins[li];
                     if isload(l.op) {
                         if s == -1 || s == loadsz(l) {
                             s = loadsz(l);
@@ -98,16 +98,16 @@ pub fn promote(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) -> RubeResult<()> {
         }
 
         /* get rid of the alloc and replace uses */
-        blks.borrow_mut(bi).ins_mut()[ii] = Ins::NOP;
+        blks[bi].ins[ii] = Ins::NOP;
         t.ndef -= 1;
 
         for u in &t.uses {
-            let ub = blks.borrow_mut(u.bi);
-            let mut ub_ins = ub.ins_mut();
+            let ub: &mut Blk = &mut blks[u.bi];
+            let mut ub_ins = ub.ins;
             let l: &mut Ins = {
                 assert!(matches!(u.typ, UseT::UIns(_)));
                 if let UseT::UIns(li) = u.typ {
-                    &mut ub_ins/*ub.ins_mut()*/[li]
+                    &mut ub_ins/*ub.ins*/[li]
                 } else {
                     continue;
                 }
@@ -271,18 +271,17 @@ fn scmp(a: &Slot, b: &Slot) -> Ordering {
     a.r.a.cmp(&b.r.a)
 }
 
-fn maxrpo(blks: &[Blk], hdi: BlkIdx, bi: BlkIdx) {
-    let b_id = blks.id_of(bi);
-    blks.with_mut(hdi, |hd| {
-        // Ugh, fixme
-        if hd.loop_ < (b_id.usize() as i32) {
-            hd.loop_ = b_id.usize() as i32;
-        }
-    });
+fn maxrpo(blks: &mut [Blk], hdi: BlkIdx, bi: BlkIdx) {
+    let b_id = blks[bi].id;
+    let hd: &mut Blk = &mut blks[hdi];
+    // Ugh, fixme
+    if hd.loop_ < (b_id.usize() as i32) {
+        hd.loop_ = b_id.usize() as i32;
+    }
 }
 
 pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
-    let blks: &[Blk] = &f.blks;
+    let blks: &mut [Blk] = &mut f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let nblk = rpo.len();
     assert!(nblk == f.nblk as usize);
@@ -299,7 +298,7 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut sl: Vec<Slot> = vec![];
     {
         let tmps: &mut [Tmp] = &mut f.tmps;
-        let start_id = blks.borrow(f.start).id;
+        let start_id = blks[f.start].id;
         for n in TMP0..tmps.len() {
             let ti: TmpIdx = TmpIdx::from(n);
             let t: &mut Tmp = &mut tmps[ti];
@@ -328,81 +327,80 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     {
         let tmps: &[Tmp] = &f.tmps;
         /* one-pass liveness analysis */
-        blks.for_each_mut(|b| b.loop_ = -1);
+        for_each_blk_mut(blks, |b| b.loop_ = -1);
         loopiter(blks, rpo, maxrpo);
         {
             let mut br: Vec<Range> = vec![Range { a: 0, b: 0 }; nblk];
             for n in (0..nblk).rev() {
                 let bi: BlkIdx = rpo[n];
-                blks.with(bi, |b| {
-                    // TODO - this dedups s1, s2 - does it matter?
-                    let succs = b.succs();
-                    br[n].b = ip;
+                let b: &Blk = &blks[bi];
+                // TODO - this dedups s1, s2 - does it matter?
+                let succs = b.succs();
+                br[n].b = ip;
+                ip -= 1;
+                for s in &mut sl {
+                    s.l = 0;
+                    for psi in succs {
+                        if psi == BlkIdx::NONE {
+                            break;
+                        }
+                        let m = blks[psi].id;
+                        if (m.usize()) > n && rin(&s.r, br[m.usize()].a) {
+                            s.l = s.m;
+                            radd(&mut s.r, ip);
+                        }
+                    }
+                }
+                if b.jmp.typ == J::Jretc {
                     ip -= 1;
-                    for s in &mut sl {
-                        s.l = 0;
-                        for psi in succs {
-                            if psi == BlkIdx::NONE {
-                                break;
-                            }
-                            let m = blks.id_of(psi);
-                            if (m.usize()) > n && rin(&s.r, br[m.usize()].a) {
-                                s.l = s.m;
-                                radd(&mut s.r, ip);
-                            }
-                        }
-                    }
-                    if b.jmp().typ == J::Jretc {
+                    load(tmps, cons, b.jmp.arg, u64::MAX, ip, &mut sl);
+                }
+                for iii in (0..b.ins.len()).rev() {
+                    let i: &Ins = &b.ins[iii];
+                    let ii: InsIdx = InsIdx::from(iii);
+                    if i.op == O::Oargc {
                         ip -= 1;
-                        load(tmps, cons, b.jmp().arg, u64::MAX, ip, &mut sl);
+                        load(tmps, cons, i.args[1], u64::MAX, ip, &mut sl);
                     }
-                    for iii in (0..b.ins().len()).rev() {
-                        let i: &Ins = &b.ins()[iii];
-                        let ii: InsIdx = InsIdx::from(iii);
-                        if i.op == O::Oargc {
-                            ip -= 1;
-                            load(tmps, cons, i.args[1], u64::MAX, ip, &mut sl);
-                        }
-                        if isload(i.op) {
-                            let x: Bits = bit(loadsz(i) as usize) - 1;
-                            ip -= 1;
-                            load(tmps, cons, i.args[0], x, ip, &mut sl);
-                        }
-                        if isstore(i.op) {
-                            let x: Bits = bit(storesz(i) as usize) - 1;
+                    if isload(i.op) {
+                        let x: Bits = bit(loadsz(i) as usize) - 1;
+                        ip -= 1;
+                        load(tmps, cons, i.args[0], x, ip, &mut sl);
+                    }
+                    if isstore(i.op) {
+                        let x: Bits = bit(storesz(i) as usize) - 1;
+                        store(tmps, cons, i.args[1], x, ip, bi, ii, &mut sl);
+                        ip -= 1;
+                    }
+                    if i.op == O::Oblit0 {
+                        assert!(iii + 1 < b.ins.len());
+                        let blit1: &Ins = &b.ins[iii + 1];
+                        assert!(blit1.op == O::Oblit1); // TODO bounds check
+                        assert!(matches!(blit1.args[0], RInt(_)));
+                        if let RInt(rsval) = blit1.args[0] {
+                            let sz: i32 = rsval.abs();
+                            let x: Bits = if sz >= (NBIT as i32) {
+                                u64::MAX
+                            } else {
+                                bit(sz as usize) - 1
+                            };
                             store(tmps, cons, i.args[1], x, ip, bi, ii, &mut sl);
                             ip -= 1;
-                        }
-                        if i.op == O::Oblit0 {
-                            assert!(iii + 1 < b.ins().len());
-                            let blit1: &Ins = &b.ins()[iii + 1];
-                            assert!(blit1.op == O::Oblit1); // TODO bounds check
-                            assert!(matches!(blit1.args[0], RInt(_)));
-                            if let RInt(rsval) = blit1.args[0] {
-                                let sz: i32 = rsval.abs();
-                                let x: Bits = if sz >= (NBIT as i32) {
-                                    u64::MAX
-                                } else {
-                                    bit(sz as usize) - 1
-                                };
-                                store(tmps, cons, i.args[1], x, ip, bi, ii, &mut sl);
-                                ip -= 1;
-                                load(tmps, cons, i.args[0], x, ip, &mut sl);
-                                bl.push((bi, ii));
-                            }
+                            load(tmps, cons, i.args[0], x, ip, &mut sl);
+                            bl.push((bi, ii));
                         }
                     }
-                    for s in &mut sl {
-                        if s.l != 0 {
-                            radd(&mut s.r, ip);
-                            if b.loop_ != -1 {
-                                assert!(b.loop_ > n as i32);
-                                radd(&mut s.r, br[b.loop_ as usize].b - 1);
-                            }
+                }
+                for s in &mut sl {
+                    if s.l != 0 {
+                        radd(&mut s.r, ip);
+                        if b.loop_ != -1 {
+                            assert!(b.loop_ > n as i32);
+                            radd(&mut s.r, br[b.loop_ as usize].b - 1);
                         }
                     }
-                    br[n].a = ip;
-                });
+                }
+                br[n].a = ip;
             }
         }
 
@@ -410,13 +408,12 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         for s in &mut sl {
             for n in 0..s.st.len() {
                 if !rin(&s.r, s.st[n].ip) {
-                    blks.with_mut(s.st[n].bi, |b| {
-                        let ii: InsIdx = s.st[n].ii;
-                        if b.ins()[ii].op == O::Oblit0 {
-                            b.ins_mut()[(ii.0 as usize) + 1] = Ins::NOP;
-                        }
-                        b.ins_mut()[ii] = Ins::NOP;
-                    });
+                    let b: &mut Blk = &mut blks[s.st[n].bi];
+                    let ii: InsIdx = s.st[n].ii;
+                    if b.ins[ii].op == O::Oblit0 {
+                        b.ins[ii.next()] = Ins::NOP;
+                    }
+                    b.ins[ii] = Ins::NOP;
                 }
             }
         }
@@ -464,54 +461,49 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     assert!(t.ndef == 1 && t.def != InsIdx::NONE);
                     let def_bi = f.rpo[t.bid];
                     let mut is_load = false;
-                    blks.with_mut(def_bi, |b| {
-                        let i: &mut Ins = &mut b.ins_mut()[t.def];
-                        if isload(i.op) {
-                            *i = Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
-                            is_load = true;
-                        } else {
-                            *i = Ins::NOP;
-                        }
-                    });
+                    let i: &mut Ins = &mut blks[def_bi].ins[t.def];
+                    if isload(i.op) {
+                        *i = Ins::new1(O::Ocopy, i.cls, i.to, [UNDEF]);
+                        is_load = true;
+                    } else {
+                        *i = Ins::NOP;
+                    }
                     if is_load {
                         continue;
                     }
                     for u in &t.uses {
                         assert!(!matches!(u.typ, UseT::UPhi(_)));
                         let bi: BlkIdx = rpo[u.bid];
-                        blks.with_mut(bi, |b| {
-                            match u.typ {
-                                UseT::UJmp => {
-                                    assert!(isret(b.jmp().typ));
-                                    b.jmp_mut().typ = J::Jret0;
-                                    b.jmp_mut().arg = R;
-                                }
-                                UseT::UIns(ii) => {
-                                    let i: &mut Ins = &mut b.ins_mut()[ii];
-                                    assert!(i.to == R || matches!(i.to, RTmp(_)));
-                                    match i.to {
-                                        R => {
-                                            if isarg(i.op) {
-                                                assert!(i.op == O::Oargc);
-                                                i.args[1] = CON_Z; // crash
-                                            } else {
-                                                if i.op == O::Oblit0 {
-                                                    // This is not gonna work :(
-                                                    //panic!("fixme");
-                                                    b.ins_mut()[ii.next()] = Ins::NOP;
-                                                }
-                                                *i = Ins::NOP;
-                                            }
-                                        }
-                                        RTmp(ti) => {
-                                            stk.push(ti);
-                                        }
-                                        _ => (),
-                                    }
-                                }
-                                _ => (),
+                        let b: &mut Blk = &mut blks[bi];
+                        match u.typ {
+                            UseT::UJmp => {
+                                assert!(isret(b.jmp.typ));
+                                b.jmp.typ = J::Jret0;
+                                b.jmp.arg = R;
                             }
-                        });
+                            UseT::UIns(ii) => {
+                                let i: &mut Ins = &mut b.ins[ii];
+                                assert!(i.to == R || matches!(i.to, RTmp(_)));
+                                match i.to {
+                                    R => {
+                                        if isarg(i.op) {
+                                            assert!(i.op == O::Oargc);
+                                            i.args[1] = CON_Z; // crash
+                                        } else {
+                                            if i.op == O::Oblit0 {
+                                                b.ins[ii.next()] = Ins::NOP;
+                                            }
+                                            *i = Ins::NOP;
+                                        }
+                                    }
+                                    RTmp(ti) => {
+                                        stk.push(ti);
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            _ => (),
+                        }
                     }
                 }
             }
@@ -568,8 +560,8 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             if sl[si].si == SlotIdx::from(si) {
                 continue;
             }
-            blks.with_mut(t_def_bi, |b| b.ins_mut()[t_def_ii] = Ins::NOP);
-            //f.blk_mut(t_def_bi).ins_mut()[t_def_ii.0 as usize] = Ins::NOP;
+            blks.with_mut(t_def_bi, |b| b.ins[t_def_ii] = Ins::NOP);
+            //f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = Ins::NOP;
             let ssi: SlotIdx = sl[si].si;
             let ssti: TmpIdx = sl[ssi.0 as usize].ti;
             let (ts_def_ii, ts_bid) = {
@@ -583,11 +575,11 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                  * dominates its new uses
                  */
                 blks.with_mut(t_def_bi, |b| {
-                    let tsi: Ins = /*f.blk(t_def_bi)*/b.ins()[ts_def_ii]; // Note copy
-                                                                          /*f.blk_mut(t_def_bi)*/
-                    b.ins_mut()[t_def_ii] = tsi;
+                    let tsi: Ins = /*f.blk(t_def_bi)*/b.ins[ts_def_ii]; // Note copy
+                                                                        /*f.blk_mut(t_def_bi)*/
+                    b.ins[t_def_ii] = tsi;
                     /*f.blk_mut(t_def_bi)*/
-                    b.ins_mut()[ts_def_ii] = Ins::NOP;
+                    b.ins[ts_def_ii] = Ins::NOP;
                 });
                 tmps[ssti].def = t_def_ii;
             }
@@ -597,19 +589,18 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 match u.typ {
                     UseT::UJmp => {
                         let bi: BlkIdx = rpo[u.bid];
-                        blks.with_mut(bi, |b| /*f.blk_mut(bi)*/b.jmp_mut().arg = RTmp(ssti));
+                        blks[bi].jmp.arg = RTmp(ssti);
                     }
                     UseT::UIns(ii) => {
                         let bi: BlkIdx = rpo[u.bid];
                         //let b = f.blk_mut(bi);
-                        blks.with_mut(bi, |b| {
-                            let args: &mut [Ref; 2] = &mut b.ins_mut()[ii.0 as usize].args;
-                            for arg in args {
-                                if *arg == RTmp(sti) {
-                                    *arg = RTmp(ssti);
-                                }
+                        let b: &mut Blk = &mut blks[bi];
+                        let args: &mut [Ref; 2] = &mut b.ins[ii].args;
+                        for arg in args {
+                            if *arg == RTmp(sti) {
+                                *arg = RTmp(ssti);
                             }
-                        });
+                        }
                     }
                     _ => (),
                 }
@@ -620,29 +611,28 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let tmps: &[Tmp] = &f.tmps;
     /* fix newly overlapping blits */
     for (bi, ii) in bl {
-        blks.with_mut(bi, |b| {
-            let i: Ins = b.ins_mut()[ii]; // Note - copy Ugh fixme
-            if i.op == O::Oblit0 {
-                if let Some((s0, off0)) = slot(tmps, cons, i.args[0]) {
-                    if let Some((s1, off1)) = slot(tmps, cons, i.args[1]) {
-                        if sl[s0].si == sl[s1].si {
-                            if off0 < off1 {
-                                assert!(ii.next().usize() < b.ins().len());
-                                let blit1: &mut Ins = &mut b.ins_mut()[ii.next()];
-                                assert!(blit1.op == O::Oblit1 && matches!(blit1.args[0], RInt(_)));
-                                if let RInt(sz) = blit1.args[0] {
-                                    assert!(sz >= 0);
-                                    blit1.args[0] = RInt(-sz); // What are you doing Quentin???
-                                }
-                            } else if off0 == off1 {
-                                b.ins_mut()[ii] = Ins::NOP;
-                                b.ins_mut()[ii.next()] = Ins::NOP;
+        let b: &mut Blk = &mut blks[bi];
+        let i: Ins = b.ins[ii]; // Note - copy Ugh fixme
+        if i.op == O::Oblit0 {
+            if let Some((s0, off0)) = slot(tmps, cons, i.args[0]) {
+                if let Some((s1, off1)) = slot(tmps, cons, i.args[1]) {
+                    if sl[s0].si == sl[s1].si {
+                        if off0 < off1 {
+                            assert!(ii.next().usize() < b.ins.len());
+                            let blit1: &mut Ins = &mut b.ins[ii.next()];
+                            assert!(blit1.op == O::Oblit1 && matches!(blit1.args[0], RInt(_)));
+                            if let RInt(sz) = blit1.args[0] {
+                                assert!(sz >= 0);
+                                blit1.args[0] = RInt(-sz); // What are you doing Quentin???
                             }
+                        } else if off0 == off1 {
+                            b.ins[ii] = Ins::NOP;
+                            b.ins[ii.next()] = Ins::NOP;
                         }
                     }
                 }
             }
-        });
+        }
     }
 
     if true

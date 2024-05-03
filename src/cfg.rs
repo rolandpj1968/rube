@@ -238,7 +238,7 @@ pub fn fillfron(f: &mut Fn) {
     });
 }
 
-fn loopmark(blks: &mut [Blk], hdi: BlkIdx, bi: BlkIdx, func: fn(&[Blk], BlkIdx, BlkIdx)) {
+fn loopmark(blks: &mut [Blk], hdi: BlkIdx, bi: BlkIdx, func: fn(&mut [Blk], BlkIdx, BlkIdx)) {
     let (hd_id, b_id, b_visit) = (blks[hdi].id, blks[bi].id, blks[bi].visit);
     if b_id < hd_id || b_visit == hd_id {
         return;
@@ -252,7 +252,7 @@ fn loopmark(blks: &mut [Blk], hdi: BlkIdx, bi: BlkIdx, func: fn(&[Blk], BlkIdx, 
     }
 }
 
-pub fn loopiter(blks: &mut [Blk], rpo: &[BlkIdx], func: fn(&[Blk], BlkIdx, BlkIdx)) {
+pub fn loopiter(blks: &mut [Blk], rpo: &[BlkIdx], func: fn(&mut [Blk], BlkIdx, BlkIdx)) {
     for_each_blk_mut(blks, |b| b.visit = RpoIdx::NONE);
 
     for n in 0..rpo.len() {

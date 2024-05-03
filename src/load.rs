@@ -1,5 +1,4 @@
 use derive_new::new;
-use std::cell;
 use std::cmp::Ordering;
 use std::io::stdout;
 
@@ -277,7 +276,7 @@ fn def(
 
     if ii == InsIdx::NONE {
         // Bit naughty - this is out of range
-        ii = InsIdx::from(blks.borrow(bi).ins().len());
+        ii = InsIdx::from(blks[bi].ins.len());
     }
     let cls: K = if sl.sz > 4 { Kl } else { Kw };
     let msks: Bits = genmask(sl.sz as i32);
@@ -285,7 +284,7 @@ fn def(
     let mut goto_load: bool = false;
     while ii != InsIdx::from(0) && !goto_load {
         ii = InsIdx::from(ii.usize() - 1);
-        let mut i: Ins = blks.borrow(bi).ins()[ii.0 as usize]; /* Note: copy! */
+        let mut i: Ins = blks[bi].ins[ii]; /* Note: copy! TODO But mut ???*/
         if killsl(tmps, i.to, sl) || (i.op == O::Ocall && escapes(tmps, sl.r)) {
             // println!("                              killsl or escaping call");
             goto_load = true;
@@ -301,7 +300,7 @@ fn def(
                 if let RInt(blit1_i) = i.args[0] {
                     assert!(ii != InsIdx::from(0));
                     ii = InsIdx::from(ii.usize() - 1);
-                    i = blks.borrow(bi).ins()[ii.0 as usize];
+                    i = blks[bi].ins[ii];
                     assert!(i.op == O::Oblit0);
                     (blit1_i.abs(), i.args[1], R)
                 } else {
@@ -390,7 +389,7 @@ fn def(
     }
 
     if !goto_load {
-        let bid = blks.borrow(bi).id;
+        let bid = blks[bi].id;
 
         for isti in 0..ilog.len() {
             let ist: &Insert = &ilog[isti];
@@ -408,7 +407,7 @@ fn def(
             }
         }
 
-        let mut pi = blks.borrow(bi).phi;
+        let mut pi = blks[bi].phi;
         while pi != PhiIdx::NONE {
             let p_to: Ref = phis[pi].to;
             if killsl(tmps, p_to, sl) {
@@ -421,14 +420,14 @@ fn def(
         }
     }
 
-    goto_load = goto_load || blks.borrow(bi).preds.is_empty();
+    goto_load = goto_load || blks[bi].preds.is_empty();
 
     if !goto_load {
-        if blks.borrow(bi).preds.len() == 1 {
-            let bpi = blks.borrow(bi).preds[0];
-            assert!(blks.borrow(bpi).loop_ >= blks.borrow(il.bi).loop_);
+        if blks[bi].preds.len() == 1 {
+            let bpi = blks[bi].preds[0];
+            assert!(blks[bpi].loop_ >= blks[il.bi].loop_);
             let mut l: Loc = *il;
-            if blks.borrow(bpi).s2 != BlkIdx::NONE {
+            if blks[bpi].s2 != BlkIdx::NONE {
                 l.typ = LocT::LNoLoad;
             }
             let r1: Ref = def(blks, phis, tmps, cons, ilog, sl, msk, bpi, InsIdx::NONE, &l);
@@ -451,16 +450,16 @@ fn def(
         // Maybe for phi's, QBE gets "to" from UPhi(p.to)
         ilog.push(Insert::new(
             TmpIdx::from(0), /*TODO*/
-            blks.borrow(bi).id,
+            blks[bi].id,
             InsertU::Phi(UPhi { m: *sl, pi }),
         ));
-        let preds_len = blks.borrow(bi).preds.len();
+        let preds_len = blks[bi].preds.len();
         for np in 0..preds_len {
-            let bpi: BlkIdx = blks.borrow(bi).preds[np];
+            let bpi: BlkIdx = blks[bi].preds[np];
             let l_type: LocT;
-            if blks.borrow(bpi).s2 == BlkIdx::NONE
+            if blks[bpi].s2 == BlkIdx::NONE
                 && il.typ != LocT::LNoLoad
-                && blks.borrow(bpi).loop_ < blks.borrow(il.bi).loop_
+                && blks[bpi].loop_ < blks[il.bi].loop_
             {
                 l_type = LocT::LLoad;
             } else {
@@ -469,7 +468,7 @@ fn def(
             let l: Loc = Loc {
                 typ: l_type,
                 bi: bpi,
-                off: InsIdx::from(blks.borrow(bpi).ins().len()),
+                off: InsIdx::from(blks[bpi].ins.len()),
             };
             let r1: Ref = def(
                 blks,
@@ -534,7 +533,7 @@ fn icmp(a: &Insert, b: &Insert) -> Ordering {
 
 /* require rpo ssa alias */
 pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
-    let blks: &[Blk] = &f.blks;
+    let blks: &mut [Blk] = &mut f.blks;
     let phis: &mut Vec<Phi> = &mut f.phis;
     let tmps: &mut Vec<Tmp> = &mut f.tmps;
     let cons: &mut Vec<Con> = &mut f.cons;
@@ -542,10 +541,10 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut ilog: Vec<Insert> = vec![];
 
     for_each_bi_mut(blks, |bi| {
-        let ins_len = blks.borrow(bi).ins().len();
+        let ins_len = blks[bi].ins.len();
         for iii in 0..ins_len {
             let i_arg1 = {
-                let i: Ins = blks.borrow(bi).ins()[iii]; // Note - copy
+                let i: Ins = blks[bi].ins[iii]; // Note - copy
                 if !isload(i.op) {
                     continue;
                 }
@@ -575,7 +574,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     &l,
                 )
             };
-            blks.borrow_mut(bi).ins_mut()[iii].args[1] = i_arg1;
+            blks[bi].ins[iii].args[1] = i_arg1;
         }
     });
     ilog.sort_by(icmp);
@@ -596,9 +595,9 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         let bi: BlkIdx = f.rpo[n];
         while ist.bid == n {
             if let InsertU::Phi(uphi) = &mut ist.new {
-                let pi = blks.borrow(bi).phi;
+                let pi = blks[bi].phi;
                 phis[uphi.pi].link = pi;
-                blks.borrow_mut(bi).phi = uphi.pi;
+                blks[bi].phi = uphi.pi;
             } else {
                 break;
             }
@@ -621,10 +620,10 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 isti += 1;
                 ist = &mut ilog[isti];
             } else {
-                if ni == InsIdx::from(blks.borrow(bi).ins().len()) {
+                if ni == InsIdx::from(blks[bi].ins.len()) {
                     break;
                 }
-                i = blks.borrow(bi).ins()[ni.0 as usize];
+                i = blks[bi].ins[ni];
                 ni = ni.next();
                 if isload(i.op) && i.args[1] != R {
                     // TODO same code in mem.rs
@@ -657,7 +656,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             ib.push(i);
         }
-        blks.borrow_mut(bi).ins = cell::RefCell::new(ib);
+        blks[bi].ins = ib;
         n = n.next();
     }
     if true

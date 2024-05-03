@@ -193,6 +193,14 @@ pub fn for_each_blk_mut(blks: &mut [Blk], mut f: impl FnMut(&mut Blk)) {
     }
 }
 
+pub fn for_each_blk(blks: &[Blk], mut f: impl FnMut(&Blk)) {
+    let mut bi = BlkIdx::START;
+    while bi != BlkIdx::NONE {
+        f(&mut blks[bi]);
+        bi = blks[bi].link;
+    }
+}
+
 // Typed index into blks, tmps, etc for type safety
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Idx<TagT: Eq + Copy>(pub u32, PhantomData<TagT>);

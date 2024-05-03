@@ -150,9 +150,9 @@ fn visitjmp(
     n: RpoIdx,
 ) {
     assert!(b.id == n); // ???
-    match b.jmp().typ {
+    match b.jmp.typ {
         J::Jjnz => {
-            let l: Lat = latval(val, b.jmp().arg);
+            let l: Lat = latval(val, b.jmp.arg);
             match l {
                 Lat::Bot => {
                     edge[n.usize() * 2 + 1].work = *flowrk;
@@ -178,7 +178,7 @@ fn visitjmp(
             *flowrk = EdgeIdx::from(n.usize() * 2);
         }
         J::Jhlt => (),
-        _ => assert!(isret(b.jmp().typ)),
+        _ => assert!(isret(b.jmp.typ)),
     }
 }
 
@@ -216,7 +216,7 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     //     int t, d;
     //     uint n, a;
 
-    let blks: &[Blk] = &f.blks;
+    let blks: &mut [Blk] = &mut f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let phis: &[Phi] = &f.phis;
     let tmps: &[Tmp] = &f.tmps;
@@ -236,10 +236,9 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut usewrk: Vec<(TmpIdx, u32 /*UseIdx*/)> = vec![];
 
     for n in 0..rpo.len() {
-        let (s1, s2) = blks.with_mut(rpo[n], |b| {
-            b.ivisit = 0;
-            (b.s1, b.s2)
-        });
+        let bi: BlkIdx = rpo[n];
+        blks[bi].ivisit = 0;
+        let (s1, s2) = (blks[bi].s1, blks[bi].s2);
         initedge(blks, &mut edge[n * 2], s1);
         initedge(blks, &mut edge[n * 2 + 1], s2);
     }
@@ -260,28 +259,24 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             e.dead = false;
             let n: RpoIdx = e.dest;
             let bi: BlkIdx = rpo[n];
-            let mut pi: PhiIdx = blks.phi_of(bi);
+            let mut pi: PhiIdx = blks[bi].phi;
             while pi != PhiIdx::NONE {
                 let p: &Phi = &phis[pi];
                 visitphi(blks, tmps, &mut usewrk, &mut val, &edge, p, n);
                 pi = p.link;
             }
-            if blks.ivisit_of(bi) == 0 {
-                blks.with(bi, |b| {
-                    for i in b.ins().iter() {
-                        visitins(tmps, cons, &mut usewrk, &mut val, i);
-                    }
-                    visitjmp(cons, &val, &mut edge, &mut flowrk, b, n);
-                });
+            if blks[bi].ivisit == 0 {
+                for i in &blks[bi].ins {
+                    visitins(tmps, cons, &mut usewrk, &mut val, i);
+                }
+                visitjmp(cons, &val, &mut edge, &mut flowrk, &blks[bi], n);
             }
-            blks.with_mut(bi, |b| {
-                b.ivisit += 1;
-                assert!(
-                    b.jmp.borrow().typ != J::Jjmp
-                        || !edge[n.usize() * 2].dead
-                        || flowrk.usize() == n.usize() * 2
-                );
-            });
+            blks[bi].ivisit += 1;
+            assert!(
+                blks[bi].jmp.typ != J::Jjmp
+                    || !edge[n.usize() * 2].dead
+                    || flowrk.usize() == n.usize() * 2
+            );
         } else {
             match usewrk.pop() {
                 None => break,
@@ -289,7 +284,7 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                     let u: &Use = &tmps[ti].uses[ui as usize];
                     let n: RpoIdx = u.bid;
                     let bi: BlkIdx = rpo[n];
-                    if blks.ivisit_of(bi) == 0 {
+                    if blks[bi].ivisit == 0 {
                         continue;
                     }
                     match u.typ {
@@ -297,14 +292,12 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                             visitphi(blks, tmps, &mut usewrk, &mut val, &edge, &phis[pi], n)
                         }
                         UseT::UIns(ii) => {
-                            blks.with(bi, |b| {
-                                visitins(tmps, cons, &mut usewrk, &mut val, &b.ins()[ii]);
-                            });
+                            // TODO - which bi - just changed this from bi to u.bi
+                            assert!(bi == u.bi);
+                            visitins(tmps, cons, &mut usewrk, &mut val, &blks[u.bi].ins[ii]);
                         }
                         UseT::UJmp => {
-                            blks.with(bi, |b| {
-                                visitjmp(cons, &val, &mut edge, &mut flowrk, b, n);
-                            });
+                            visitjmp(cons, &val, &mut edge, &mut flowrk, &blks[bi], n);
                         }
                         _ => {
                             // unreachable
@@ -352,29 +345,29 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut bi: BlkIdx = BlkIdx::START;
     //     for (pb=&f.start; (b=*pb);) {
     while bi != BlkIdx::NONE {
-        if blks.ivisit_of(bi) == 0 {
+        if blks[bi].ivisit == 0 {
             d = true;
             if true
             /*debug['F']*/
             {
                 /*e*/
-                print!("{} ", to_s(&blks.borrow(bi).name));
+                print!("{} ", to_s(&blks[bi].name));
             }
-            let succs = blks.succs_of(bi);
+            let succs = blks[bi].succs();
             for si in succs {
                 edgedel(blks, phis, bi, si);
             }
             if prev_bi == BlkIdx::NONE {
-                f.start = blks.borrow(bi).link;
+                f.start = blks[bi].link;
             } else {
-                blks.borrow_mut(prev_bi).link = blks.borrow(bi).link;
+                blks[prev_bi].link = blks[bi].link;
             }
-            bi = blks.borrow(bi).link;
+            bi = blks[bi].link;
             continue;
         }
-        let bid: RpoIdx = blks.id_of(bi);
+        let bid: RpoIdx = blks[bi].id;
         let mut prev_pi: PhiIdx = PhiIdx::NONE;
-        let mut pi: PhiIdx = blks.phi_of(bi);
+        let mut pi: PhiIdx = blks[bi].phi;
         while pi != PhiIdx::NONE {
             let p_to: Ref = phis[pi].to;
             let p_link: PhiIdx = phis[pi].link;
@@ -383,14 +376,14 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 if val[ti.usize()] != Lat::Bot {
                     // *pp = p.link;
                     if prev_pi == PhiIdx::NONE {
-                        blks.with_mut(bi, |b| b.phi = p_link);
+                        blks[bi].phi = p_link;
                     } else {
                         phis[prev_pi].link = p_link;
                     }
                 } else {
                     let p: &mut Phi = &mut phis[pi];
                     for a in 0..p.args.len() {
-                        if !deadedge(&edge, blks.id_of(p.blks[a]), bid) {
+                        if !deadedge(&edge, blks[p.blks[a]].id, bid) {
                             renref(&val, &mut p.args[a]);
                         }
                     }
@@ -399,7 +392,7 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             }
             pi = p_link;
         }
-        for i in blks.borrow(bi).ins_mut().iter_mut() {
+        for i in &mut blks[bi].ins {
             if renref(&val, &mut i.to) {
                 *i = Ins::NOP;
             } else {
@@ -411,10 +404,10 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 }
             }
         }
-        renref(&val, &mut blks.borrow(bi).jmp_mut().arg);
-        if blks.borrow(bi).jmp().typ == J::Jjnz {
+        renref(&val, &mut blks[bi].jmp.arg);
+        if blks[bi].jmp.typ == J::Jjnz {
             let maybe_ci: Option<ConIdx> = {
-                if let RCon(ci) = blks.borrow(bi).jmp().arg {
+                if let RCon(ci) = blks[bi].jmp.arg {
                     Some(ci)
                 } else {
                     None
@@ -424,23 +417,21 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 None => (), // nada
                 Some(ci) => {
                     if iscon(&cons[ci], false, 0) {
-                        let s1: BlkIdx = blks.borrow(bi).s1;
+                        let s1: BlkIdx = blks[bi].s1;
                         edgedel(blks, phis, bi, s1);
-                        blks.with_mut(bi, |b| {
-                            b.s1 = b.s2;
-                            b.s2 = BlkIdx::NONE;
-                        });
+                        blks[bi].s1 = blks[bi].s2;
+                        blks[bi].s2 = BlkIdx::NONE;
                     } else {
-                        let s2: BlkIdx = blks.borrow(bi).s2;
+                        let s2: BlkIdx = blks[bi].s2;
                         edgedel(blks, phis, bi, s2);
                     }
-                    blks.borrow(bi).jmp_mut().typ = J::Jjmp;
-                    blks.borrow(bi).jmp_mut().arg = R;
+                    blks[bi].jmp.typ = J::Jjmp;
+                    blks[bi].jmp.arg = R;
                 }
             }
         }
         prev_bi = bi;
-        bi = blks.borrow(bi).link;
+        bi = blks[bi].link;
     }
 
     if true

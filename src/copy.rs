@@ -4,8 +4,8 @@ use crate::all::Ref::{RCon, RTmp, R};
 use crate::all::TmpWdth::{Wsb, Wsh, Wsw, Wub, Wuh, Wuw};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{
-    bit, bshas, isext, kbase, to_s, BSet, Bits, Blk, BlkIdx, Con, Fn, Ins, Phi, PhiIdx, Ref,
-    RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, O, TMP0, UNDEF,
+    bit, bshas, for_each_blk_mut, isext, kbase, to_s, BSet, Bits, Blk, BlkIdx, Con, Fn, Ins, Phi,
+    PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, O, TMP0, UNDEF,
 };
 use crate::cfg::dom;
 use crate::parse::{printfn, printref};
@@ -93,16 +93,14 @@ fn phisimpl(
             Some(u) => {
                 match u.typ {
                     UseT::UIns(ii) => {
-                        blks.with(u.bi, |b| {
-                            let i: &Ins = &b.ins()[ii];
-                            if iscopy(tmps, cons, i, r) {
-                                p = p0;
-                                assert!(matches!(i.to, RTmp(_)));
-                                if let RTmp(ti0) = i.to {
-                                    ti = ti0;
-                                }
+                        let i: &Ins = &blks[u.bi].ins[ii];
+                        if iscopy(tmps, cons, i, r) {
+                            p = p0;
+                            assert!(matches!(i.to, RTmp(_)));
+                            if let RTmp(ti0) = i.to {
+                                ti = ti0;
                             }
-                        });
+                        }
                     }
                     UseT::UPhi(pi) => {
                         p = &phis[pi];
@@ -167,70 +165,69 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     /* 1. build the copy-of map */
     for n in 0..rpo.len() {
         let bi: BlkIdx = rpo[n];
-        blks.with(bi, |b| {
-            // println!("Building copy-map using @{}", to_s(&b.name));
-            let mut pi: PhiIdx = b.phi;
-            while pi != PhiIdx::NONE {
-                let p: &Phi = &phis[pi];
-                assert!(matches!(p.to, RTmp(_)));
-                // println!("  phi for {:?}", p.to);
-                if let RTmp(ti) = p.to {
-                    // println!("      it is for %{}", to_s(&tmps[ti].name));
-                    if cpy[ti.0 as usize] != R {
-                        // are we gonna allow TmpIdx indexing???
-                        // println!("        ... cpy is already {:?}", cpy[ti.0 as usize]);
-                        pi = p.link;
-                        continue;
-                    }
-                    let mut eq: usize = 0;
-                    let mut r: Ref = R;
-                    for a in 0..p.args.len() {
-                        let abi: BlkIdx = p.blks[a];
-                        let ab = blks.borrow(abi);
-                        if ab.id.usize() < n {
-                            let r1: Ref = copyof(p.args[a], &cpy);
-                            if r == R || r == UNDEF {
-                                r = r1;
-                            }
-                            if r1 == r || r1 == UNDEF {
-                                eq += 1;
-                            }
+        let b: &Blk = &blks[bi];
+        // println!("Building copy-map using @{}", to_s(&b.name));
+        let mut pi: PhiIdx = b.phi;
+        while pi != PhiIdx::NONE {
+            let p: &Phi = &phis[pi];
+            assert!(matches!(p.to, RTmp(_)));
+            // println!("  phi for {:?}", p.to);
+            if let RTmp(ti) = p.to {
+                // println!("      it is for %{}", to_s(&tmps[ti].name));
+                if cpy[ti.0 as usize] != R {
+                    // are we gonna allow TmpIdx indexing???
+                    // println!("        ... cpy is already {:?}", cpy[ti.0 as usize]);
+                    pi = p.link;
+                    continue;
+                }
+                let mut eq: usize = 0;
+                let mut r: Ref = R;
+                for a in 0..p.args.len() {
+                    let abi: BlkIdx = p.blks[a];
+                    let ab: &Blk = &blks[abi];
+                    if ab.id.usize() < n {
+                        let r1: Ref = copyof(p.args[a], &cpy);
+                        if r == R || r == UNDEF {
+                            r = r1;
+                        }
+                        if r1 == r || r1 == UNDEF {
+                            eq += 1;
                         }
                     }
-                    assert!(r != R);
-                    let mut rti: TmpIdx = TmpIdx::NONE;
-                    if let RTmp(rti0) = r {
-                        rti = rti0;
-                    }
-                    if rti != TmpIdx::NONE && !dom(blks, rpo[tmps[rti].bid], bi) {
-                        cpy[ti.usize()] = p.to;
-                    } else if eq == p.args.len() {
-                        cpy[ti.usize()] = r;
-                    } else {
-                        cpy[ti.usize()] = p.to;
-                        phisimpl(blks, tmps, phis, cons, pi, r, &mut cpy);
-                    }
                 }
-                pi = p.link;
-            }
-            for i in b.ins().iter() {
-                assert!(i.to == R || matches!(i.to, RTmp(_)));
-                if let RTmp(ti) = i.to {
-                    // println!("  ins for {:?} %{}", i.to, to_s(&tmps[ti].name));
-                    let r: Ref = copyof(i.args[0], &cpy);
-                    if iscopy(tmps, cons, i, r) {
-                        cpy[ti.usize()] = r;
-                    } else {
-                        cpy[ti.usize()] = i.to;
-                    }
+                assert!(r != R);
+                let mut rti: TmpIdx = TmpIdx::NONE;
+                if let RTmp(rti0) = r {
+                    rti = rti0;
+                }
+                if rti != TmpIdx::NONE && !dom(blks, rpo[tmps[rti].bid], bi) {
+                    cpy[ti.usize()] = p.to;
+                } else if eq == p.args.len() {
+                    cpy[ti.usize()] = r;
+                } else {
+                    cpy[ti.usize()] = p.to;
+                    phisimpl(blks, tmps, phis, cons, pi, r, &mut cpy);
                 }
             }
-        });
+            pi = p.link;
+        }
+        for i in &b.ins {
+            assert!(i.to == R || matches!(i.to, RTmp(_)));
+            if let RTmp(ti) = i.to {
+                // println!("  ins for {:?} %{}", i.to, to_s(&tmps[ti].name));
+                let r: Ref = copyof(i.args[0], &cpy);
+                if iscopy(tmps, cons, i, r) {
+                    cpy[ti.usize()] = r;
+                } else {
+                    cpy[ti.usize()] = i.to;
+                }
+            }
+        }
     }
 
     /* 2. remove redundant phis/copies
      * and rewrite their uses */
-    blks.for_each_mut(|b| {
+    for_each_blk_mut(blks, |b| {
         // println!("Copy elimination on @{}", to_s(&b.name));
         let mut ppi: PhiIdx = PhiIdx::NONE;
         let mut pi: PhiIdx = b.phi;
@@ -266,7 +263,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             ppi = pi;
             pi = p_link;
         }
-        for i in &mut b.ins_mut().iter_mut() {
+        for i in &mut b.ins {
             // Hrmmm, this only works for RTmp - what about QBE and void ops?
             // assert!(matches!(i.to, RTmp(_)));
             if let RTmp(ti) = i.to {
@@ -279,7 +276,7 @@ pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             subst(&mut i.args[0], &cpy);
             subst(&mut i.args[1], &cpy);
         }
-        subst(&mut b.jmp.borrow_mut().arg, &cpy);
+        subst(&mut b.jmp.arg, &cpy);
     });
 
     if true
