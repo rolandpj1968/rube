@@ -6,8 +6,9 @@ use std::io::stdout;
 use crate::all::Ref::{RTmp, R};
 use crate::all::K::{Kw, Kx};
 use crate::all::{
-    bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, InsIdx, Phi, PhiIdx, Ref, RpoIdx,
-    RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, K, O, TMP0, UNDEF,
+    bshas, for_each_bi, for_each_blk, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, InsIdx,
+    Phi, PhiIdx, Ref, RpoIdx, RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, K, O, TMP0,
+    UNDEF,
 };
 use crate::cfg::{dom, filldom, fillfron, sdom};
 use crate::live::filllive;
@@ -62,67 +63,66 @@ pub fn filluse(f: &mut Fn) {
         tmp.uses.clear();
     }
 
-    blks.for_each_bi(|bi| {
-        blks.with(bi, |b| {
-            let mut pi: PhiIdx = b.phi;
-            while pi != PhiIdx::NONE {
-                let p: &Phi = &phis[pi];
-                let cls = p.cls;
-                assert!(matches!(p.to, RTmp(_)));
-                if let RTmp(mut pti) = p.to {
-                    let tmp: &mut Tmp = &mut tmps[pti];
-                    tmp.bid = b.id;
-                    tmp.ndef += 1;
-                    tmp.cls = cls;
+    for_each_bi(blks, |bi| {
+        let b: &Blk = &blks[bi];
+        let mut pi: PhiIdx = b.phi;
+        while pi != PhiIdx::NONE {
+            let p: &Phi = &phis[pi];
+            let cls = p.cls;
+            assert!(matches!(p.to, RTmp(_)));
+            if let RTmp(mut pti) = p.to {
+                let tmp: &mut Tmp = &mut tmps[pti];
+                tmp.bid = b.id;
+                tmp.ndef += 1;
+                tmp.cls = cls;
 
-                    pti = phicls(pti, tmps);
-                    for a in &p.args {
-                        if let RTmp(mut ati) = a {
-                            adduse(&mut tmps[ati], UseT::UPhi(pi), bi, b.id);
-                            ati = phicls(ati, tmps);
-                            if ati != pti {
-                                tmps[ati].phi = pti;
-                            }
+                pti = phicls(pti, tmps);
+                for a in &p.args {
+                    if let RTmp(mut ati) = a {
+                        adduse(&mut tmps[ati], UseT::UPhi(pi), bi, b.id);
+                        ati = phicls(ati, tmps);
+                        if ati != pti {
+                            tmps[ati].phi = pti;
                         }
                     }
                 }
-                pi = p.link;
             }
+            pi = p.link;
+        }
 
-            for (ii, i) in b.ins().iter().enumerate() {
-                assert!(i.to == R || matches!(i.to, RTmp(_)));
-                if let RTmp(ti) = i.to {
-                    let mut w: TmpWdth = TmpWdth::WFull;
-                    if isparbh(i.op) {
-                        w = TmpWdth::from_parbh(i.op);
-                    } else if isload(i.op) && i.op != O::Oload {
-                        w = TmpWdth::from_loadbh(i.op);
-                    } else if isext(i.op) {
-                        w = TmpWdth::from_ext(i.op);
-                    }
-                    if w == TmpWdth::Wsw || w == TmpWdth::Wuw {
-                        if i.cls == Kw {
-                            w = TmpWdth::WFull;
-                        }
-                    }
-                    let tmp: &mut Tmp = &mut tmps[ti];
-                    tmp.width = w;
-                    tmp.def = InsIdx::from(ii);
-                    tmp.bid = b.id;
-                    tmp.ndef += 1;
-                    tmp.cls = i.cls;
+        for (ii, i) in b.ins.iter().enumerate() {
+            assert!(i.to == R || matches!(i.to, RTmp(_)));
+            if let RTmp(ti) = i.to {
+                let mut w: TmpWdth = TmpWdth::WFull;
+                if isparbh(i.op) {
+                    w = TmpWdth::from_parbh(i.op);
+                } else if isload(i.op) && i.op != O::Oload {
+                    w = TmpWdth::from_loadbh(i.op);
+                } else if isext(i.op) {
+                    w = TmpWdth::from_ext(i.op);
                 }
-                for arg in i.args {
-                    if let RTmp(ti) = arg {
-                        adduse(&mut tmps[ti], UseT::UIns(InsIdx::from(ii)), bi, b.id);
+                if w == TmpWdth::Wsw || w == TmpWdth::Wuw {
+                    if i.cls == Kw {
+                        w = TmpWdth::WFull;
                     }
                 }
+                let tmp: &mut Tmp = &mut tmps[ti];
+                tmp.width = w;
+                tmp.def = InsIdx::from(ii);
+                tmp.bid = b.id;
+                tmp.ndef += 1;
+                tmp.cls = i.cls;
             }
+            for arg in i.args {
+                if let RTmp(ti) = arg {
+                    adduse(&mut tmps[ti], UseT::UIns(InsIdx::from(ii)), bi, b.id);
+                }
+            }
+        }
 
-            if let RTmp(ti) = b.jmp().arg {
-                adduse(&mut tmps[ti], UseT::UJmp, bi, b.id);
-            }
-        });
+        if let RTmp(ti) = b.jmp.arg {
+            adduse(&mut tmps[ti], UseT::UJmp, bi, b.id);
+        }
     });
 }
 
@@ -141,7 +141,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
     let be: usize = blks.len();
     let nt: usize = tmps.len();
     assert!(f.start == BlkIdx::START);
-    let start_id: RpoIdx = blks.id_of(BlkIdx::START);
+    let start_id: RpoIdx = blks[BlkIdx::START].id;
     for tii in TMP0..nt {
         let ti: TmpIdx = TmpIdx::from(tii);
         {
@@ -165,64 +165,60 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         assert!(f.start == BlkIdx::START);
         let mut bi = BlkIdx::START;
         while bi != BlkIdx::NONE {
-            blks.with_mut(bi, |b| {
-                b.ivisit = 0;
-                let mut r: Ref = R;
-                for i in b.ins_mut().iter_mut() {
-                    if r != R {
-                        for arg in &mut i.args {
-                            if *arg == rt {
-                                *arg = r;
-                            }
-                        }
-                    }
-                    if i.to == rt {
-                        if !bshas(&b.out, ti.usize()) {
-                            r = refindex(tmps, ti);
-                            i.to = r;
-                        } else {
-                            if !bshas(&u, b.id.usize()) {
-                                bsset(&mut u, b.id.usize());
-                                bp -= 1;
-                                blist[bp] = bi;
-                            }
-                            if clsmerge(&mut k, i.cls) {
-                                // TODO - better msg
-                                return Err(Box::new(SsaError::new("invalid input")));
-                            }
+            let b: &mut Blk = &mut blks[bi];
+            b.ivisit = 0;
+            let mut r: Ref = R;
+            for i in b.ins.iter_mut() {
+                if r != R {
+                    for arg in &mut i.args {
+                        if *arg == rt {
+                            *arg = r;
                         }
                     }
                 }
-                if r != R && b.jmp().arg == rt {
-                    b.jmp_mut().arg = r;
+                if i.to == rt {
+                    if !bshas(&b.out, ti.usize()) {
+                        r = refindex(tmps, ti);
+                        i.to = r;
+                    } else {
+                        if !bshas(&u, b.id.usize()) {
+                            bsset(&mut u, b.id.usize());
+                            bp -= 1;
+                            blist[bp] = bi;
+                        }
+                        if clsmerge(&mut k, i.cls) {
+                            // TODO - better msg
+                            return Err(Box::new(SsaError::new("invalid input")));
+                        }
+                    }
                 }
-                bi = b.link;
-
-                Ok(())
-            })?;
+            }
+            if r != R && b.jmp.arg == rt {
+                b.jmp.arg = r;
+            }
+            bi = b.link;
         }
         let defs: BSet = u.clone();
         while bp != be {
             tmps[ti].tvisit = ti;
             let bi: BlkIdx = blist[bp];
             bp += 1;
-            bsclr(&mut u, blks.borrow(bi).id.usize());
-            let frons_len = blks.borrow(bi).frons.len();
+            bsclr(&mut u, blks[bi].id.usize());
+            let frons_len = blks[bi].frons.len();
             for n in 0..frons_len {
-                let ai: BlkIdx = blks.borrow(bi).frons[n];
-                blks.with_mut(ai, |a| {
-                    a.ivisit += 1;
-                    if a.ivisit == 1 && bshas(&a.in_, ti.usize()) {
-                        let pi: PhiIdx = PhiIdx::from(phis.len());
-                        phis.push(Phi::new(rt, vec![], vec![], k, a.phi));
-                        a.phi = pi;
-                        if !bshas(&defs, a.id.usize()) && !bshas(&u, a.id.usize()) {
-                            bsset(&mut u, a.id.usize());
-                            bp -= 1;
-                            blist[bp] = ai;
-                        }
+                let ai: BlkIdx = blks[bi].frons[n];
+                let a: &mut Blk = &mut blks[ai];
+                a.ivisit += 1;
+                if a.ivisit == 1 && bshas(&a.in_, ti.usize()) {
+                    let pi: PhiIdx = PhiIdx::from(phis.len());
+                    phis.push(Phi::new(rt, vec![], vec![], k, a.phi));
+                    a.phi = pi;
+                    if !bshas(&defs, a.id.usize()) && !bshas(&u, a.id.usize()) {
+                        bsset(&mut u, a.id.usize());
+                        bp -= 1;
+                        blist[bp] = ai;
                     }
-                });
+                }
             }
         }
     }
@@ -324,43 +320,42 @@ fn renblk(
     names: &mut Vec<Name>,
     stk: &mut [NameIdx],
 ) {
-    blks.with(bi, |b| {
-        let mut pi = b.phi;
-        while pi != PhiIdx::NONE {
-            let to: Ref = phis[pi].to;
-            let to_new = rendef(tmps, bi, to, namel, names, stk);
-            phis[pi].to = to_new;
+    let b: &Blk = &blks[bi];
+    let mut pi = b.phi;
+    while pi != PhiIdx::NONE {
+        let to: Ref = phis[pi].to;
+        let to_new = rendef(tmps, bi, to, namel, names, stk);
+        phis[pi].to = to_new;
 
-            pi = phis[pi].link;
-        }
-        let ins_len = b.ins().len();
-        for ii in 0..ins_len {
-            for m in 0..2 {
-                let arg = b.ins()[ii].args[m];
-                if let RTmp(ti) = arg {
-                    if tmps[ti].tvisit != TmpIdx::NONE {
-                        let new_arg = getstk(blks, bi, ti, namel, names, stk);
-                        b.ins_mut()[ii].args[m] = new_arg;
-                    }
+        pi = phis[pi].link;
+    }
+    let ins_len = b.ins.len();
+    for ii in 0..ins_len {
+        for m in 0..2 {
+            let arg = b.ins[ii].args[m];
+            if let RTmp(ti) = arg {
+                if tmps[ti].tvisit != TmpIdx::NONE {
+                    let new_arg = getstk(blks, bi, ti, namel, names, stk);
+                    b.ins[ii].args[m] = new_arg;
                 }
             }
-            let to: Ref = b.ins()[ii].to;
-            b.ins_mut()[ii].to = rendef(tmps, bi, to, namel, names, stk);
         }
-        let jmp_arg: Ref = b.jmp().arg;
-        if let RTmp(ti) = jmp_arg {
-            if tmps[ti].tvisit != TmpIdx::NONE {
-                b.jmp_mut().arg = getstk(blks, bi, ti, namel, names, stk);
-            }
+        let to: Ref = b.ins[ii].to;
+        b.ins[ii].to = rendef(tmps, bi, to, namel, names, stk);
+    }
+    let jmp_arg: Ref = b.jmp.arg;
+    if let RTmp(ti) = jmp_arg {
+        if tmps[ti].tvisit != TmpIdx::NONE {
+            b.jmp.arg = getstk(blks, bi, ti, namel, names, stk);
         }
-    });
+    }
 
-    let succs = blks.succs_of(bi);
+    let succs = blks[bi].succs();
     for si in succs {
         if si == BlkIdx::NONE {
             continue;
         }
-        let mut pi: PhiIdx = blks.phi_of(si);
+        let mut pi: PhiIdx = blks[si].phi;
         while pi != PhiIdx::NONE {
             let p: &mut Phi = &mut phis[pi];
             assert!(matches!(p.to, RTmp(_)));
@@ -376,10 +371,10 @@ fn renblk(
         }
     }
 
-    let mut si: BlkIdx = blks.dom_of(bi);
+    let mut si: BlkIdx = blks[bi].dom;
     while si != BlkIdx::NONE {
         renblk(blks, phis, tmps, si, namel, names, stk);
-        si = blks.dlink_of(si);
+        si = blks[si].dlink;
     }
 }
 
@@ -395,13 +390,13 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
         // TODO obviously
         /*e*/
         println!("\n> Dominators:");
-        f.blks.for_each(|b1| {
+        for_each_blk(&f.blks, |b1| {
             if b1.dom != BlkIdx::NONE {
                 /*e*/
                 print!("{:>10}:", to_s(&b1.name));
                 let mut bi: BlkIdx = b1.dom;
                 while bi != BlkIdx::NONE {
-                    let b = f.blks.borrow(bi);
+                    let b: &Blk = &f.blks[bi];
                     /*e*/
                     print!(" {}", to_s(&b.name));
                     bi = b.dlink;
@@ -454,7 +449,7 @@ fn phicheck(blks: &[Blk], p: &Phi, bi: BlkIdx, t: Ref) -> bool {
 
 /* require use and ssa */
 pub fn ssacheck(f: &Fn) -> RubeResult<()> {
-    let blks = &f.blks;
+    let blks: &[Blk] = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let phis: &[Phi] = &f.phis;
     let tmps: &[Tmp] = &f.tmps;
@@ -474,64 +469,61 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
     assert!(f.start == BlkIdx::START);
     let mut bi: BlkIdx = BlkIdx::START;
     while bi != BlkIdx::NONE {
-        blks.with(bi, |b| {
-            let mut pi: PhiIdx = b.phi;
-            while pi != PhiIdx::NONE {
-                let p: &Phi = &phis[pi];
-                let r: Ref = p.to;
-                let ti: TmpIdx = if let RTmp(ti0) = r {
-                    ti0
-                } else {
-                    return Err(Box::new(SsaError::new(&format!(
-                        "phi does not define a temporary in @{}",
-                        to_s(&b.name)
-                    ))));
-                };
-                let t: &Tmp = &tmps[ti];
-                for u in &t.uses {
-                    let bui: BlkIdx = rpo[u.bid];
+        let b: &Blk = &blks[bi];
+        let mut pi: PhiIdx = b.phi;
+        while pi != PhiIdx::NONE {
+            let p: &Phi = &phis[pi];
+            let r: Ref = p.to;
+            let ti: TmpIdx = if let RTmp(ti0) = r {
+                ti0
+            } else {
+                return Err(Box::new(SsaError::new(&format!(
+                    "phi does not define a temporary in @{}",
+                    to_s(&b.name)
+                ))));
+            };
+            let t: &Tmp = &tmps[ti];
+            for u in &t.uses {
+                let bui: BlkIdx = rpo[u.bid];
 
-                    if let UseT::UPhi(upi) = u.typ {
-                        if phicheck(blks, &phis[upi], bi, r) {
-                            return Err(ssacheck_err(f, t, bui));
-                        }
-                    } else {
-                        if bui != bi && !sdom(blks, bi, bui) {
-                            return Err(ssacheck_err(f, t, bui));
-                        }
+                if let UseT::UPhi(upi) = u.typ {
+                    if phicheck(blks, &phis[upi], bi, r) {
+                        return Err(ssacheck_err(f, t, bui));
+                    }
+                } else {
+                    if bui != bi && !sdom(blks, bi, bui) {
+                        return Err(ssacheck_err(f, t, bui));
                     }
                 }
-                for (ii, i) in b.ins().iter().enumerate() {
-                    if let RTmp(ti) = i.to {
-                        let t: &Tmp = &tmps[ti];
-                        for u in &t.uses {
-                            let bui: BlkIdx = rpo[u.bid];
-                            match u.typ {
-                                UseT::UPhi(upi) => {
-                                    if phicheck(blks, &phis[upi], bi, r) {
-                                        return Err(ssacheck_err(f, t, bui));
-                                    }
+            }
+            for (ii, i) in b.ins.iter().enumerate() {
+                if let RTmp(ti) = i.to {
+                    let t: &Tmp = &tmps[ti];
+                    for u in &t.uses {
+                        let bui: BlkIdx = rpo[u.bid];
+                        match u.typ {
+                            UseT::UPhi(upi) => {
+                                if phicheck(blks, &phis[upi], bi, r) {
+                                    return Err(ssacheck_err(f, t, bui));
                                 }
-                                UseT::UIns(uii) => {
-                                    if bui == bi && uii.0 <= (ii as u32) {
-                                        return Err(ssacheck_err(f, t, bui));
-                                    }
+                            }
+                            UseT::UIns(uii) => {
+                                if bui == bi && uii.0 <= (ii as u32) {
+                                    return Err(ssacheck_err(f, t, bui));
                                 }
-                                _ => {
-                                    if bui != bi && !sdom(blks, bi, bui) {
-                                        return Err(ssacheck_err(f, t, bui));
-                                    }
+                            }
+                            _ => {
+                                if bui != bi && !sdom(blks, bi, bui) {
+                                    return Err(ssacheck_err(f, t, bui));
                                 }
                             }
                         }
                     }
                 }
-                pi = p.link;
             }
-            bi = b.link;
-
-            Ok(())
-        })?;
+            pi = p.link;
+        }
+        bi = b.link;
     }
     Ok(())
 }

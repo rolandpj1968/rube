@@ -560,8 +560,7 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             if sl[si].si == SlotIdx::from(si) {
                 continue;
             }
-            blks.with_mut(t_def_bi, |b| b.ins[t_def_ii] = Ins::NOP);
-            //f.blk_mut(t_def_bi).ins[t_def_ii.0 as usize] = Ins::NOP;
+            blks[t_def_bi].ins[t_def_ii] = Ins::NOP;
             let ssi: SlotIdx = sl[si].si;
             let ssti: TmpIdx = sl[ssi.0 as usize].ti;
             let (ts_def_ii, ts_bid) = {
@@ -574,13 +573,10 @@ pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                  * selected has a def that
                  * dominates its new uses
                  */
-                blks.with_mut(t_def_bi, |b| {
-                    let tsi: Ins = /*f.blk(t_def_bi)*/b.ins[ts_def_ii]; // Note copy
-                                                                        /*f.blk_mut(t_def_bi)*/
-                    b.ins[t_def_ii] = tsi;
-                    /*f.blk_mut(t_def_bi)*/
-                    b.ins[ts_def_ii] = Ins::NOP;
-                });
+                let b: &mut Blk = &mut blks[t_def_bi];
+                let tsi: Ins = b.ins[ts_def_ii]; // Note copy
+                b.ins[t_def_ii] = tsi;
+                b.ins[ts_def_ii] = Ins::NOP;
                 tmps[ssti].def = t_def_ii;
             }
             for ui in 0..tmps[sti].uses.len() {
