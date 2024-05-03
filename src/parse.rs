@@ -1301,28 +1301,29 @@ impl Parser<'_> {
 
         let blks: &[Blk] = &f.blks;
         let phis: &[Phi] = &f.phis;
+        let tmps: &mut [Tmp] = &mut f.tmps;
 
+        assert!(f.start == BlkIdx::START);
         let mut bi: BlkIdx = f.start;
         while bi != BlkIdx::NONE {
-            let mut pi: PhiIdx = f.blk(bi).phi;
+            let b: &Blk = &blks[bi];
+            let mut pi: PhiIdx = b.phi;
             while pi != PhiIdx::NONE {
-                if let RTmp(ti) = f.phis[pi].to {
-                    f.tmps[ti].cls = f.phis[pi].cls;
+                let p: &Phi = &phis[pi];
+                if let RTmp(ti) = p.to {
+                    tmps[ti].cls = p.cls;
                 } else {
                     return Err(self.err(&format!(
                         "phi to val is not a tmp in block {}",
-                        to_s(&f.blk(bi).name)
+                        to_s(&b.name)
                     )));
                 }
-                pi = f.phis[pi].link;
+                pi = p.link;
             }
-            let ins_len = f.blk(bi).ins.len();
-            for ii in 0..ins_len {
-                let i: Ins = f.blk(bi).ins[ii]; // Note - copy
+            for i in &b.ins {
                 if let RTmp(ti) = i.to {
-                    let ins_cls: K = i.cls;
-                    let t: &mut Tmp = &mut f.tmps[ti];
-                    if clsmerge(&mut t.cls, ins_cls) {
+                    let t: &mut Tmp = &mut tmps[ti];
+                    if clsmerge(&mut t.cls, i.cls) {
                         return Err(self.err(&format!(
                             "temporary %{} is assigned with multiple types",
                             to_s(&t.name)
@@ -1330,31 +1331,33 @@ impl Parser<'_> {
                     }
                 }
             }
-            bi = f.blk(bi).link;
+            bi = b.link;
         }
+
+        let tmps: &[Tmp] = &f.tmps;
 
         bi = f.start;
         while bi != BlkIdx::NONE {
-            let b = f.blk(bi);
+            let b: &Blk = &blks[bi];
 
-            let mut pb: BSet = bsinit(f.blks.len());
+            let mut pb: BSet = bsinit(blks.len());
 
             for pred_bi in &b.preds {
                 bsset(&mut pb, pred_bi.usize());
             }
             let mut pi = b.phi;
             while pi != PhiIdx::NONE {
-                let p: &Phi = &f.phis[pi];
+                let p: &Phi = &phis[pi];
                 if let RTmp(ti) = p.to {
-                    let t: &Tmp = &f.tmps[ti];
+                    let t: &Tmp = &tmps[ti];
                     let k: K = t.cls;
-                    let mut ppb: BSet = bsinit(f.blks.len());
-                    for n in 0..f.phis[pi].args.len() {
+                    let mut ppb: BSet = bsinit(blks.len());
+                    for n in 0..phis[pi].args.len() {
                         let pbi: BlkIdx = p.blks[n];
                         if bshas(&ppb, pbi.usize()) {
                             return Err(self.err(&format!(
                                 "multiple entries for @{} in phi %{}",
-                                to_s(&f.blk(pbi).name),
+                                to_s(&blks[pbi].name),
                                 to_s(&t.name)
                             )));
                         }
@@ -1364,7 +1367,7 @@ impl Parser<'_> {
                             if let RTmp(ti) = argr {
                                 return Err(self.err(&format!(
                                     "invalid type for operand %{} in phi %{}",
-                                    to_s(&f.tmps[ti].name),
+                                    to_s(&tmps[ti].name),
                                     to_s(&t.name)
                                 )));
                             } else {
@@ -1381,15 +1384,15 @@ impl Parser<'_> {
                         )));
                     }
 
-                    pi = f.phis[pi].link;
+                    pi = phis[pi].link;
                 } else {
                     // Already checked above that p.to is an RTmp
                     assert!(false);
                 }
             }
-            for i in b.ins.iter() {
+            for i in &b.ins {
                 for n in 0..2 {
-                    let op: &Op = &OPTAB[i.op as usize];
+                    let op: &Op = &OPTAB[i.op];
                     let k: K = op.argcls[n][i.cls as usize];
                     let r: Ref = i.args[n];
                     if k == Ke {
@@ -1417,6 +1420,7 @@ impl Parser<'_> {
                     }
                     if !usecheck(f, r, k) {
                         // Must be a RTmp if usecheck() fails
+                        assert!(matches!(r, RTmp(_)));
                         if let RTmp(ti) = r {
                             return Err(self.err(&format!(
                                 "invalid type for {} operand %{} in {}",
@@ -1424,8 +1428,6 @@ impl Parser<'_> {
                                 to_s(&f.tmps[ti].name),
                                 to_s(op.name)
                             )));
-                        } else {
-                            assert!(false);
                         }
                     }
                 }
@@ -1434,7 +1436,6 @@ impl Parser<'_> {
             let mut goto_jerr: bool = false;
             let r: Ref = b.jmp.arg;
             if isret(b.jmp.typ) {
-                // This must succeed after isret()
                 // TODO - QBE handling of jret0 seems odd
                 if b.jmp.typ != J::Jret0 {
                     let k: K = cls_for_ret(b.jmp.typ).unwrap();
@@ -1443,36 +1444,32 @@ impl Parser<'_> {
                     }
                 }
             }
-            if b.jmp.typ == J::Jjnz && !usecheck(f, r, Kw) {
+            if !goto_jerr && b.jmp.typ == J::Jjnz && !usecheck(f, r, Kw) {
                 goto_jerr = true;
             }
             if goto_jerr {
                 // Must be RTmp after usecheck() failure
+                assert!(matches!(r, RTmp(_)));
                 if let RTmp(ti) = r {
                     return Err(self.err(&format!(
                         "invalid type for jump argument %{} in block @{}",
-                        to_s(&f.tmps[ti].name),
+                        to_s(&tmps[ti].name),
                         to_s(&b.name)
                     )));
-                } else {
-                    assert!(false);
                 }
             }
 
-            if b.s1 != BlkIdx::NONE && f.blk(b.s1).jmp.typ == J::Jxxx {
-                return Err(self.err(&format!(
-                    "block @{} is used undefined",
-                    to_s(&f.blk(b.s1).name)
-                )));
-            }
-            if b.s2 != BlkIdx::NONE && f.blk(b.s2).jmp.typ == J::Jxxx {
-                return Err(self.err(&format!(
-                    "block @{} is used undefined",
-                    to_s(&f.blk(b.s2).name)
-                )));
+            let succs = b.succs();
+            for si in succs {
+                if si != BlkIdx::NONE && blks[si].jmp.typ == J::Jxxx {
+                    return Err(self.err(&format!(
+                        "block @{} is used undefined",
+                        to_s(&blks[si].name)
+                    )));
+                }
             }
 
-            bi = f.blk(bi).link;
+            bi = b.link;
         }
 
         Ok(())
