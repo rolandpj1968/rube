@@ -36,19 +36,17 @@ pub fn edgedel(blks: &mut [Blk], phis: &mut [Phi], bsi: BlkIdx, bdi: BlkIdx) {
 }
 
 pub fn fillpreds(f: &mut Fn) {
-    for_each_blk_mut(&mut f.blks, |b| b.preds.clear());
     let blks: &mut [Blk] = &mut f.blks;
+    for_each_blk_mut(blks, |b| b.preds.clear());
     assert!(f.start == BlkIdx::START);
-    let mut bi: BlkIdx = BlkIdx::START;
-    while bi != BlkIdx::NONE {
+    loop_bi!(blks, bi, {
         let succs = blks[bi].succs();
         succs.iter().for_each(|si| {
             if *si != BlkIdx::NONE {
                 blks[si].preds.push(bi);
             }
         });
-        bi = blks[bi].link;
-    }
+    });
 }
 
 fn rporec(blks: &mut [Blk], bi: BlkIdx, mut x: RpoIdx) -> RpoIdx {
@@ -124,13 +122,12 @@ pub fn fillrpo(f: &mut Fn) {
     let rpo: &mut [BlkIdx] = &mut f.rpo;
     let mut prev_bi = BlkIdx::NONE;
     assert!(f.start == BlkIdx::START);
-    let mut bi: BlkIdx = BlkIdx::START;
-    while bi != BlkIdx::NONE {
-        let (id, succs, link) = (blks[bi].id, blks[bi].succs(), blks[bi].link);
-        if id == RpoIdx::NONE {
+    loop_bi!(blks, bi, {
+        if blks[bi].id == RpoIdx::NONE {
             // Unreachable Blk
+            let succs = blks[bi].succs();
             succs.iter().for_each(|si| edgedel(blks, phis, bi, *si));
-            blks[prev_bi].link = link;
+            blks[prev_bi].link = blks[bi].link;
             blks[bi].is_dead = true;
         } else {
             let b: &mut Blk = &mut blks[bi];
@@ -138,8 +135,7 @@ pub fn fillrpo(f: &mut Fn) {
             rpo[b.id] = bi;
             prev_bi = bi;
         }
-        bi = blks[bi].link;
-    }
+    });
 }
 
 /* for dominators computation, read
@@ -168,10 +164,9 @@ pub fn filldom(f: &mut Fn) {
     let rpo: &[BlkIdx] = &f.rpo;
 
     for_each_blk_mut(blks, |b| {
-        b.idom = BlkIdx::NONE;
-        b.dom = BlkIdx::NONE;
-        b.dlink = BlkIdx::NONE;
+        (b.idom, b.dom, b.dlink) = (BlkIdx::NONE, BlkIdx::NONE, BlkIdx::NONE);
     });
+
     loop {
         let mut ch: u32 = 0;
         for bi in rpo.iter().skip(1) {
@@ -193,17 +188,16 @@ pub fn filldom(f: &mut Fn) {
             break;
         }
     }
+
     assert!(f.start == BlkIdx::START);
-    let mut bi = BlkIdx::START;
-    while bi != BlkIdx::NONE {
+    loop_bi!(blks, bi, {
         let di: BlkIdx = blks[bi].idom;
         if di != BlkIdx::NONE {
             assert!(di != bi);
             blks[bi].dlink = blks[di].dom;
             blks[di].dom = bi;
         }
-        bi = blks[bi].link;
-    }
+    });
 }
 
 pub fn sdom(blks: &[Blk], b1i: BlkIdx, mut b2i: BlkIdx) -> bool {
@@ -242,12 +236,10 @@ pub fn fillfron(f: &mut Fn) {
     let blks: &mut [Blk] = &mut f.blks;
     for_each_blk_mut(blks, |b| b.frons.clear());
     assert!(f.start == BlkIdx::START);
-    let mut bi = BlkIdx::START;
-    while bi != BlkIdx::NONE {
+    loop_bi!(blks, bi, {
         let succs = blks[bi].succs();
         succs.iter().for_each(|si| fillfron_for_succ(blks, bi, *si));
-        bi = blks[bi].link;
-    }
+    });
 }
 
 fn loopmark(blks: &mut [Blk], hdi: BlkIdx, bi: BlkIdx, func: fn(&mut [Blk], BlkIdx, BlkIdx)) {

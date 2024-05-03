@@ -60,3 +60,14 @@ macro_rules! def_enum_index {
 //         }
 //     };
 // }
+
+// Helper for iterating over Blk::link chain
+macro_rules! loop_bi {
+    ($blks:expr, $bi:ident, $block:block) => {
+        let mut $bi = BlkIdx::START;
+        while $bi != BlkIdx::NONE {
+            $block
+            $bi = ($blks)[$bi].link;
+        }
+    };
+}
