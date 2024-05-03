@@ -12,9 +12,9 @@ use strum_macros::{EnumIter, FromRepr};
 use crate::all::Ref::{RCall, RCon, RInt, RMem, RSlot, RTmp, RTyp, R};
 use crate::all::K::{Kc, Kd, Ke, Kl, Ks, Ksb, Ksh, Kub, Kuh, Kw, Kx, K0};
 use crate::all::{
-    bshas, cls_for_ret, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConIdx, ConPP, Dat, DatT,
-    DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx, RubeResult, Sym, SymT, Target, Tmp,
-    TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0,
+    bshas, cls_for_ret, for_each_blk_mut, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConIdx,
+    ConPP, Dat, DatT, DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx, RubeResult, Sym, SymT,
+    Target, Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -1298,6 +1298,10 @@ fn usecheck(f: &Fn, r: Ref, k: K) -> bool {
 impl Parser<'_> {
     fn typecheck(&self, f: &mut Fn) -> RubeResult<()> {
         fillpreds(f);
+
+        let blks: &[Blk] = &f.blks;
+        let phis: &[Phi] = &f.phis;
+
         let mut bi: BlkIdx = f.start;
         while bi != BlkIdx::NONE {
             let mut pi: PhiIdx = f.blk(bi).phi;
@@ -1479,7 +1483,6 @@ impl Parser<'_> {
         self.insb.clear(); // TODO would prefer Ins's on Blk's...
         let mut curf = Fn::new(lnk.clone());
         for i in 0..(TMP0 as u32) {
-            /* TODO jus use usize for targ.fpr0 etc. */
             if self.targ.fpr0 <= i && i < self.targ.fpr0 + self.targ.nfpr {
                 // Ugh, returns Ref
                 let _ = newtmpref(b"", false, Kd, &mut curf);
@@ -1495,7 +1498,7 @@ impl Parser<'_> {
         )); /* UNDEF */
         curf.cons
             .push(Con::CAddr(Sym::new(SymT::SGlo, InternId::INVALID), 0)); /* CON_Z - crash */
-        curf.lnk = lnk.clone();
+        // curf.lnk = lnk.clone(); dup
 
         self.blink = BlkIdx::NONE;
 
@@ -1526,12 +1529,9 @@ impl Parser<'_> {
 
         curf.nblk = curf.blks.len() as u32;
 
-        let mut bi = curf.start;
-        while bi != BlkIdx::NONE {
-            let b = curf.blk_mut(bi);
-            b.dlink = BlkIdx::NONE;
-            bi = b.link;
-        }
+        assert!(curf.start == BlkIdx::START);
+        for_each_blk_mut(&mut curf.blks, |b| b.dlink = BlkIdx::NONE);
+
         for i in 0..BMASK + 1 {
             self.blkh[i as usize] = BlkIdx::NONE;
         }

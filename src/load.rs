@@ -541,8 +541,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     let mut ilog: Vec<Insert> = vec![];
 
     assert!(f.start == BlkIdx::START);
-    let mut bi = BlkIdx::START;
-    while bi != BlkIdx::NONE {
+    loop_bi!(blks, bi, {
         let ins_len = blks[bi].ins.len();
         for iii in 0..ins_len {
             let i_arg1 = {
@@ -578,8 +577,7 @@ pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
             };
             blks[bi].ins[iii].args[1] = i_arg1;
         }
-        bi = blks[bi].link;
-    }
+    });
     ilog.sort_by(icmp);
     let sentinal_ins = Ins::new0(O::Oxxx, Kx, R);
     /* add a sentinel */

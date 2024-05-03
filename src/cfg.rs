@@ -81,31 +81,6 @@ fn rporec(blks: &mut [Blk], bi: BlkIdx, mut x: RpoIdx) -> RpoIdx {
     x.prev()
 }
 
-// use crate::all::to_s;
-// fn printlives(start: BlkIdx, blks: &[Blk]) {
-//     //let blks = &f.blks;
-//     println!("live blocks according to is_dead");
-//     blks.for_each_bi(|bi| {
-//         println!(
-//             "    {:?} id {} {}",
-//             bi,
-//             blks[bi].id.0,
-//             to_s(&blks.borrow(bi).name)
-//         );
-//     });
-//     println!("live blocks according to link");
-//     let mut bi = start;
-//     while bi != BlkIdx::NONE {
-//         println!(
-//             "    {:?} id {} {}",
-//             bi,
-//             blks[bi].id.0,
-//             to_s(&blks.borrow(bi).name)
-//         );
-//         bi = blks.borrow(bi).link;
-//     }
-// }
-
 /* fill the reverse post-order (rpo) information */
 pub fn fillrpo(f: &mut Fn) {
     let blks: &mut [Blk] = &mut f.blks;

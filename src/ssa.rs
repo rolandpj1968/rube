@@ -163,12 +163,11 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
         let mut bp: usize = be;
         let rt: Ref = RTmp(ti);
         assert!(f.start == BlkIdx::START);
-        let mut bi = BlkIdx::START;
-        while bi != BlkIdx::NONE {
+        loop_bi!(blks, bi, {
             let b: &mut Blk = &mut blks[bi];
             b.ivisit = 0;
             let mut r: Ref = R;
-            for i in b.ins.iter_mut() {
+            for i in &mut b.ins {
                 if r != R {
                     for arg in &mut i.args {
                         if *arg == rt {
@@ -196,8 +195,7 @@ fn phiins(f: &mut Fn) -> RubeResult<()> {
             if r != R && b.jmp.arg == rt {
                 b.jmp.arg = r;
             }
-            bi = b.link;
-        }
+        });
         let defs: BSet = u.clone();
         while bp != be {
             tmps[ti].tvisit = ti;
@@ -467,8 +465,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
         }
     }
     assert!(f.start == BlkIdx::START);
-    let mut bi: BlkIdx = BlkIdx::START;
-    while bi != BlkIdx::NONE {
+    loop_bi!(blks, bi, {
         let b: &Blk = &blks[bi];
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
@@ -523,8 +520,7 @@ pub fn ssacheck(f: &Fn) -> RubeResult<()> {
             }
             pi = p.link;
         }
-        bi = b.link;
-    }
+    });
     Ok(())
 }
 

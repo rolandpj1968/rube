@@ -5,6 +5,7 @@ macro_rules! def_index {
     ($idxt:ty, $colt:ty, $valt:ty) => {
         impl Index<$idxt> for $colt {
             type Output = $valt;
+            #[inline]
             fn index(&self, index: $idxt) -> &Self::Output {
                 debug_assert!(index != <$idxt>::NONE);
                 self.index(index.0 as usize)
@@ -12,6 +13,7 @@ macro_rules! def_index {
         }
         impl Index<&$idxt> for $colt {
             type Output = $valt;
+            #[inline]
             fn index(&self, index: &$idxt) -> &Self::Output {
                 debug_assert!(*index != <$idxt>::NONE);
                 self.index(index.0 as usize)
@@ -24,12 +26,14 @@ macro_rules! def_index {
 macro_rules! def_index_mut {
     ($idxt:ty, $colt:ty, $valt:ty) => {
         impl IndexMut<$idxt> for $colt {
+            #[inline]
             fn index_mut(&mut self, index: $idxt) -> &mut Self::Output {
                 debug_assert!(index != <$idxt>::NONE);
                 self.index_mut(index.0 as usize)
             }
         }
         impl IndexMut<&$idxt> for $colt {
+            #[inline]
             fn index_mut(&mut self, index: &$idxt) -> &mut Self::Output {
                 debug_assert!(*index != <$idxt>::NONE);
                 self.index_mut(index.0 as usize)

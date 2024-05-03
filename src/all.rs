@@ -24,30 +24,6 @@ pub fn to_s(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).to_string()
 }
 
-pub fn for_each_bi(blks: &[Blk], mut f: impl FnMut(BlkIdx)) {
-    let mut bi = BlkIdx::START;
-    while bi != BlkIdx::NONE {
-        f(bi);
-        bi = blks[bi].link;
-    }
-}
-
-pub fn for_each_blk_mut(blks: &mut [Blk], mut f: impl FnMut(&mut Blk)) {
-    let mut bi = BlkIdx::START;
-    while bi != BlkIdx::NONE {
-        f(&mut blks[bi]);
-        bi = blks[bi].link;
-    }
-}
-
-pub fn for_each_blk(blks: &[Blk], mut f: impl FnMut(&Blk)) {
-    let mut bi = BlkIdx::START;
-    while bi != BlkIdx::NONE {
-        f(&blks[bi]);
-        bi = blks[bi].link;
-    }
-}
-
 // Typed index into blks, tmps, etc for type safety
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Idx<TagT: Eq + Copy>(pub u32, PhantomData<TagT>);
@@ -1081,6 +1057,25 @@ impl Fn {
         self.cons.push(c);
         ci
     }
+}
+
+// Helpers for iterating through Blk::link chain
+pub fn for_each_bi(blks: &[Blk], mut f: impl FnMut(BlkIdx)) {
+    loop_bi!(blks, bi, {
+        f(bi);
+    });
+}
+
+pub fn for_each_blk_mut(blks: &mut [Blk], mut f: impl FnMut(&mut Blk)) {
+    loop_bi!(blks, bi, {
+        f(&mut blks[bi]);
+    });
+}
+
+pub fn for_each_blk(blks: &[Blk], mut f: impl FnMut(&Blk)) {
+    loop_bi!(blks, bi, {
+        f(&blks[bi]);
+    });
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

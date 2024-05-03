@@ -345,9 +345,7 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
         /* 2. trim dead code, replace constants */
         assert!(f.start == BlkIdx::START);
         let mut prev_bi = BlkIdx::NONE;
-        let mut bi: BlkIdx = BlkIdx::START;
-        //     for (pb=&f.start; (b=*pb);) {
-        while bi != BlkIdx::NONE {
+        loop_bi!(blks, bi, {
             if blks[bi].ivisit == 0 {
                 d = true;
                 if true
@@ -434,8 +432,7 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
                 }
             }
             prev_bi = bi;
-            bi = blks[bi].link;
-        }
+        });
     }
 
     if true
