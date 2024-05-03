@@ -239,8 +239,8 @@ fn fillfron_for_succ(blks: &mut [Blk], bi: BlkIdx, si: BlkIdx) {
 
 /* fill the dominance frontier */
 pub fn fillfron(f: &mut Fn) {
-    f.for_each_blk_mut(|b| b.frons.clear());
     let blks: &mut [Blk] = &mut f.blks;
+    for_each_blk_mut(blks, |b| b.frons.clear());
     assert!(f.start == BlkIdx::START);
     let mut bi = BlkIdx::START;
     while bi != BlkIdx::NONE {

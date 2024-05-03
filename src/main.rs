@@ -77,7 +77,7 @@ fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     ssacheck(f).unwrap();
     copy(f, typ, itbl);
     filluse(f);
-    fold(f, typ, itbl);
+    // fold(f, typ, itbl);
 
     printfn(&mut stdout(), f, typ, itbl);
 }

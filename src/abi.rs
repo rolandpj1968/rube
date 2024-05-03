@@ -1,4 +1,4 @@
-use crate::all::{isargbh, isparbh, isretbh, Fn, J, O};
+use crate::all::{for_each_blk_mut, isargbh, isparbh, isretbh, Fn, J, O};
 
 /* eliminate sub-word abi op
  * variants for targets that
@@ -8,7 +8,7 @@ use crate::all::{isargbh, isparbh, isretbh, Fn, J, O};
  */
 // TODO - f now does now need to be mut here (interior mutability)
 pub fn elimsb(f: &mut Fn) {
-    f.for_each_blk_mut(|b| {
+    for_each_blk_mut(&mut f.blks, |b| {
         for i in &mut b.ins {
             if isargbh(i.op) {
                 i.op = O::Oarg;

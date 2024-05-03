@@ -1,6 +1,6 @@
 use crate::all::Ref::{RCon, RInt, RTmp, RTyp, R};
 use crate::all::{
-    astack, bit, for_each_bi, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, Blk, BlkIdx,
+    astack, bit, for_each_blk, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, Blk, BlkIdx,
     CanAlias, Con, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
 };
 
@@ -272,8 +272,8 @@ pub fn fillalias(f: &mut Fn) {
             esc(tmps, jmp_arg);
         }
     }
-    for_each_bi(blks, |bi| {
-        let mut pi: PhiIdx = blks[bi].phi;
+    for_each_blk(blks, |b| {
+        let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             p.args.iter().for_each(|arg| esc(tmps, *arg));

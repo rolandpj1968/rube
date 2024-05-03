@@ -53,7 +53,7 @@ pub fn filluse(f: &mut Fn) {
     let tmps: &mut [Tmp] = &mut f.tmps;
 
     /* todo, is this the correct file? */
-    for tmp in tmps.iter_mut().skip(TMP0 as usize) {
+    for tmp in tmps.iter_mut().skip(TMP0) {
         tmp.def = InsIdx::NONE;
         tmp.bid = RpoIdx::NONE;
         tmp.ndef = 0;
