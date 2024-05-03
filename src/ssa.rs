@@ -532,7 +532,7 @@ fn ssacheck_err(f: &Fn, t: &Tmp, bui: BlkIdx) -> Box<SsaError> {
             format!(
                 "ssa temporary %{} is used undefined in @{}",
                 to_s(&t.name),
-                to_s(&f.blk(bui).name)
+                to_s(&f.blks[bui].name)
             )
         }
     }))

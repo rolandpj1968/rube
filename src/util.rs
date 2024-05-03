@@ -500,9 +500,8 @@ pub fn newtmp2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> TmpIdx {
     }
 
     let ti: TmpIdx = TmpIdx::from(tmps.len());
-    tmps.push(Tmp::new(name, /*slot*/ -1, /*cls*/ k));
+    tmps.push(Tmp::new(name, /*cls*/ k));
     ti
-    //fn_.add_tmp(Tmp::new(name, /*slot*/ -1, /*cls*/ k))
 }
 
 pub fn newtmpref2(tmps: &mut Vec<Tmp>, prfx: &[u8], sufx: bool, k: K) -> Ref {

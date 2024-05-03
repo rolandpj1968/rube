@@ -488,9 +488,6 @@ pub fn isretbh(j: J) -> bool {
 #[derive(Clone, Copy, Debug, FromRepr, PartialEq, PartialOrd)]
 #[repr(i8)]
 pub enum K {
-    // Duplicated here from Kbase cos optab etc. uses the everythings.
-    // This is going to cause grief?
-    // Really want to extend KBase
     Kx = -1, /* "top" class (see usecheck() and clsmerge()) */
     Kw = 0,
     Kl,
@@ -670,26 +667,6 @@ impl Blk {
         }
     }
 
-    // pub fn with_ins<R>(&self, f: impl FnOnce(&[Ins]) -> R) -> R {
-    //     f(&*self.ins.borrow())
-    // }
-
-    // pub fn ins(&self) -> cell::Ref<Vec<Ins>> {
-    //     self.ins.borrow()
-    // }
-
-    // pub fn ins_mut(&self) -> cell::RefMut<Vec<Ins>> {
-    //     self.ins.borrow_mut()
-    // }
-
-    // pub fn jmp(&self) -> cell::Ref<BlkJmp> {
-    //     self.jmp.borrow()
-    // }
-
-    // pub fn jmp_mut(&self) -> cell::RefMut<BlkJmp> {
-    //     self.jmp.borrow_mut()
-    // }
-
     pub fn succs(&self) -> [BlkIdx; 2] {
         [
             self.s1,
@@ -699,10 +676,6 @@ impl Blk {
                 self.s2
             },
         ]
-    }
-
-    pub fn s1_s2(&self) -> (BlkIdx, BlkIdx) {
-        (self.s1, self.s2)
     }
 }
 
@@ -733,7 +706,7 @@ def_index_mut!(RpoIdx, Vec<BlkIdx>, BlkIdx);
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum UseT {
-    UXXX,
+    Uxxx,
     UPhi(PhiIdx),
     UIns(InsIdx),
     UJmp,
@@ -883,15 +856,15 @@ pub struct Tmp {
 }
 
 impl Tmp {
-    pub fn new(name: Vec<u8>, /*ndef: u32, nuse: u32,*/ slot: i32, cls: K) -> Tmp {
+    pub fn new(name: Vec<u8>, cls: K) -> Tmp {
         Tmp {
             name,
             def: InsIdx::NONE, // ??? QBE sets ndef to 1 initially in parse.c
-            uses: vec![Use::new(UseT::UXXX, BlkIdx::NONE, RpoIdx::NONE)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
+            uses: vec![Use::new(UseT::Uxxx, BlkIdx::NONE, RpoIdx::NONE)], // QBE sets nuse to 1 initially in parse.c - probs not necessary
             ndef: 1, // TODO??? QBE sets ndef to 1 initially in parse.c
             bid: RpoIdx::NONE,
 
-            slot,
+            slot: -1,
             cls,
             phi: TmpIdx::NONE, // QBE inits to 0 in newtmp()
             alias: Alias::default(),
@@ -980,7 +953,7 @@ pub struct Lnk {
 pub struct Fn {
     pub blks: Vec<Blk>,
     pub phis: Vec<Phi>,
-    pub start: BlkIdx,
+    pub start: BlkIdx, // Always 0
     pub tmps: Vec<Tmp>,
     pub cons: Vec<Con>,
     pub mems: Vec<Mem>,
@@ -1018,26 +991,10 @@ impl Fn {
         }
     }
 
-    pub fn blk(&self, bi: BlkIdx) -> &Blk {
-        &self.blks[bi]
-    }
-
-    pub fn blk_mut(&mut self, bi: BlkIdx) -> &mut Blk {
-        &mut self.blks[bi]
-    }
-
     pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
         let bi: BlkIdx = BlkIdx::from(self.blks.len());
         self.blks.push(b);
         bi
-    }
-
-    pub fn set_blk_link(&mut self, from_bi: BlkIdx, to_bi: BlkIdx) {
-        if from_bi == BlkIdx::NONE {
-            self.start = to_bi;
-        } else {
-            self.blk_mut(from_bi).link = to_bi;
-        }
     }
 
     pub fn add_phi(&mut self, p: Phi) -> PhiIdx {
