@@ -461,11 +461,62 @@ fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
                 None
             }
         }
-        (Con::CAddr(sym, off), Con::CBits(i, _)) | (Con::CBits(i, _), Con::CAddr(sym, off)) => {
+        (Con::CAddr(sym, off), Con::CBits(ri64, _)) => {
             if op == O::Oadd {
-                Some(Con::CAddr(sym, off + i))
+                Some(Con::CAddr(sym, off + ri64))
             } else {
                 None
+            }
+        }
+        (Con::CBits(li64, _), Con::CAddr(sym, off)) => {
+            if op == O::Oadd {
+                Some(Con::CAddr(sym, off + li64))
+            } else {
+                let lfs: f32 = f32::from_bits(li64 as u32);
+                let lfd: f64 = f64::from_bits(li64 as u64);
+                let lu64: u64 = li64 as u64;
+                let lu32: u32 = li64 as u32;
+                let li32: i32 = li64 as i32;
+                // Unary ops
+                let x: u64 = match op {
+                    O::Oneg => (-li64) as u64,
+                    O::Oextsb => lu64 as i8 as i64 as u64,
+                    O::Oextub => lu64 as u8 as u64,
+                    O::Oextsh => lu64 as i16 as i64 as u64,
+                    O::Oextuh => lu64 as u16 as u64,
+                    O::Oextsw => li32 as i64 as u64,
+                    O::Oextuw => lu32 as u64,
+                    O::Ostosi => (if w { lfs as i64 } else { lfs as i32 as i64 }) as u64,
+                    O::Ostoui => {
+                        if w {
+                            lfs as u64
+                        } else {
+                            lfs as u32 as u64
+                        }
+                    }
+                    O::Odtosi => (if w { lfd as i64 } else { lfd as i32 as i64 }) as u64,
+                    O::Odtoui => {
+                        if w {
+                            lfd as u64
+                        } else {
+                            lfd as u32 as u64
+                        }
+                    }
+                    O::Ocast => {
+                        lu64
+                        // TODO
+                        //     if (cl->type == CAddr) {
+                        //         typ = CAddr;
+                        //         sym = cl->sym;
+                        //     }
+                    }
+                    _ => {
+                        return None;
+                        // assert!(false); // unreachable
+                        // 0
+                    }
+                };
+                Some(Con::CBits(x as i64, ConPP::I))
             }
         }
         // TODO - unary operators are going to be caught by the above, and incorrectly
@@ -495,7 +546,6 @@ fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
             let x: u64 = match op {
                 O::Oadd => lu64.wrapping_add(ru64),
                 O::Osub => lu64.wrapping_sub(ru64),
-                O::Oneg => (-li64) as u64,
                 O::Odiv => (if w { li64 / ri64 } else { (li32 / ri32) as i64 }) as u64,
                 O::Orem => (if w { li64 % ri64 } else { (li32 % ri32) as i64 }) as u64,
                 O::Oudiv => {
@@ -519,36 +569,6 @@ fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
                 O::Osar => ((if w { li64 } else { li32 as i64 }) >> (ru64 & shmask)) as u64,
                 O::Oshr => (if w { lu64 } else { lu32 as u64 }) >> (ru64 & shmask),
                 O::Oshl => lu64.wrapping_shl((ru64 & shmask) as u32),
-                O::Oextsb => lu64 as i8 as i64 as u64,
-                O::Oextub => lu64 as i8 as u64,
-                O::Oextsh => lu64 as i16 as i64 as u64,
-                O::Oextuh => lu64 as u16 as u64,
-                O::Oextsw => li32 as i64 as u64,
-                O::Oextuw => lu32 as u64,
-                O::Ostosi => (if w { lfs as i64 } else { lfs as i32 as i64 }) as u64,
-                O::Ostoui => {
-                    if w {
-                        lfs as u64
-                    } else {
-                        lfs as u32 as u64
-                    }
-                }
-                O::Odtosi => (if w { lfd as i64 } else { lfd as i32 as i64 }) as u64,
-                O::Odtoui => {
-                    if w {
-                        lfd as u64
-                    } else {
-                        lfd as u32 as u64
-                    }
-                }
-                O::Ocast => {
-                    lu64
-                    // TODO
-                    //     if (cl->type == CAddr) {
-                    //         typ = CAddr;
-                    //         sym = cl->sym;
-                    //     }
-                }
                 _ => {
                     if OCMPW <= op && op <= OCMPL1 {
                         let cmpi: CmpI;
