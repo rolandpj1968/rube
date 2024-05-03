@@ -7,8 +7,8 @@ use crate::alias::{alias, escapes};
 use crate::all::Ref::{RCon, RInt, RTmp, R};
 use crate::all::K::{Kd, Kl, Ks, Kw, Kx};
 use crate::all::{
-    bit, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, BlkIdx, Blks, CanAlias, Con, Fn, Ins,
-    InsIdx, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, K, O,
+    bit, for_each_bi_mut, isload, isstore, kwide, Alias, AliasT, AliasU, Bits, Blk, BlkIdx,
+    CanAlias, Con, Fn, Ins, InsIdx, Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, K, O,
 };
 use crate::cfg::dom;
 use crate::parse::printfn;
@@ -98,7 +98,7 @@ pub fn storesz(s: &Ins) -> i32 {
 }
 
 fn iins(
-    blks: &Blks,
+    blks: &[Blk],
     tmps: &mut Vec<Tmp>,
     ilog: &mut Vec<Insert>,
     cls: K,
@@ -110,15 +110,11 @@ fn iins(
     let ti: TmpIdx = newtmp2(tmps, b"ld", true, cls);
     let to: Ref = RTmp(ti);
     let ins: Ins = Ins::new2(op, cls, to, [a0, a1]);
-    ilog.push(Insert::new(
-        ti,
-        blks.borrow(l.bi).id,
-        InsertU::Ins(l.off, ins),
-    ));
+    ilog.push(Insert::new(ti, blks[l.bi].id, InsertU::Ins(l.off, ins)));
     to
 }
 
-fn cast(blks: &Blks, tmps: &mut Vec<Tmp>, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
+fn cast(blks: &[Blk], tmps: &mut Vec<Tmp>, ilog: &mut Vec<Insert>, r: &mut Ref, cls: K, l: &Loc) {
     match *r {
         RCon(_) => (), /*ok*/
         RTmp(ti) => {
@@ -148,7 +144,7 @@ fn cast(blks: &Blks, tmps: &mut Vec<Tmp>, ilog: &mut Vec<Insert>, r: &mut Ref, c
 }
 
 fn mask(
-    blks: &Blks,
+    blks: &[Blk],
     tmps: &mut Vec<Tmp>,
     cons: &mut Vec<Con>,
     ilog: &mut Vec<Insert>,
@@ -163,7 +159,7 @@ fn mask(
 }
 
 fn load(
-    blks: &Blks,
+    blks: &[Blk],
     tmps: &mut Vec<Tmp>,
     cons: &mut Vec<Con>,
     ilog: &mut Vec<Insert>,
@@ -254,7 +250,7 @@ fn killsl(tmps: &[Tmp], r: Ref, sl: &Slice) -> bool {
  * otherwise, it has class sl.cls
  * the procedure returns R when it fails */
 fn def(
-    blks: &Blks,
+    blks: &[Blk],
     phis: &mut Vec<Phi>,
     tmps: &mut Vec<Tmp>,
     cons: &mut Vec<Con>,
@@ -538,14 +534,14 @@ fn icmp(a: &Insert, b: &Insert) -> Ordering {
 
 /* require rpo ssa alias */
 pub fn loadopt(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
-    let blks: &Blks = &f.blks;
+    let blks: &[Blk] = &f.blks;
     let phis: &mut Vec<Phi> = &mut f.phis;
     let tmps: &mut Vec<Tmp> = &mut f.tmps;
     let cons: &mut Vec<Con> = &mut f.cons;
 
     let mut ilog: Vec<Insert> = vec![];
 
-    blks.for_each_bi(|bi| {
+    for_each_bi_mut(blks, |bi| {
         let ins_len = blks.borrow(bi).ins().len();
         for iii in 0..ins_len {
             let i_arg1 = {

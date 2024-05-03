@@ -1,7 +1,6 @@
 // TODO remove eventually
 #![allow(dead_code, unused_variables)]
 
-use std::cell;
 //use std::iter::Map;
 use std::marker::PhantomData;
 use std::ops::{Index, IndexMut};
@@ -25,149 +24,174 @@ pub fn to_s(raw: &[u8]) -> String {
     String::from_utf8_lossy(raw).to_string()
 }
 
-pub struct RefCellVec<T> {
-    v: Vec<cell::RefCell<T>>,
-}
+// pub struct RefCellVec<T> {
+//     v: Vec<cell::RefCell<T>>,
+// }
 
-impl<T> RefCellVec<T> {
-    fn borrow_i(&self, i: usize) -> cell::Ref<T> {
-        self.v[i].borrow()
-    }
-    pub fn with_i<R>(&self, i: usize, f: impl FnOnce(&T) -> R) -> R {
-        f(&*self.borrow_i(i))
-    }
-    fn borrow_mut_i(&self, i: usize) -> cell::RefMut<T> {
-        self.v[i].borrow_mut()
-    }
-    pub fn with_mut_i<R>(&self, i: usize, f: impl FnOnce(&mut T) -> R) -> R {
-        f(&mut *self.borrow_mut_i(i))
-    }
-    pub fn len(&self) -> usize {
-        self.v.len()
-    }
-    fn add_i(&mut self, elem: T) -> usize {
-        self.v.push(cell::RefCell::new(elem));
-        self.len() - 1
-    }
-}
-
-pub type Blks = RefCellVec<Blk>;
-// Hrmmm, wants lifetime specifier?
-// pub type BlkRef = cell::Ref<Blk>;
-// pub type BlkRefMut = cell::RefMut<Blk>;
-
-// TODO - can do this on RefCellVec as generic on TagT
-impl Blks {
-    pub fn borrow(&self, bi: BlkIdx) -> cell::Ref<Blk> {
-        assert!(bi != BlkIdx::NONE);
-        self.borrow_i(bi.0 as usize)
-    }
-    pub fn with<R>(&self, bi: BlkIdx, f: impl FnOnce(&Blk) -> R) -> R {
-        assert!(bi != BlkIdx::NONE);
-        self.with_i(bi.0 as usize, f)
-    }
-    pub fn borrow_mut(&self, bi: BlkIdx) -> cell::RefMut<Blk> {
-        assert!(bi != BlkIdx::NONE);
-        self.borrow_mut_i(bi.0 as usize)
-    }
-    pub fn with_mut<R>(&self, bi: BlkIdx, f: impl FnOnce(&mut Blk) -> R) -> R {
-        assert!(bi != BlkIdx::NONE);
-        self.with_mut_i(bi.0 as usize, f)
-    }
-    pub fn add(&mut self, b: Blk) -> BlkIdx {
-        BlkIdx::from(self.add_i(b))
-    }
-    pub fn play(&self) -> std::slice::Iter<cell::RefCell<Blk>> {
-        self.v.iter()
-    }
-    // Hrmmmm, what type does map() return...
-    // pub fn iter_mut<R, F: FnMut(cell::RefMut<Blk>) -> R>(
-    //     &self,
-    // ) -> Map<std::slice::Iter<cell::RefCell<Blk>>, F> {
-    //     self.v
-    //         .iter()
-    //         .map::<std::slice::Iter<cell::RefCell<Blk>>, F>(|br: cell::RefCell<Blk>| {
-    //             br.borrow_mut()
-    //         })
-    // }
-    pub fn for_each_mut(&self, mut f: impl FnMut(&mut Blk)) {
-        let mut bi = BlkIdx::START;
-        while bi != BlkIdx::NONE {
-            let mut b = self.borrow_mut(bi);
-            f(&mut *b);
-            bi = b.link;
-        }
-        // TODO - this generates blks in a different order from the link chain :(
-        // Need to sort f.blks on link chain order to maintain behaviour parity with QBE
-        // self.v.iter().for_each(|br| {
-        //     let mut b = br.borrow_mut();
-        //     assert!(b.is_defined);
-        //     if !b.is_dead {
-        //         f(&mut *b)
-        //     }
-        // });
-    }
-
-    pub fn for_each(&self, mut f: impl FnMut(&Blk)) {
-        let mut bi = BlkIdx::START;
-        while bi != BlkIdx::NONE {
-            let b = self.borrow_mut(bi);
-            f(&*b);
-            bi = b.link;
-        }
-    }
-
-    pub fn for_each_bi(&self, mut f: impl FnMut(BlkIdx)) {
-        let mut bi = BlkIdx::START;
-        while bi != BlkIdx::NONE {
-            f(bi);
-            bi = self.borrow(bi).link;
-        }
-        // TODO - this generates blks in a different order from the link chain :(
-        // Need to sort f.blks on link chain order to maintain behaviour parity with QBE
-        // let len = self.len();
-        // for bii in 0..len {
-        //     let is_dead = self.v[bii].borrow().is_dead;
-        //     if !is_dead {
-        //         f(BlkIdx::new(bii));
-        //     }
-        // }
-    }
-
-    pub fn id_of(&self, bi: BlkIdx) -> RpoIdx {
-        self.borrow(bi).id
-    }
-    pub fn dom_of(&self, bi: BlkIdx) -> BlkIdx {
-        self.borrow(bi).dom
-    }
-    pub fn idom_of(&self, bi: BlkIdx) -> BlkIdx {
-        self.borrow(bi).idom
-    }
-    pub fn phi_of(&self, bi: BlkIdx) -> PhiIdx {
-        self.borrow(bi).phi
-    }
-    pub fn succs_of(&self, bi: BlkIdx) -> [BlkIdx; 2] {
-        self.borrow(bi).succs()
-    }
-    pub fn dlink_of(&self, bi: BlkIdx) -> BlkIdx {
-        self.borrow(bi).dlink
-    }
-    pub fn visit_of(&self, bi: BlkIdx) -> RpoIdx {
-        self.borrow(bi).visit
-    }
-    pub fn ivisit_of(&self, bi: BlkIdx) -> i32 {
-        self.borrow(bi).ivisit
-    }
-}
-
-// Hrmm, it's complaining about lifetime params - need more grokking, just use .borrow() for now
-// impl Index<BlkIdx> for Blks {
-//     type Output = cell::Ref<Blk>;
-//     fn index(&self, index: BlkIdx) -> &Self::Output {
-//         debug_assert!(index != BlkIdx::NONE);
-//         &self.borrow(index)
+// impl<T> RefCellVec<T> {
+//     fn borrow_i(&self, i: usize) -> cell::Ref<T> {
+//         self.v[i].borrow()
+//     }
+//     pub fn with_i<R>(&self, i: usize, f: impl FnOnce(&T) -> R) -> R {
+//         f(&*self.borrow_i(i))
+//     }
+//     fn borrow_mut_i(&self, i: usize) -> cell::RefMut<T> {
+//         self.v[i].borrow_mut()
+//     }
+//     pub fn with_mut_i<R>(&self, i: usize, f: impl FnOnce(&mut T) -> R) -> R {
+//         f(&mut *self.borrow_mut_i(i))
+//     }
+//     pub fn len(&self) -> usize {
+//         self.v.len()
+//     }
+//     fn add_i(&mut self, elem: T) -> usize {
+//         self.v.push(cell::RefCell::new(elem));
+//         self.len() - 1
 //     }
 // }
+
+// pub type Blks = RefCellVec<Blk>;
+// // Hrmmm, wants lifetime specifier?
+// // pub type BlkRef = cell::Ref<Blk>;
+// // pub type BlkRefMut = cell::RefMut<Blk>;
+
+// // TODO - can do this on RefCellVec as generic on TagT
+// impl Blks {
+//     pub fn borrow(&self, bi: BlkIdx) -> cell::Ref<Blk> {
+//         assert!(bi != BlkIdx::NONE);
+//         self.borrow_i(bi.0 as usize)
+//     }
+//     pub fn with<R>(&self, bi: BlkIdx, f: impl FnOnce(&Blk) -> R) -> R {
+//         assert!(bi != BlkIdx::NONE);
+//         self.with_i(bi.0 as usize, f)
+//     }
+//     pub fn borrow_mut(&self, bi: BlkIdx) -> cell::RefMut<Blk> {
+//         assert!(bi != BlkIdx::NONE);
+//         self.borrow_mut_i(bi.0 as usize)
+//     }
+//     pub fn with_mut<R>(&self, bi: BlkIdx, f: impl FnOnce(&mut Blk) -> R) -> R {
+//         assert!(bi != BlkIdx::NONE);
+//         self.with_mut_i(bi.0 as usize, f)
+//     }
+//     pub fn add(&mut self, b: Blk) -> BlkIdx {
+//         BlkIdx::from(self.add_i(b))
+//     }
+//     pub fn play(&self) -> std::slice::Iter<cell::RefCell<Blk>> {
+//         self.v.iter()
+//     }
+//     // Hrmmmm, what type does map() return...
+//     // pub fn iter_mut<R, F: FnMut(cell::RefMut<Blk>) -> R>(
+//     //     &self,
+//     // ) -> Map<std::slice::Iter<cell::RefCell<Blk>>, F> {
+//     //     self.v
+//     //         .iter()
+//     //         .map::<std::slice::Iter<cell::RefCell<Blk>>, F>(|br: cell::RefCell<Blk>| {
+//     //             br.borrow_mut()
+//     //         })
+//     // }
+//     pub fn for_each_mut(&self, mut f: impl FnMut(&mut Blk)) {
+//         let mut bi = BlkIdx::START;
+//         while bi != BlkIdx::NONE {
+//             let mut b = self.borrow_mut(bi);
+//             f(&mut *b);
+//             bi = b.link;
+//         }
+//         // TODO - this generates blks in a different order from the link chain :(
+//         // Need to sort f.blks on link chain order to maintain behaviour parity with QBE
+//         // self.v.iter().for_each(|br| {
+//         //     let mut b = br.borrow_mut();
+//         //     assert!(b.is_defined);
+//         //     if !b.is_dead {
+//         //         f(&mut *b)
+//         //     }
+//         // });
+//     }
+
+//     pub fn for_each(&self, mut f: impl FnMut(&Blk)) {
+//         let mut bi = BlkIdx::START;
+//         while bi != BlkIdx::NONE {
+//             let b = self.borrow_mut(bi);
+//             f(&*b);
+//             bi = b.link;
+//         }
+//     }
+
+//     pub fn for_each_bi(&self, mut f: impl FnMut(BlkIdx)) {
+//         let mut bi = BlkIdx::START;
+//         while bi != BlkIdx::NONE {
+//             f(bi);
+//             bi = self.borrow(bi).link;
+//         }
+//         // TODO - this generates blks in a different order from the link chain :(
+//         // Need to sort f.blks on link chain order to maintain behaviour parity with QBE
+//         // let len = self.len();
+//         // for bii in 0..len {
+//         //     let is_dead = self.v[bii].borrow().is_dead;
+//         //     if !is_dead {
+//         //         f(BlkIdx::new(bii));
+//         //     }
+//         // }
+//     }
+
+//     pub fn id_of(&self, bi: BlkIdx) -> RpoIdx {
+//         self.borrow(bi).id
+//     }
+//     pub fn dom_of(&self, bi: BlkIdx) -> BlkIdx {
+//         self.borrow(bi).dom
+//     }
+//     pub fn idom_of(&self, bi: BlkIdx) -> BlkIdx {
+//         self.borrow(bi).idom
+//     }
+//     pub fn phi_of(&self, bi: BlkIdx) -> PhiIdx {
+//         self.borrow(bi).phi
+//     }
+//     pub fn succs_of(&self, bi: BlkIdx) -> [BlkIdx; 2] {
+//         self.borrow(bi).succs()
+//     }
+//     pub fn dlink_of(&self, bi: BlkIdx) -> BlkIdx {
+//         self.borrow(bi).dlink
+//     }
+//     pub fn visit_of(&self, bi: BlkIdx) -> RpoIdx {
+//         self.borrow(bi).visit
+//     }
+//     pub fn ivisit_of(&self, bi: BlkIdx) -> i32 {
+//         self.borrow(bi).ivisit
+//     }
+// }
+
+// // Hrmm, it's complaining about lifetime params - need more grokking, just use .borrow() for now
+// // impl Index<BlkIdx> for Blks {
+// //     type Output = cell::Ref<Blk>;
+// //     fn index(&self, index: BlkIdx) -> &Self::Output {
+// //         debug_assert!(index != BlkIdx::NONE);
+// //         &self.borrow(index)
+// //     }
+// // }
+
+pub fn for_each_bi(blks: &[Blk], mut f: impl FnMut(BlkIdx)) {
+    let mut bi = BlkIdx::START;
+    while bi != BlkIdx::NONE {
+        f(bi);
+        bi = blks[bi].link;
+    }
+}
+
+pub fn for_each_bi_mut(blks: &mut [Blk], mut f: impl FnMut(BlkIdx)) {
+    let mut bi = BlkIdx::START;
+    while bi != BlkIdx::NONE {
+        f(bi);
+        bi = blks[bi].link;
+    }
+}
+
+// TODO - use this for Fn::for_each_mut()
+pub fn for_each_blk_mut(blks: &mut [Blk], mut f: impl FnMut(&mut Blk)) {
+    let mut bi = BlkIdx::START;
+    while bi != BlkIdx::NONE {
+        f(&mut blks[bi]);
+        bi = blks[bi].link;
+    }
+}
 
 // Typed index into blks, tmps, etc for type safety
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -760,9 +784,8 @@ impl BlkJmp {
 
 pub struct Blk {
     pub phi: PhiIdx,
-    // Behind a RefCell to get access mutably together with other fields.
-    pub ins: cell::RefCell<Vec<Ins>>,
-    pub jmp: cell::RefCell<BlkJmp>,
+    pub ins: Vec<Ins>,
+    pub jmp: BlkJmp,
     pub s1: BlkIdx,
     pub s2: BlkIdx,
     pub link: BlkIdx,
@@ -790,8 +813,8 @@ impl Blk {
     pub fn new(name: &[u8], id: RpoIdx, dlink: BlkIdx) -> Blk {
         Blk {
             phi: PhiIdx::NONE,
-            ins: cell::RefCell::new(vec![]),
-            jmp: cell::RefCell::new(BlkJmp::new()),
+            ins: vec![],
+            jmp: BlkJmp::new(),
             s1: BlkIdx::NONE,
             s2: BlkIdx::NONE,
             link: BlkIdx::NONE,
@@ -816,25 +839,25 @@ impl Blk {
         }
     }
 
-    pub fn with_ins<R>(&self, f: impl FnOnce(&[Ins]) -> R) -> R {
-        f(&*self.ins.borrow())
-    }
+    // pub fn with_ins<R>(&self, f: impl FnOnce(&[Ins]) -> R) -> R {
+    //     f(&*self.ins.borrow())
+    // }
 
-    pub fn ins(&self) -> cell::Ref<Vec<Ins>> {
-        self.ins.borrow()
-    }
+    // pub fn ins(&self) -> cell::Ref<Vec<Ins>> {
+    //     self.ins.borrow()
+    // }
 
-    pub fn ins_mut(&self) -> cell::RefMut<Vec<Ins>> {
-        self.ins.borrow_mut()
-    }
+    // pub fn ins_mut(&self) -> cell::RefMut<Vec<Ins>> {
+    //     self.ins.borrow_mut()
+    // }
 
-    pub fn jmp(&self) -> cell::Ref<BlkJmp> {
-        self.jmp.borrow()
-    }
+    // pub fn jmp(&self) -> cell::Ref<BlkJmp> {
+    //     self.jmp.borrow()
+    // }
 
-    pub fn jmp_mut(&self) -> cell::RefMut<BlkJmp> {
-        self.jmp.borrow_mut()
-    }
+    // pub fn jmp_mut(&self) -> cell::RefMut<BlkJmp> {
+    //     self.jmp.borrow_mut()
+    // }
 
     pub fn succs(&self) -> [BlkIdx; 2] {
         [
@@ -1124,7 +1147,7 @@ pub struct Lnk {
 }
 
 pub struct Fn {
-    pub blks: Blks,
+    pub blks: Vec<Blk>,
     pub phis: Vec<Phi>,
     pub start: BlkIdx,
     pub tmps: Vec<Tmp>,
@@ -1145,7 +1168,7 @@ pub struct Fn {
 impl Fn {
     pub fn new(lnk: Lnk) -> Fn {
         Fn {
-            blks: Blks { v: vec![] },
+            blks: vec![],
             phis: vec![], // TODO - should be on Blk
             start: BlkIdx::NONE,
             tmps: vec![],
@@ -1164,16 +1187,26 @@ impl Fn {
         }
     }
 
-    pub fn blk(&self, bi: BlkIdx) -> cell::Ref<Blk> {
-        self.blks.borrow(bi)
+    pub fn for_each_blk_mut(&mut self, mut f: impl FnMut(&mut Blk)) {
+        let mut bi = BlkIdx::START;
+        while bi != BlkIdx::NONE {
+            let b: &mut Blk = &mut self.blks[bi];
+            f(b);
+            bi = b.link;
+        }
+    }
+    pub fn blk(&self, bi: BlkIdx) -> &Blk {
+        &self.blks[bi]
     }
 
-    pub fn blk_mut(&self, bi: BlkIdx) -> cell::RefMut<Blk> {
-        self.blks.borrow_mut(bi)
+    pub fn blk_mut(&mut self, bi: BlkIdx) -> &mut Blk {
+        &mut self.blks[bi]
     }
 
     pub fn add_blk(&mut self, b: Blk) -> BlkIdx {
-        self.blks.add(b)
+        let bi: BlkIdx = BlkIdx::from(self.blks.len());
+        self.blks.push(b);
+        bi
     }
 
     pub fn set_blk_link(&mut self, from_bi: BlkIdx, to_bi: BlkIdx) {

@@ -8,8 +8,8 @@ use crate::alias::getalias;
 use crate::all::Ref::{RInt, RTmp, R};
 use crate::all::K::{Kl, Kx};
 use crate::all::{
-    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, BlkIdx, Blks,
-    Con, Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Typ, Use, UseT, CON_Z, J, K, NBIT, O,
+    bit, isarg, isload, isret, isstore, kbase, to_s, Alias, AliasT, AliasU, Bits, Blk, BlkIdx, Con,
+    Fn, Idx, Ins, InsIdx, Ref, RubeResult, Tmp, TmpIdx, Typ, Use, UseT, CON_Z, J, K, NBIT, O,
     OALLOC, OALLOC1, TMP0, UNDEF,
 };
 use crate::cfg::loopiter;
@@ -271,7 +271,7 @@ fn scmp(a: &Slot, b: &Slot) -> Ordering {
     a.r.a.cmp(&b.r.a)
 }
 
-fn maxrpo(blks: &Blks, hdi: BlkIdx, bi: BlkIdx) {
+fn maxrpo(blks: &[Blk], hdi: BlkIdx, bi: BlkIdx) {
     let b_id = blks.id_of(bi);
     blks.with_mut(hdi, |hd| {
         // Ugh, fixme
@@ -282,7 +282,7 @@ fn maxrpo(blks: &Blks, hdi: BlkIdx, bi: BlkIdx) {
 }
 
 pub fn coalesce(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
-    let blks: &Blks = &f.blks;
+    let blks: &[Blk] = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let nblk = rpo.len();
     assert!(nblk == f.nblk as usize);

@@ -1,7 +1,7 @@
 use crate::all::Ref::{RCon, RInt, RTmp, RTyp, R};
 use crate::all::{
-    astack, bit, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, BlkIdx, Blks, CanAlias,
-    Con, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
+    astack, bit, for_each_bi, isload, isstore, Alias, AliasLoc, AliasT, AliasU, Bits, Blk, BlkIdx,
+    CanAlias, Con, Fn, Ins, Phi, PhiIdx, Ref, Tmp, TmpIdx, J, NBIT, O, OALLOC, OALLOC1,
 };
 
 use crate::load::storesz;
@@ -165,7 +165,7 @@ fn store(tmps: &mut [Tmp], r: Ref, sz: i32) {
 }
 
 pub fn fillalias(f: &mut Fn) {
-    let blks: &Blks = &f.blks;
+    let blks: &[Blk] = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let tmps: &mut [Tmp] = &mut f.tmps;
     let cons: &[Con] = &f.cons;
@@ -175,7 +175,7 @@ pub fn fillalias(f: &mut Fn) {
 
     assert!(f.nblk as usize == rpo.len());
     for bi in rpo {
-        let b = blks.borrow(*bi);
+        let b: &Blk = &blks[bi];
         let mut pi: PhiIdx = b.phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
@@ -190,9 +190,8 @@ pub fn fillalias(f: &mut Fn) {
             }
             pi = p.link;
         }
-        let ins = b.ins();
-        for ii in 0..ins.len() {
-            let i: &Ins = &ins[ii];
+        for ii in 0..b.ins.len() {
+            let i: &Ins = &b.ins[ii];
 
             if i.op == O::Oblit1 {
                 // Already handled as part of preceding Oblit0
@@ -256,8 +255,8 @@ pub fn fillalias(f: &mut Fn) {
                 }
             }
             if i.op == O::Oblit0 {
-                assert!(ii < ins.len() - 1);
-                let blit1 = &ins[ii + 1];
+                assert!(ii < b.ins.len() - 1);
+                let blit1 = &b.ins[ii + 1];
                 assert!(blit1.op == O::Oblit1);
                 assert!(matches!(blit1.args[0], RInt(_)));
                 if let RInt(blit1_i) = blit1.args[0] {
@@ -268,13 +267,13 @@ pub fn fillalias(f: &mut Fn) {
                 store(tmps, i.args[1], storesz(&i));
             }
         }
-        if b.jmp().typ != J::Jretc {
-            let jmp_arg = b.jmp().arg;
+        if b.jmp.typ != J::Jretc {
+            let jmp_arg = b.jmp.arg;
             esc(tmps, jmp_arg);
         }
     }
-    blks.for_each_bi(|bi| {
-        let mut pi: PhiIdx = blks.phi_of(bi);
+    for_each_bi(blks, |bi| {
+        let mut pi: PhiIdx = blks[bi].phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             p.args.iter().for_each(|arg| esc(tmps, *arg));

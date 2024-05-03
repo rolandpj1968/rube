@@ -2,17 +2,17 @@ use std::io::stdout;
 
 use crate::all::Ref::{RCall, RMem, RTmp, R};
 use crate::all::{
-    bshas, kbase, to_s, BSet, Blk, BlkIdx, Blks, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target, Tmp, O,
+    bshas, kbase, to_s, BSet, Blk, BlkIdx, Fn, Ins, Mem, Phi, PhiIdx, Ref, Target, Tmp, O,
 };
 
 use crate::util::{bsclr, bscopy, bscount, bsequal, bsinit, bsiter, bsset, bsunion, dumpts};
 
 // Ugh, put phis on Blk
-fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
-    bscopy(v, &blks.borrow(si).in_);
+fn liveon(blks: &mut [Blk], phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
+    bscopy(v, &blks[si].in_);
 
     {
-        let mut pi: PhiIdx = blks.phi_of(si);
+        let mut pi: PhiIdx = blks[si].phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             if let RTmp(ti) = p.to {
@@ -22,7 +22,7 @@ fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
         }
     }
     {
-        let mut pi = blks.phi_of(si);
+        let mut pi = blks[si].phi;
         while pi != PhiIdx::NONE {
             let p: &Phi = &phis[pi];
             assert!(p.args.len() == p.blks.len());
@@ -30,7 +30,7 @@ fn liveon(blks: &Blks, phis: &[Phi], v: &mut BSet, bi: BlkIdx, si: BlkIdx) {
                 if p.blks[a] == bi {
                     if let RTmp(ati) = p.args[a] {
                         bsset(v, ati.usize());
-                        blks.with_mut(bi, |b| bsset(&mut b.gen, ati.usize()));
+                        bsset(&mut blks[bi].gen, ati.usize());
                     }
                 }
             }
@@ -53,7 +53,7 @@ fn bset(tmps: &[Tmp], r: Ref, b: &mut Blk, nlv: &mut [u32; 2]) {
  * requires rpo computation
  */
 pub fn filllive(f: &mut Fn, targ: &Target) {
-    let blks: &Blks = &f.blks;
+    let blks: &mut [Blk] = &mut f.blks;
     let phis: &[Phi] = &f.phis;
     let rpo: &[BlkIdx] = &f.rpo;
     let tmps: &[Tmp] = &f.tmps;
@@ -62,7 +62,7 @@ pub fn filllive(f: &mut Fn, targ: &Target) {
     let mut u: BSet = bsinit(tmps.len());
     let mut v: BSet = bsinit(tmps.len());
 
-    blks.for_each_mut(|b| {
+    f.for_each_blk_mut(|b| {
         b.in_ = bsinit(tmps.len());
         b.out = bsinit(tmps.len());
         b.gen = bsinit(tmps.len());

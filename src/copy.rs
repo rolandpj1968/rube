@@ -4,7 +4,7 @@ use crate::all::Ref::{RCon, RTmp, R};
 use crate::all::TmpWdth::{Wsb, Wsh, Wsw, Wub, Wuh, Wuw};
 use crate::all::K::{Kl, Kw, Kx};
 use crate::all::{
-    bit, bshas, isext, kbase, to_s, BSet, Bits, BlkIdx, Blks, Con, Fn, Ins, Phi, PhiIdx, Ref,
+    bit, bshas, isext, kbase, to_s, BSet, Bits, Blk, BlkIdx, Con, Fn, Ins, Phi, PhiIdx, Ref,
     RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, O, TMP0, UNDEF,
 };
 use crate::cfg::dom;
@@ -72,7 +72,7 @@ fn copyof(r: Ref, cpy: &[Ref]) -> Ref {
  * and Efficient SSA Construction" by Braun M. et al.
  */
 fn phisimpl(
-    blks: &Blks,
+    blks: &mut [Blk],
     tmps: &[Tmp],
     phis: &[Phi],
     cons: &[Con],
@@ -155,7 +155,7 @@ fn subst(pr: &mut Ref, cpy: &[Ref]) {
 
 /* requires use and dom, breaks use */
 pub fn copy(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
-    let blks: &Blks = &f.blks;
+    let blks: &mut [Blk] = &mut f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let phis: &mut [Phi] = &mut f.phis;
     let tmps: &[Tmp] = &f.tmps;

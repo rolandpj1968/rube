@@ -1,10 +1,10 @@
 use std::io::stdout;
 
 use crate::all::Ref::{RCon, RTmp, R};
-use crate::all::K::{Kd, Kl, Ks, Kw};
+use crate::all::K::{Kd, Kl, Kw};
 use crate::all::{
-    isret, isstore, kwide, to_s, Blk, BlkIdx, Blks, CmpF, CmpI, Con, ConIdx, ConPP, Fn, Idx, Ins,
-    Phi, PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, OCMPD, OCMPD1, OCMPL1, OCMPS,
+    isret, isstore, kwide, to_s, Blk, BlkIdx, CmpF, CmpI, Con, ConIdx, ConPP, Fn, Idx, Ins, Phi,
+    PhiIdx, Ref, RpoIdx, Tmp, TmpIdx, Typ, Use, UseT, J, K, O, OCMPD, OCMPD1, OCMPL1, OCMPS,
     OCMPS1, OCMPW, OCMPW1, TMP0, UNDEF,
 };
 use crate::cfg::edgedel;
@@ -94,7 +94,7 @@ fn deadedge(edge: &[Edge], s: RpoIdx, d: RpoIdx) -> bool {
 }
 
 fn visitphi(
-    blks: &Blks,
+    blks: &[Blk],
     tmps: &[Tmp],
     usewrk: &mut Vec<(TmpIdx, u32 /*UseIdx*/)>,
     val: &mut [Lat],
@@ -105,7 +105,7 @@ fn visitphi(
     let mut v: Lat = Lat::Top;
     assert!(p.args.len() == p.blks.len());
     for a in 0..p.args.len() {
-        if !deadedge(edge, blks.id_of(p.blks[a]), n) {
+        if !deadedge(edge, blks[p.blks[a]].id, n) {
             v = latmerge(v, latval(val, p.args[a]));
         }
     }
@@ -182,9 +182,9 @@ fn visitjmp(
     }
 }
 
-fn initedge(blks: &Blks, e: &mut Edge, s: BlkIdx) {
-    if s != BlkIdx::NONE {
-        e.dest = blks.borrow(s).id;
+fn initedge(blks: &[Blk], e: &mut Edge, si: BlkIdx) {
+    if si != BlkIdx::NONE {
+        e.dest = blks[si].id;
     } else {
         e.dest = RpoIdx::NONE;
     }
@@ -216,7 +216,7 @@ pub fn fold(f: &mut Fn, typ: &[Typ], itbl: &[Bucket]) {
     //     int t, d;
     //     uint n, a;
 
-    let blks: &Blks = &f.blks;
+    let blks: &[Blk] = &f.blks;
     let rpo: &[BlkIdx] = &f.rpo;
     let phis: &[Phi] = &f.phis;
     let tmps: &[Tmp] = &f.tmps;
@@ -503,8 +503,20 @@ fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
                 O::Oneg => (-li64) as u64,
                 O::Odiv => (if w { li64 / ri64 } else { (li32 / ri32) as i64 }) as u64,
                 O::Orem => (if w { li64 % ri64 } else { (li32 % ri32) as i64 }) as u64,
-                O::Oudiv => (if w { lu64 / ru64 } else { (lu32 / ru32) as u64 }),
-                O::Ourem => (if w { lu64 % ru64 } else { (lu32 % ru32) as u64 }),
+                O::Oudiv => {
+                    if w {
+                        lu64 / ru64
+                    } else {
+                        (lu32 / ru32) as u64
+                    }
+                }
+                O::Ourem => {
+                    if w {
+                        lu64 % ru64
+                    } else {
+                        (lu32 % ru32) as u64
+                    }
+                }
                 O::Omul => lu64.wrapping_mul(ru64),
                 O::Oand => lu64 & ru64,
                 O::Oor => lu64 | ru64,
@@ -519,9 +531,21 @@ fn foldint(op: O, w: bool, cl: &Con, cr: &Con) -> Option<Con> {
                 O::Oextsw => li32 as i64 as u64,
                 O::Oextuw => lu32 as u64,
                 O::Ostosi => (if w { lfs as i64 } else { lfs as i32 as i64 }) as u64,
-                O::Ostoui => (if w { lfs as u64 } else { lfs as u32 as u64 }),
+                O::Ostoui => {
+                    if w {
+                        lfs as u64
+                    } else {
+                        lfs as u32 as u64
+                    }
+                }
                 O::Odtosi => (if w { lfd as i64 } else { lfd as i32 as i64 }) as u64,
-                O::Odtoui => (if w { lfd as u64 } else { lfd as u32 as u64 }),
+                O::Odtoui => {
+                    if w {
+                        lfd as u64
+                    } else {
+                        lfd as u32 as u64
+                    }
+                }
                 O::Ocast => {
                     lu64
                     // TODO

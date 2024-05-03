@@ -6,7 +6,7 @@ use std::io::stdout;
 use crate::all::Ref::{RTmp, R};
 use crate::all::K::{Kw, Kx};
 use crate::all::{
-    bshas, isext, isload, isparbh, to_s, BSet, BlkIdx, Blks, Fn, InsIdx, Phi, PhiIdx, Ref, RpoIdx,
+    bshas, isext, isload, isparbh, to_s, BSet, Blk, BlkIdx, Fn, InsIdx, Phi, PhiIdx, Ref, RpoIdx,
     RubeResult, Target, Tmp, TmpIdx, TmpWdth, Typ, Use, UseT, K, O, TMP0, UNDEF,
 };
 use crate::cfg::{dom, filldom, fillfron, sdom};
@@ -293,7 +293,7 @@ fn rendef(
 }
 
 fn getstk(
-    blks: &Blks,
+    blks: &[Blk],
     bi: BlkIdx,
     ti: TmpIdx,
     namel: &mut NameIdx,
@@ -316,7 +316,7 @@ fn getstk(
 }
 
 fn renblk(
-    blks: &Blks,
+    blks: &[Blk],
     phis: &mut Vec<Phi>,
     tmps: &mut Vec<Tmp>,
     bi: BlkIdx,
@@ -440,7 +440,7 @@ pub fn ssa(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) -> RubeResul
     Ok(())
 }
 
-fn phicheck(blks: &Blks, p: &Phi, bi: BlkIdx, t: Ref) -> bool {
+fn phicheck(blks: &[Blk], p: &Phi, bi: BlkIdx, t: Ref) -> bool {
     for n in 0..p.args.len() {
         if p.args[n] == t {
             let bi1 = p.blks[n];
