@@ -13,8 +13,8 @@ use crate::all::Ref::{RCall, RCon, RInt, RMem, RSlot, RTmp, RTyp, R};
 use crate::all::K::{Kc, Kd, Ke, Kl, Ks, Ksb, Ksh, Kub, Kuh, Kw, Kx, K0};
 use crate::all::{
     bshas, cls_for_ret, for_each_blk_mut, isret, ret_for_cls, to_s, BSet, Blk, BlkIdx, Con, ConIdx,
-    ConPP, Dat, DatT, DatU, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx, RubeResult, Sym, SymT,
-    Target, Tmp, TmpIdx, Typ, TypFld, TypFldT, TypIdx, J, K, NPUBOP, O, TMP0,
+    ConPP, Dat, DatT, DatU, Field, FieldT, Fn, Ins, Lnk, Mem, Op, Phi, PhiIdx, Ref, RpoIdx,
+    RubeResult, Sym, SymT, Target, Tmp, TmpIdx, Typ, TypIdx, J, K, NPUBOP, O, TMP0,
 };
 use crate::cfg::fillpreds;
 use crate::optab::OPTAB;
@@ -1537,7 +1537,15 @@ impl Parser<'_> {
     }
 
     // TODO - this should just return a Vec<TypField>
-    fn parsefields(&mut self, ty: &mut Typ, tparam: Token, tvparam: TokVal) -> RubeResult<()> {
+    fn parsefields(
+        &mut self,
+        ty: &mut Typ,
+        n: usize,
+        tparam: Token,
+        tvparam: TokVal,
+    ) -> RubeResult<()> {
+        ty.fields.push(vec![]);
+
         let mut t: Token = tparam;
         let mut tv: TokVal = tvparam;
         let mut sz: u64 = 0;
@@ -1546,17 +1554,17 @@ impl Parser<'_> {
             let mut ftyp_idx: TypIdx = TypIdx::NONE;
 
             let (type_, mut s, mut a) = match t {
-                Token::Td => (TypFldT::Fd, 8u64, 3i32),
-                Token::Tl => (TypFldT::Fl, 8u64, 3i32),
-                Token::Ts => (TypFldT::Fs, 4u64, 2i32),
-                Token::Tw => (TypFldT::Fw, 4u64, 2i32),
-                Token::Th => (TypFldT::Fh, 2u64, 1i32),
-                Token::Tb => (TypFldT::Fb, 1u64, 0i32),
+                Token::Td => (FieldT::Fd, 8u64, 3i32),
+                Token::Tl => (FieldT::Fl, 8u64, 3i32),
+                Token::Ts => (FieldT::Fs, 4u64, 2i32),
+                Token::Tw => (FieldT::Fw, 4u64, 2i32),
+                Token::Th => (FieldT::Fh, 2u64, 1i32),
+                Token::Tb => (FieldT::Fb, 1u64, 0i32),
                 Token::Ttyp => {
                     let idx: TypIdx = self.findtyp(&tv.as_str())?;
                     // TODO - neaten up...
                     ftyp_idx = idx;
-                    (TypFldT::FTyp, self.typ[idx].size, self.typ[idx].align)
+                    (FieldT::FTyp, self.typ[idx].size, self.typ[idx].align)
                 }
                 _ => return Err(self.err("invalid type member specifier")),
             };
@@ -1566,7 +1574,7 @@ impl Parser<'_> {
             a = (1 << a) - 1;
             a = (((sz as i32) + a) & !a) - (sz as i32); // TODO - this is fugly casting
             if a != 0 {
-                ty.fields.push(TypFld::new(TypFldT::FPad, a as u32));
+                ty.fields[n].push(Field::new(FieldT::FPad, a as u32));
             }
             (t, tv) = self.nextnl()?;
             let mut c: i32 = 1;
@@ -1575,11 +1583,11 @@ impl Parser<'_> {
                 t = self.nextnl_tok()?;
             }
             sz += (a as u64) + (c as u64) * s;
-            if type_ == TypFldT::FTyp {
+            if type_ == FieldT::FTyp {
                 s = ftyp_idx.usize() as u64;
             }
             while c > 0 {
-                ty.fields.push(TypFld::new(type_, s as u32)); // ugh
+                ty.fields[n].push(Field::new(type_, s as u32)); // ugh
 
                 c -= 1;
             }
@@ -1650,7 +1658,7 @@ impl Parser<'_> {
             self.typ.push(ty);
             return Ok(());
         }
-        let mut n: u32 = 0;
+        let mut n: usize = 0;
         if t == Token::Tlbrace {
             ty.isunion = true;
             loop {
@@ -1658,7 +1666,7 @@ impl Parser<'_> {
                     return Err(self.err("invalid union member"));
                 }
                 (t, tv) = self.nextnl()?;
-                self.parsefields(&mut ty, t, tv)?;
+                self.parsefields(&mut ty, n, t, tv)?;
                 n += 1;
                 t = self.nextnl_tok()?;
                 if t == Token::Trbrace {
@@ -1666,10 +1674,10 @@ impl Parser<'_> {
                 }
             }
         } else {
-            self.parsefields(&mut ty, t, tv)?;
+            self.parsefields(&mut ty, n, t, tv)?;
             n += 1;
         }
-        ty.nunion = n;
+        ty.nunion = n as u32;
         self.typ.push(ty);
         Ok(())
     }

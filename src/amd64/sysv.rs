@@ -1,99 +1,112 @@
-use crate::amd64::all::{Amd64Reg, NFPS, NGPS};
+use crate::{
+    all::{
+        for_each_blk_mut, ispar, Blk, BlkIdx, Field, FieldT, Fn, Ins, InsIdx,
+        Ref::{self, R},
+        Typ, TypIdx,
+        K::{self, Kx},
+    },
+    amd64::all::{Amd64Reg, NFPS, NGPS},
+};
 
 /*
 #include "all.h"
 
 typedef struct AClass AClass;
 typedef struct RAlloc RAlloc;
-
+ */
+#[derive(Clone, Copy, Debug, Default)]
 struct AClass {
-    Typ *type;
-    int inmem;
-    int align;
-    uint size;
-    int cls[2];
-    Ref ref[2];
-};
+    typ: TypIdx,
+    inmem: bool,
+    align: i32,
+    size: u32,
+    cls: [K; 2],
+    refs: [Ref; 2],
+}
 
+/*
 struct RAlloc {
     Ins i;
     RAlloc *link;
 };
+ */
 
-static void
-classify(AClass *a, Typ *t, uint s)
-{
-    Field *f;
-    int *cls;
-    uint n, s1;
+fn classify(a: &mut AClass, typs: &[Typ], t: &Typ, mut s: u32) {
+    // Field *f;
+    // int *cls;
+    // uint n, s1;
 
-    for (n=0, s1=s; n<t->nunion; n++, s=s1)
-        for (f=t->fields[n]; f->type!=FEnd; f++) {
-            assert(s <= 16);
-            cls = &a->cls[s/8];
-            switch (f->type) {
-            case FEnd:
-                die("unreachable");
-            case FPad:
-                /* don't change anything */
-                s += f->len;
-                break;
-            case Fs:
-            case Fd:
-                if (*cls == Kx)
-                    *cls = Kd;
-                s += f->len;
-                break;
-            case Fb:
-            case Fh:
-            case Fw:
-            case Fl:
-                *cls = Kl;
-                s += f->len;
-                break;
-            case FTyp:
-                classify(a, &typ[f->len], s);
-                s += typ[f->len].size;
-                break;
-            }
+    let mut s1: u32 = s;
+    for n in 0..t.nunion as usize {
+        let mut f: &Field = &t.fields[n];
+        while f.typ != FieldT::FEnd {
+            //for (f=t.fields[n]; f.typ!=FEnd; f++) { f++ ???
+            //         assert(s <= 16);
+            //         cls = &a.cls[s/8];
+            //         switch (f.typ) {
+            //         case FEnd:
+            //             die("unreachable");
+            //         case FPad:
+            //             /* don't change anything */
+            //             s += f.len;
+            //             break;
+            //         case Fs:
+            //         case Fd:
+            //             if (*cls == Kx)
+            //                 *cls = Kd;
+            //             s += f.len;
+            //             break;
+            //         case Fb:
+            //         case Fh:
+            //         case Fw:
+            //         case Fl:
+            //             *cls = Kl;
+            //             s += f.len;
+            //             break;
+            //         case FTyp:
+            //             classify(a, &typ[f.len], s);
+            //             s += typ[f.len].size;
+            //             break;
+            //         }
         }
+        s = s1;
+    }
 }
 
-static void
-typclass(AClass *a, Typ *t)
-{
-    uint sz, al;
+fn typclass(a: &mut AClass, typs: &[Typ], ti: TypIdx) {
+    let t: &Typ = &typs[ti];
 
-    sz = t->size;
-    al = 1u << t->align;
+    let mut sz: u32 = t.size as u32; // Hrmmm
+    let mut al: u32 = 1 << (t.align as u32);
 
     /* the ABI requires sizes to be rounded
      * up to the nearest multiple of 8, moreover
      * it makes it easy load and store structures
      * in registers
      */
-    if (al < 8)
+    if al < 8 {
         al = 8;
-    sz = (sz + al-1) & -al;
+    }
+    sz = (sz + al - 1) & ((-(al as i32)) as u32);
 
-    a->type = t;
-    a->size = sz;
-    a->align = t->align;
+    a.typ = ti;
+    a.size = sz;
+    a.align = t.align;
 
-    if (t->isdark || sz > 16 || sz == 0) {
+    if t.isdark || sz > 16 || sz == 0 {
         /* large or unaligned structures are
          * required to be passed in memory
          */
-        a->inmem = 1;
+        a.inmem = true;
         return;
     }
 
-    a->cls[0] = Kx;
-    a->cls[1] = Kx;
-    a->inmem = 0;
-    classify(a, t, 0);
+    a.cls[0] = Kx;
+    a.cls[1] = Kx;
+    a.inmem = false;
+    // classify(a, t, 0);
 }
-
+/*
 static int
 retr(Ref reg[2], AClass *aret)
 {
@@ -454,83 +467,83 @@ selcall(Fn *fn, Ins *i0, Ins *i1, RAlloc **rap)
     }
     emit(Osalloc, Kl, r, getcon(stk, fn), R);
 }
+ */
 
-static int
-selpar(Fn *fn, Ins *i0, Ins *i1)
-{
-    AClass *ac, *a, aret;
-    Ins *i;
-    int ni, ns, s, al, fa;
-    Ref r, env;
+fn selpar(f: &mut Fn, typ: &[Typ], insb: &mut Vec<Ins>, bi: BlkIdx, i1: InsIdx) -> i32 {
+    // AClass *ac, *a, aret;
+    // Ins *i;
+    // int ni, ns, s, al, fa;
+    // Ref r, env;
 
-    env = R;
-    ac = alloc((i1-i0) * sizeof ac[0]);
-    curi = &insb[NIns];
-    ni = ns = 0;
+    let mut env: Ref = R;
+    let mut ac: Vec<AClass> = vec![AClass::default(); i1.usize()];
+    let mut ni: usize = 0;
+    let mut ns: usize = 0;
 
-    if (fn->retty >= 0) {
-        typclass(&aret, &typ[fn->retty]);
-        fa = argsclass(i0, i1, ac, Opar, &aret, &env);
-    } else
-        fa = argsclass(i0, i1, ac, Opar, 0, &env);
-    fn->reg = amd64_sysv_argregs(CALL(fa), 0);
+    // if (f.retty >= 0) {
+    //     typclass(&aret, &typ[f.retty]);
+    //     fa = argsclass(i0, i1, ac, Opar, &aret, &env);
+    // } else
+    //     fa = argsclass(i0, i1, ac, Opar, 0, &env);
+    // f.reg = amd64_sysv_argregs(CALL(fa), 0);
 
-    for (i=i0, a=ac; i<i1; i++, a++) {
-        if (i->op != Oparc || a->inmem)
-            continue;
-        if (a->size > 8) {
-            r = newtmp("abi", Kl, fn);
-            a->ref[1] = newtmp("abi", Kl, fn);
-            emit(Ostorel, 0, R, a->ref[1], r);
-            emit(Oadd, Kl, r, i->to, getcon(8, fn));
-        }
-        a->ref[0] = newtmp("abi", Kl, fn);
-        emit(Ostorel, 0, R, a->ref[0], i->to);
-        /* specific to NAlign == 3 */
-        al = a->align >= 2 ? a->align - 2 : 0;
-        emit(Oalloc+al, Kl, i->to, getcon(a->size, fn), R);
-    }
+    // for (i=i0, a=ac; i<i1; i++, a++) {
+    //     if (i.op != Oparc || a.inmem)
+    //         continue;
+    //     if (a.size > 8) {
+    //         r = newtmp("abi", Kl, f);
+    //         a.ref[1] = newtmp("abi", Kl, f);
+    //         emit(Ostorel, 0, R, a.ref[1], r);
+    //         emit(Oadd, Kl, r, i.to, getcon(8, f));
+    //     }
+    //     a.ref[0] = newtmp("abi", Kl, f);
+    //     emit(Ostorel, 0, R, a.ref[0], i.to);
+    //     /* specific to NAlign == 3 */
+    //     al = a.align >= 2 ? a.align - 2 : 0;
+    //     emit(Oalloc+al, Kl, i.to, getcon(a.size, f), R);
+    // }
 
-    if (fn->retty >= 0 && aret.inmem) {
-        r = newtmp("abi", Kl, fn);
-        emit(Ocopy, Kl, r, rarg(Kl, &ni, &ns), R);
-        fn->retr = r;
-    }
+    // if (f.retty >= 0 && aret.inmem) {
+    //     r = newtmp("abi", Kl, f);
+    //     emit(Ocopy, Kl, r, rarg(Kl, &ni, &ns), R);
+    //     f.retr = r;
+    // }
 
-    for (i=i0, a=ac, s=4; i<i1; i++, a++) {
-        switch (a->inmem) {
-        case 1:
-            if (a->align > 4)
-                err("sysv abi requires alignments of 16 or less");
-            if (a->align == 4)
-                s = (s+3) & -4;
-            fn->tmp[i->to.val].slot = -s;
-            s += a->size / 4;
-            continue;
-        case 2:
-            emit(Oload, i->cls, i->to, SLOT(-s), R);
-            s += 2;
-            continue;
-        }
-        if (i->op == Opare)
-            continue;
-        r = rarg(a->cls[0], &ni, &ns);
-        if (i->op == Oparc) {
-            emit(Ocopy, a->cls[0], a->ref[0], r, R);
-            if (a->size > 8) {
-                r = rarg(a->cls[1], &ni, &ns);
-                emit(Ocopy, a->cls[1], a->ref[1], r, R);
-            }
-        } else
-            emit(Ocopy, i->cls, i->to, r, R);
-    }
+    // for (i=i0, a=ac, s=4; i<i1; i++, a++) {
+    //     switch (a.inmem) {
+    //     case 1:
+    //         if (a.align > 4)
+    //             err("sysv abi requires alignments of 16 or less");
+    //         if (a.align == 4)
+    //             s = (s+3) & -4;
+    //         f.tmp[i.to.val].slot = -s;
+    //         s += a.size / 4;
+    //         continue;
+    //     case 2:
+    //         emit(Oload, i.cls, i.to, SLOT(-s), R);
+    //         s += 2;
+    //         continue;
+    //     }
+    //     if (i.op == Opare)
+    //         continue;
+    //     r = rarg(a.cls[0], &ni, &ns);
+    //     if (i.op == Oparc) {
+    //         emit(Ocopy, a.cls[0], a.ref[0], r, R);
+    //         if (a.size > 8) {
+    //             r = rarg(a.cls[1], &ni, &ns);
+    //             emit(Ocopy, a.cls[1], a.ref[1], r, R);
+    //         }
+    //     } else
+    //         emit(Ocopy, i.cls, i.to, r, R);
+    // }
 
-    if (!req(R, env))
-        emit(Ocopy, Kl, env, TMP(RAX), R);
+    // if (!req(R, env))
+    //     emit(Ocopy, Kl, env, TMP(RAX), R);
 
-    return fa | (s*4)<<12;
+    // return fa | (s*4)<<12;
+    0
 }
-
+/*
 static Blk *
 split(Fn *fn, Blk *b)
 {
@@ -682,72 +695,81 @@ selvastart(Fn *fn, int fa, Ref ap)
     emit(Oadd, Kl, r0, ap, getcon(4, fn));
     emit(Ostorew, Kw, R, getcon(gp, fn), ap);
 }
+ */
 
-void
-amd64_sysv_abi(Fn *fn)
-{
-    Blk *b;
-    Ins *i, *i0, *ip;
-    RAlloc *ral;
-    int n, fa;
+fn amd64_sysv_abi(f: &mut Fn) {
+    // Blk *b;
+    // Ins *i, *i0, *ip;
+    // RAlloc *ral;
+    // int n, fa;
 
-    for (b=fn->start; b; b=b->link)
-        b->visit = 0;
+    let blks: &mut [Blk] = &mut f.blks;
+
+    for_each_blk_mut(blks, |b| b.ivisit = 0); // what is this???
+                                              // for (b=f->start; b; b=b->link)
+                                              //     b->visit = 0;
+
+    let fa: i32; // what is this?
 
     /* lower parameters */
-    for (b=fn->start, i=b->ins; i<&b->ins[b->nins]; i++)
-        if (!ispar(i->op))
-            break;
-    fa = selpar(fn, b->ins, i);
-    n = b->nins - (i - b->ins) + (&insb[NIns] - curi);
-    i0 = alloc(n * sizeof(Ins));
-    ip = icpy(ip = i0, curi, &insb[NIns] - curi);
-    ip = icpy(ip, i, &b->ins[b->nins] - i);
-    b->nins = n;
-    b->ins = i0;
-
-    /* lower calls, returns, and vararg instructions */
-    ral = 0;
-    b = fn->start;
-    do {
-        if (!(b = b->link))
-            b = fn->start; /* do it last */
-        if (b->visit)
-            continue;
-        curi = &insb[NIns];
-        selret(b, fn);
-        for (i=&b->ins[b->nins]; i!=b->ins;)
-            switch ((--i)->op) {
-            default:
-                emiti(*i);
-                break;
-            case Ocall:
-                for (i0=i; i0>b->ins; i0--)
-                    if (!isarg((i0-1)->op))
-                        break;
-                selcall(fn, i0, i, &ral);
-                i = i0;
-                break;
-            case Ovastart:
-                selvastart(fn, fa, i->arg[0]);
-                break;
-            case Ovaarg:
-                selvaarg(fn, b, i);
-                break;
-            case Oarg:
-            case Oargc:
-                die("unreachable");
-            }
-        if (b == fn->start)
-            for (; ral; ral=ral->link)
-                emiti(ral->i);
-        b->nins = &insb[NIns] - curi;
-        idup(&b->ins, curi, b->nins);
-    } while (b != fn->start);
-
-    if (debug['A']) {
-        fprintf(stderr, "\n> After ABI lowering:\n");
-        printfn(fn, stderr);
+    {
+        assert!(f.start == BlkIdx::START);
+        let mut bi: BlkIdx = BlkIdx::START;
+        let b: &mut Blk = &mut blks[bi];
+        let mut ii: InsIdx = InsIdx::from(0);
+        while ii.usize() < b.ins.len() && ispar(b.ins[ii].op) {
+            ii = ii.next();
+        }
+        // fa = selpar(f, b->ins, i);
+        // n = b->nins - (i - b->ins) + (&insb[NIns] - curi);
+        // i0 = alloc(n * sizeof(Ins));
+        // ip = icpy(ip = i0, curi, &insb[NIns] - curi);
+        // ip = icpy(ip, i, &b->ins[b->nins] - i);
+        // b->nins = n;
+        // b->ins = i0;
     }
+
+    // /* lower calls, returns, and vararg instructions */
+    // ral = 0;
+    // b = f->start;
+    // do {
+    //     if (!(b = b->link))
+    //         b = f->start; /* do it last */
+    //     if (b->visit)
+    //         continue;
+    //     curi = &insb[NIns];
+    //     selret(b, f);
+    //     for (i=&b->ins[b->nins]; i!=b->ins;)
+    //         switch ((--i)->op) {
+    //         default:
+    //             emiti(*i);
+    //             break;
+    //         case Ocall:
+    //             for (i0=i; i0>b->ins; i0--)
+    //                 if (!isarg((i0-1)->op))
+    //                     break;
+    //             selcall(f, i0, i, &ral);
+    //             i = i0;
+    //             break;
+    //         case Ovastart:
+    //             selvastart(f, fa, i->arg[0]);
+    //             break;
+    //         case Ovaarg:
+    //             selvaarg(f, b, i);
+    //             break;
+    //         case Oarg:
+    //         case Oargc:
+    //             die("unreachable");
+    //         }
+    //     if (b == f->start)
+    //         for (; ral; ral=ral->link)
+    //             emiti(ral->i);
+    //     b->nins = &insb[NIns] - curi;
+    //     idup(&b->ins, curi, b->nins);
+    // } while (b != f->start);
+
+    // if (debug['A']) {
+    //     fprintf(stderr, "\n> After ABI lowering:\n");
+    //     printfn(f, stderr);
+    // }
 }
- */

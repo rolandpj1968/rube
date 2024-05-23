@@ -2,7 +2,9 @@ use std::io::Write;
 
 use crate::all::Ref::{RCon, RTmp};
 use crate::all::K::{Kl, Kw, Kx};
-use crate::all::{bit, to_s, BSet, Bits, Con, ConIdx, ConPP, Fn, Ref, Tmp, TmpIdx, K, NBIT, TMP0};
+use crate::all::{
+    bit, to_s, BSet, Bits, Con, ConIdx, ConPP, Fn, Ins, Ref, Tmp, TmpIdx, K, NBIT, TMP0,
+};
 use crate::parse::Parser; // ugh for intern()
 
 /*
@@ -330,13 +332,14 @@ emit(int op, int k, Ref to, Ref arg0, Ref arg1)
         .to = to, .arg = {arg0, arg1}
     };
 }
+ */
 
-void
-emiti(Ins i)
-{
-    emit(i.op, i.cls, i.to, i.arg[0], i.arg[1]);
+// Note - emit'ing forwards in R
+pub fn emiti(insb: &mut Vec<Ins>, i: Ins) {
+    insb.push(i);
 }
 
+/*
 void
 idup(Ins **pd, Ins *s, ulong n)
 {

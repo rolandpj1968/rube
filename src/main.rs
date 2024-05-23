@@ -60,7 +60,7 @@ fn dump_data(dat: &Dat, _typ: &[Typ]) {
 fn dump_func(f: &mut Fn, targ: &Target, typ: &[Typ], itbl: &[Bucket]) {
     println!("Got fn \"{}\":", String::from_utf8_lossy(&f.name));
     println!();
-    (targ.abi0)(f);
+    (targ.abi0)(f); // Up to abi1 this does not make any difference
     fillrpo(f);
     filluse(f);
     promote(f, typ, itbl).unwrap();

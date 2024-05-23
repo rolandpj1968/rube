@@ -121,6 +121,12 @@ pub enum Ref {
     RMem(MemIdx),
 }
 
+impl Default for Ref {
+    fn default() -> Self {
+        R
+    }
+}
+
 pub const UNDEF: Ref = RCon(ConIdx::UNDEF); /* represents uninitialized data */
 pub const CON_Z: Ref = RCon(ConIdx::CON_Z); /* represents uninitialized data */
 
@@ -502,6 +508,12 @@ pub enum K {
     K0,
 
     Ke = -2, /* erroneous mode */
+}
+
+impl Default for K {
+    fn default() -> Self {
+        Kx
+    }
 }
 
 pub fn kwide(k: K) -> i32 {
@@ -961,7 +973,7 @@ pub struct Fn {
     pub retty: TypIdx, // index in Parser::typ, TypIdx::INVALID if no aggregate return
     pub retr: Ref,
     pub rpo: Vec<BlkIdx>,
-    //pub bits reg,
+    pub reg: Bits,
     pub slot: i32, // ???
     pub vararg: bool,
     pub dynalloc: bool,
@@ -982,7 +994,7 @@ impl Fn {
             retty: TypIdx::NONE,
             retr: R,
             rpo: vec![],
-            //bits reg,
+            reg: 0,
             slot: -1, // ???
             vararg: false,
             dynalloc: false,
@@ -1037,7 +1049,7 @@ pub fn for_each_blk(blks: &[Blk], mut f: impl FnMut(&Blk)) {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
-pub enum TypFldT {
+pub enum FieldT {
     FEnd,
     Fb,
     Fh,
@@ -1050,8 +1062,8 @@ pub enum TypFldT {
 }
 
 #[derive(Debug, new)]
-pub struct TypFld {
-    pub typ: TypFldT,
+pub struct Field {
+    pub typ: FieldT,
     pub len: u32, // or index in typ[] for FTyp
 }
 
@@ -1063,7 +1075,7 @@ pub struct Typ {
     pub align: i32,
     pub size: u64,
     pub nunion: u32,
-    pub fields: Vec<TypFld>,
+    pub fields: Vec<Vec<Field>>,
 }
 
 impl Typ {
